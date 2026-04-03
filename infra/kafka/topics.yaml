@@ -1,0 +1,104 @@
+# Kafka Topic Definitions for Cilex Vision Multi-Camera Video Analytics Platform
+#
+# Managed by: P0-D03
+# Used by:    infra/kafka/create-topics.py
+#
+# CRITICAL: No image/video bytes on Kafka — only URI references.
+# See docs/kafka-contract.md for producer/consumer contracts and ordering guarantees.
+
+defaults:
+  replication_factor: 3
+  min_insync_replicas: 2
+
+topics:
+  - name: frames.sampled.refs
+    partitions: 12
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 7200000        # 2 hours
+    key_schema: string(camera_id)
+    value_schema: vidanalytics.v1.frame.FrameRef
+    description: >
+      Sampled frame references emitted by the frame-sampling service. Each
+      message contains a FrameRef protobuf with a URI pointing to the frame in
+      object storage — never raw image bytes. Keyed by camera_id so all frames
+      from a single camera are ordered within the same partition.
+
+  - name: tracklets.local
+    partitions: 12
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 21600000       # 6 hours
+    key_schema: string(camera_id)
+    value_schema: vidanalytics.v1.tracklet.Tracklet
+    description: >
+      Single-camera tracklets produced by the tracking service. Each message
+      is a Tracklet protobuf containing trajectory points and the current
+      track state. Keyed by camera_id to preserve per-camera track ordering
+      (state transitions must be consumed in order).
+
+  - name: attributes.jobs
+    partitions: 6
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 7200000        # 2 hours
+    key_schema: string(local_track_id)
+    value_schema: vidanalytics.v1.attribute.Attribute
+    description: >
+      Attribute extraction results produced by the attribute inference service.
+      Each message is an Attribute protobuf (color, type, confidence). Keyed by
+      local_track_id to group all attribute results for a given track together,
+      enabling consumers to build a complete attribute profile per track.
+
+  - name: mtmc.active_embeddings
+    partitions: 12
+    replication_factor: 3
+    cleanup_policy: compact
+    retention_ms: -1             # infinite (compacted topic)
+    key_schema: string(local_track_id)
+    value_schema: vidanalytics.v1.embedding.Embedding
+    description: >
+      Re-identification embeddings for active tracks, used by the cross-camera
+      matching (MTMC) service. Compacted topic — the latest embedding per
+      local_track_id is retained indefinitely. Consumers materialise a gallery
+      of active embeddings. Tombstone (null value) published when a track
+      terminates, allowing the compactor to remove stale entries.
+
+  - name: events.raw
+    partitions: 6
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 604800000      # 7 days
+    key_schema: string(event_id)
+    value_schema: vidanalytics.v1.event.Event
+    description: >
+      Raw events emitted by the event detection service. Each message is an
+      Event protobuf with a clip_uri (never raw video bytes). Keyed by event_id
+      to ensure all state updates for a single event land on the same partition,
+      preserving lifecycle ordering (NEW -> ACTIVE -> CLOSED).
+
+  - name: archive.transcode.requested
+    partitions: 4
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 86400000       # 24 hours
+    key_schema: string(camera_id)
+    value_schema: vidanalytics.v1.frame.FrameRef
+    description: >
+      Transcode job requests emitted when a clip segment needs to be archived.
+      The message contains a FrameRef pointing to the source segment URI.
+      Keyed by camera_id to avoid concurrent transcodes for the same camera
+      overwhelming a single worker.
+
+  - name: archive.transcode.completed
+    partitions: 4
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 86400000       # 24 hours
+    key_schema: string(camera_id)
+    value_schema: vidanalytics.v1.frame.FrameRef
+    description: >
+      Transcode completion acknowledgements. The message contains a FrameRef
+      with the URI of the transcoded output segment. Keyed by camera_id to
+      match the request topic partitioning and allow consumers to correlate
+      requests with completions per camera.
