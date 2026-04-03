@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package vidanalytics.v1.event;
+
+option java_multiple_files = true;
+option java_package = "com.cilexvision.vidanalytics.v1.event";
+
+import "google/protobuf/timestamp.proto";
+import "vidanalytics/v1/common/common.proto";
+
+// EventType enumerates the stateful occurrences derived from track histories.
+// Semantics and trigger/close conditions are defined in docs/taxonomy.md §3.2.
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  // A tracked object entered the camera region of interest.
+  EVENT_TYPE_ENTERED_SCENE = 1;
+  // A tracked object exited the camera region of interest.
+  EVENT_TYPE_EXITED_SCENE = 2;
+  // A vehicle class object became stationary for ≥ 3 s.
+  EVENT_TYPE_STOPPED = 3;
+  // A person remained in a configured loitering zone for ≥ 30 s.
+  EVENT_TYPE_LOITERING = 4;
+  // Frame-level motion was detected after ≥ 500 ms of stillness.
+  EVENT_TYPE_MOTION_STARTED = 5;
+  // Frame-level motion ceased for ≥ 2 s.
+  EVENT_TYPE_MOTION_ENDED = 6;
+}
+
+// EventState encodes the lifecycle of an event record.
+// Valid transitions are defined in docs/taxonomy.md §5.
+enum EventState {
+  EVENT_STATE_UNSPECIFIED = 0;
+  // Trigger condition met; record not yet persisted or published.
+  EVENT_STATE_NEW = 1;
+  // Event is ongoing; end_time and duration_ms are not yet set.
+  EVENT_STATE_ACTIVE = 2;
+  // Sub-state of ACTIVE: the tracked vehicle has become stationary.
+  EVENT_STATE_STOPPED_SUBSTATE = 3;
+  // Track has left the scene; close condition met but record not yet finalised.
+  EVENT_STATE_EXITED = 4;
+  // Terminal state: end_time, duration_ms, and clip_uri are all populated.
+  EVENT_STATE_CLOSED = 5;
+}
+
+// Event represents a stateful occurrence derived from one or more object tracks.
+// Each event is associated with exactly one camera_id.
+//
+// Point-in-time events (ENTERED_SCENE, EXITED_SCENE, MOTION_STARTED, MOTION_ENDED)
+// have end_time == start_time and duration_ms == 0 immediately upon emission.
+//
+// Camera-level events (MOTION_STARTED, MOTION_ENDED) have track_id empty.
+//
+// clip_uri MUST be a URI reference to an object store segment — raw bytes are
+// never included in this message.
+message Event {
+  // Globally unique event identifier. Format: UUID v4.
+  string event_id = 1;
+
+  // The type of event.
+  EventType event_type = 2;
+
+  // Primary track that triggered this event. Empty for camera-level events
+  // (MOTION_STARTED, MOTION_ENDED).
+  string track_id = 3;
+
+  // Identifier of the camera where this event originated.
+  string camera_id = 4;
+
+  // Wall-clock time when the trigger condition was first met.
+  google.protobuf.Timestamp start_time = 5;
+
+  // Wall-clock time when the close condition was met.
+  // Unset (default) while the event is still active.
+  google.protobuf.Timestamp end_time = 6;
+
+  // Duration in milliseconds: end_time − start_time.
+  // 0 for point-in-time events; unset (0) while still active.
+  int64 duration_ms = 7;
+
+  // Object store URI for the associated video clip segment.
+  // MUST NOT contain raw video bytes.
+  string clip_uri = 8;
+
+  // Current lifecycle state of this event record.
+  EventState state = 9;
+
+  // All track IDs associated with this event (includes track_id plus any
+  // secondary tracks involved, e.g. for future group-event support).
+  repeated string track_ids = 10;
+
+  // Three mandatory pipeline timestamps.
+  vidanalytics.v1.common.VideoTimestamp timestamps = 11;
+}

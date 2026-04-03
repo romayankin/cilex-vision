@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package vidanalytics.v1.tracklet;
+
+option java_multiple_files = true;
+option java_package = "com.cilexvision.vidanalytics.v1.tracklet";
+
+import "google/protobuf/timestamp.proto";
+import "vidanalytics/v1/common/common.proto";
+import "vidanalytics/v1/detection/detection.proto";
+
+// TrackletState represents the lifecycle state of a tracked object.
+// Valid transitions are defined in docs/taxonomy.md §5.
+enum TrackletState {
+  TRACKLET_STATE_UNSPECIFIED = 0;
+  // Track has been initialised but not yet associated with a second detection.
+  TRACKLET_STATE_NEW = 1;
+  // Track is actively associated with incoming detections.
+  TRACKLET_STATE_ACTIVE = 2;
+  // Track association was lost; within the 5-second re-association window.
+  TRACKLET_STATE_LOST = 3;
+  // Track permanently closed; no further updates will be emitted.
+  TRACKLET_STATE_TERMINATED = 4;
+}
+
+// TrajectoryPoint captures the centroid position of the tracked object at a
+// single frame, linked back to the originating Detection.
+message TrajectoryPoint {
+  // Corresponds to Detection.detection_id for this trajectory sample.
+  string detection_id = 1;
+
+  // Normalised centroid X position [0.0, 1.0] in the source frame.
+  float centroid_x = 2;
+
+  // Normalised centroid Y position [0.0, 1.0] in the source frame.
+  float centroid_y = 3;
+
+  // Source-capture timestamp of the frame this point was derived from.
+  google.protobuf.Timestamp frame_ts = 4;
+}
+
+// Tracklet represents a multi-frame object track produced by the tracker service.
+// A tracklet accumulates TrajectoryPoints over its lifetime. When the track
+// terminates the final Tracklet message with state TRACKLET_STATE_TERMINATED
+// is the authoritative record.
+message Tracklet {
+  // Globally unique track identifier. Format: UUID v4.
+  string track_id = 1;
+
+  // Identifier of the originating camera.
+  string camera_id = 2;
+
+  // Object class assigned to this track (majority-vote over detections).
+  vidanalytics.v1.detection.ObjectClass object_class = 3;
+
+  // Current lifecycle state of the track.
+  TrackletState state = 4;
+
+  // Ordered sequence of centroid positions over the track lifetime.
+  repeated TrajectoryPoint trajectory = 5;
+
+  // Mean detection confidence across all trajectory points.
+  float mean_confidence = 6;
+
+  // Three mandatory pipeline timestamps (reflect the most recent update).
+  vidanalytics.v1.common.VideoTimestamp timestamps = 7;
+
+  // Tracker algorithm identifier (e.g. "bytetrack-1.0").
+  string tracker_version = 8;
+}

@@ -1,325 +1,306 @@
-# Task Manifest — Multi-Camera Video Analytics Platform
-#
-# OWNERSHIP: Updated by human orchestrator only.
-# READ BY: agents (for context), launch.sh (dependency checks), status.sh (dashboard).
-#
-# BRANCH MODEL:
-# - Every task gets its own branch: feat/{task-id} (e.g., feat/P1-V01)
-# - All branches are created from latest `main` by launch.sh
-# - Agents commit to their branch only
-# - Human merges to `main` after review passes
-# - All agents work in THIS SAME REPOSITORY: https://github.com/romayankin/multicam-video-analytics
-#
-# STATUS VALUES:
-# - pending:     not started, may or may not have dependencies met
-# - in_progress: agent is actively working on feat/{task-id} branch
-# - in_review:   agent finished, human is reviewing via review.sh + checklist
-# - done:        merged to main, other tasks can now depend on it
-#
-# WORKFLOW:
-# 1. Run .agents/status.sh to see what's ready
-# 2. Run .agents/launch.sh {task-id} to start an agent
-# 3. Agent works on feat/{task-id} branch
-# 4. Run .agents/review.sh {task-id} when agent says done
-# 5. Human reviews with .agents/review-checklists/{role}-review.md
-# 6. Merge to main, update status to done, push
-
-
 phases:
   phase-0:
     name: Foundation
-    weeks: "1-6"
+    weeks: 1-6
     tasks:
-      - id: P0-D01
-        role: design
-        title: Taxonomy & Requirements Specification
-        depends_on: []
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-D01.md
-        tool: claude-code
-
-      - id: P0-D02
-        role: design
-        title: Protobuf Schema Package & Registry Policy
-        depends_on: [P0-D01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-D02.md
-        tool: claude-code
-
-      - id: P0-D03
-        role: design
-        title: Kafka Topic Contract & Partitioning Plan
-        depends_on: [P0-D02]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-D03.md
-        tool: claude-code
-
-      - id: P0-D04
-        role: design
-        title: Database Schema (TimescaleDB + PostgreSQL)
-        depends_on: [P0-D01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-D04.md
-        tool: claude-code
-
-      - id: P0-D05
-        role: design
-        title: Camera Topology Graph Data Model
-        depends_on: [P0-D04]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-D05.md
-        tool: claude-code
-
-      - id: P0-D06
-        role: design
-        title: Ingress Bridge Design Specification
-        depends_on: [P0-D02]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-D06.md
-        tool: claude-code
-
-      - id: P0-D07
-        role: design
-        title: Time Synchronization & Timestamp Policy
-        depends_on: []
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-D07.md
-        tool: codex-cli
-
-      - id: P0-D08
-        role: design
-        title: Security Design - mTLS & ACLs
-        depends_on: []
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-D08.md
-        tool: codex-cli
-
-      - id: P0-D09
-        role: design
-        title: Model Rollout & Cutover SOP
-        depends_on: []
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-D09.md
-        tool: claude-code
-
-      - id: P0-D10
-        role: design
-        title: Triton Model Placement & VRAM Budget
-        depends_on: []
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-D10.md
-        tool: claude-code
-
-      - id: P0-E01
-        role: eval
-        title: Model Bake-Off Protocol
-        depends_on: [P0-D01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-E01.md
-        tool: codex-cli
-
-      - id: P0-O01
-        role: ops
-        title: Infrastructure Scaffolding
-        depends_on: []
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-O01.md
-        tool: codex-cli
-
-      - id: P0-V01
-        role: dev
-        title: Throwaway 1-Camera Prototype
-        depends_on: []
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-V01.md
-        tool: claude-code
-
-      - id: P0-X01
-        role: doc
-        title: Parametric Cost Model
-        depends_on: []
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-X01.md
-        tool: codex-cli
-
-      - id: P0-X02
-        role: doc
-        title: Privacy & Compliance Framework
-        depends_on: []
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P0-X02.md
-        tool: codex-cli
-
+    - id: P0-D01
+      role: design
+      title: Taxonomy & Requirements Specification
+      depends_on: []
+      status: done
+      assigned_to: null
+      branch: feat/P0-D01
+      prompt: .agents/prompts/P0-D01.md
+      tool: claude-code
+    - id: P0-D02
+      role: design
+      title: Protobuf Schema Package & Registry Policy
+      depends_on:
+      - P0-D01
+      status: done
+      assigned_to: null
+      branch: feat/P0-D02
+      prompt: .agents/prompts/P0-D02.md
+      tool: claude-code
+    - id: P0-D03
+      role: design
+      title: Kafka Topic Contract & Partitioning Plan
+      depends_on:
+      - P0-D02
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-D03.md
+      tool: claude-code
+    - id: P0-D04
+      role: design
+      title: Database Schema (TimescaleDB + PostgreSQL)
+      depends_on:
+      - P0-D01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-D04.md
+      tool: claude-code
+    - id: P0-D05
+      role: design
+      title: Camera Topology Graph Data Model
+      depends_on:
+      - P0-D04
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-D05.md
+      tool: claude-code
+    - id: P0-D06
+      role: design
+      title: Ingress Bridge Design Specification
+      depends_on:
+      - P0-D02
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-D06.md
+      tool: claude-code
+    - id: P0-D07
+      role: design
+      title: Time Synchronization & Timestamp Policy
+      depends_on: []
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-D07.md
+      tool: codex-cli
+    - id: P0-D08
+      role: design
+      title: Security Design - mTLS & ACLs
+      depends_on: []
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-D08.md
+      tool: codex-cli
+    - id: P0-D09
+      role: design
+      title: Model Rollout & Cutover SOP
+      depends_on: []
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-D09.md
+      tool: claude-code
+    - id: P0-D10
+      role: design
+      title: Triton Model Placement & VRAM Budget
+      depends_on: []
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-D10.md
+      tool: claude-code
+    - id: P0-E01
+      role: eval
+      title: Model Bake-Off Protocol
+      depends_on:
+      - P0-D01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-E01.md
+      tool: codex-cli
+    - id: P0-O01
+      role: ops
+      title: Infrastructure Scaffolding
+      depends_on: []
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-O01.md
+      tool: codex-cli
+    - id: P0-V01
+      role: dev
+      title: Throwaway 1-Camera Prototype
+      depends_on: []
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-V01.md
+      tool: claude-code
+    - id: P0-X01
+      role: doc
+      title: Parametric Cost Model
+      depends_on: []
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-X01.md
+      tool: codex-cli
+    - id: P0-X02
+      role: doc
+      title: Privacy & Compliance Framework
+      depends_on: []
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P0-X02.md
+      tool: codex-cli
   phase-1:
     name: Core Pipeline
-    weeks: "4-16"
+    weeks: 4-16
     tasks:
-      - id: P1-V01
-        role: dev
-        title: Edge Agent
-        depends_on: [P0-D02, P0-D07, P0-O01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-V01.md
-        tool: claude-code
-
-      - id: P1-V02
-        role: dev
-        title: Ingress Bridge Service
-        depends_on: [P0-D06, P0-D02, P0-O01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-V02.md
-        tool: claude-code
-
-      - id: P1-V03
-        role: dev
-        title: Central Decode & Frame Sampling
-        depends_on: [P0-D03, P0-O01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-V03.md
-        tool: claude-code
-
-      - id: P1-V04
-        role: dev
-        title: Detection & Tracking Inference Worker
-        depends_on: [P0-D02, P0-D10, P1-E01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-V04.md
-        tool: claude-code
-
-      - id: P1-V05
-        role: dev
-        title: Metadata Bulk Collector
-        depends_on: [P0-D04, P0-D03]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-V05.md
-        tool: codex-cli
-
-      - id: P1-V06
-        role: dev
-        title: Basic Query API
-        depends_on: [P0-D04, P1-V05]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-V06.md
-        tool: claude-code
-
-      - id: P1-V07
-        role: dev
-        title: Debug Trace Pipeline
-        depends_on: [P1-V04]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-V07.md
-        tool: claude-code
-
-      - id: P1-E01
-        role: eval
-        title: Detector Bake-Off (10 days)
-        depends_on: [P0-E01, P1-A01, P1-O01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-E01.md
-        tool: codex-cli
-
-      - id: P1-E02
-        role: eval
-        title: Tracker Bake-Off (5 days)
-        depends_on: [P1-E01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-E02.md
-        tool: codex-cli
-
-      - id: P1-E03
-        role: eval
-        title: Edge Filter Pass-Through Measurement
-        depends_on: [P1-V01, P1-V04]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-E03.md
-        tool: codex-cli
-
-      - id: P1-O01
-        role: ops
-        title: Pilot Infrastructure Deployment
-        depends_on: [P0-O01, P0-D03, P0-D07, P0-D08]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-O01.md
-        tool: codex-cli
-
-      - id: P1-O02
-        role: ops
-        title: Observability Dashboards & Alerts
-        depends_on: [P1-O01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-O02.md
-        tool: codex-cli
-
-      - id: P1-A01
-        role: data
-        title: CVAT Setup & Annotation Baseline
-        depends_on: [P0-D01, P1-O01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-A01.md
-        tool: codex-cli
-
-      - id: P1-X01
-        role: doc
-        title: Camera Compatibility Matrix
-        depends_on: [P1-V01]
-        status: pending
-        assigned_to: null
-        branch: null
-        prompt: .agents/prompts/P1-X01.md
-        tool: codex-cli
+    - id: P1-V01
+      role: dev
+      title: Edge Agent
+      depends_on:
+      - P0-D02
+      - P0-D07
+      - P0-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-V01.md
+      tool: claude-code
+    - id: P1-V02
+      role: dev
+      title: Ingress Bridge Service
+      depends_on:
+      - P0-D06
+      - P0-D02
+      - P0-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-V02.md
+      tool: claude-code
+    - id: P1-V03
+      role: dev
+      title: Central Decode & Frame Sampling
+      depends_on:
+      - P0-D03
+      - P0-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-V03.md
+      tool: claude-code
+    - id: P1-V04
+      role: dev
+      title: Detection & Tracking Inference Worker
+      depends_on:
+      - P0-D02
+      - P0-D10
+      - P1-E01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-V04.md
+      tool: claude-code
+    - id: P1-V05
+      role: dev
+      title: Metadata Bulk Collector
+      depends_on:
+      - P0-D04
+      - P0-D03
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-V05.md
+      tool: codex-cli
+    - id: P1-V06
+      role: dev
+      title: Basic Query API
+      depends_on:
+      - P0-D04
+      - P1-V05
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-V06.md
+      tool: claude-code
+    - id: P1-V07
+      role: dev
+      title: Debug Trace Pipeline
+      depends_on:
+      - P1-V04
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-V07.md
+      tool: claude-code
+    - id: P1-E01
+      role: eval
+      title: Detector Bake-Off (10 days)
+      depends_on:
+      - P0-E01
+      - P1-A01
+      - P1-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-E01.md
+      tool: codex-cli
+    - id: P1-E02
+      role: eval
+      title: Tracker Bake-Off (5 days)
+      depends_on:
+      - P1-E01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-E02.md
+      tool: codex-cli
+    - id: P1-E03
+      role: eval
+      title: Edge Filter Pass-Through Measurement
+      depends_on:
+      - P1-V01
+      - P1-V04
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-E03.md
+      tool: codex-cli
+    - id: P1-O01
+      role: ops
+      title: Pilot Infrastructure Deployment
+      depends_on:
+      - P0-O01
+      - P0-D03
+      - P0-D07
+      - P0-D08
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-O01.md
+      tool: codex-cli
+    - id: P1-O02
+      role: ops
+      title: Observability Dashboards & Alerts
+      depends_on:
+      - P1-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-O02.md
+      tool: codex-cli
+    - id: P1-A01
+      role: data
+      title: CVAT Setup & Annotation Baseline
+      depends_on:
+      - P0-D01
+      - P1-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-A01.md
+      tool: codex-cli
+    - id: P1-X01
+      role: doc
+      title: Camera Compatibility Matrix
+      depends_on:
+      - P1-V01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P1-X01.md
+      tool: codex-cli

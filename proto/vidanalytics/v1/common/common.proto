@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package vidanalytics.v1.common;
+
+option java_multiple_files = true;
+option java_package = "com.cilexvision.vidanalytics.v1.common";
+
+import "google/protobuf/timestamp.proto";
+
+// ClockQuality describes the synchronisation status of the source_capture_ts clock.
+// Higher values indicate less reliable timestamps.
+enum ClockQuality {
+  CLOCK_QUALITY_UNSPECIFIED = 0;
+  // IEEE 1588 PTP hardware sync; expected drift < 1 µs.
+  CLOCK_QUALITY_PTP_SYNCED = 1;
+  // NTP software sync; expected drift < 10 ms.
+  CLOCK_QUALITY_NTP_SYNCED = 2;
+  // Locally estimated from frame sequence and nominal frame rate; drift unknown.
+  CLOCK_QUALITY_ESTIMATED = 3;
+  // Clock source unavailable; timestamp may be unreliable.
+  CLOCK_QUALITY_UNKNOWN = 4;
+}
+
+// VideoTimestamp carries the three mandatory pipeline timestamps required on every
+// message, plus a clock quality indicator for the source clock.
+//
+// Rules:
+//   - source_capture_ts: set by the edge capture process; never rewritten downstream.
+//   - edge_receive_ts:   set when the edge pipeline ingests the frame from the camera.
+//   - core_ingest_ts:    set when the core ingest service first processes the message.
+//   - All three fields MUST be populated before a message is published to Kafka.
+message VideoTimestamp {
+  // Timestamp at which the camera sensor captured this frame.
+  google.protobuf.Timestamp source_capture_ts = 1;
+
+  // Timestamp at which the edge node received this frame from the camera.
+  google.protobuf.Timestamp edge_receive_ts = 2;
+
+  // Timestamp at which the core ingest service processed this message.
+  google.protobuf.Timestamp core_ingest_ts = 3;
+
+  // Quality of the source_capture_ts clock on the originating edge device.
+  ClockQuality clock_quality = 4;
+}

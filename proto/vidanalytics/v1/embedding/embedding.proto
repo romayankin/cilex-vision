@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package vidanalytics.v1.embedding;
+
+option java_multiple_files = true;
+option java_package = "com.cilexvision.vidanalytics.v1.embedding";
+
+// EmbeddingSourceType identifies what kind of entity the embedding was derived from.
+enum EmbeddingSourceType {
+  EMBEDDING_SOURCE_TYPE_UNSPECIFIED = 0;
+  // Embedding derived from a single detection crop.
+  EMBEDDING_SOURCE_TYPE_DETECTION = 1;
+  // Embedding derived by aggregating crops over a tracklet.
+  EMBEDDING_SOURCE_TYPE_TRACKLET = 2;
+}
+
+// Embedding is a dense vector representation of a detected or tracked object,
+// used for re-identification and cross-camera matching.
+//
+// Raw image bytes are NEVER included; the embedding is computed from the crop
+// referenced by source_id and stored separately.
+message Embedding {
+  // Globally unique embedding identifier. Format: UUID v4.
+  string embedding_id = 1;
+
+  // Identifier of the entity this embedding was derived from.
+  // Either Detection.detection_id or Tracklet.track_id depending on source_type.
+  string source_id = 2;
+
+  // Indicates whether source_id refers to a detection or a tracklet.
+  EmbeddingSourceType source_type = 3;
+
+  // Dense embedding vector values. Length must equal dimension.
+  repeated float vector = 4;
+
+  // Length of the vector (e.g. 512 for typical re-ID models).
+  // Consumers MUST validate len(vector) == dimension before use.
+  uint32 dimension = 5;
+
+  // Model identifier used to produce this embedding (e.g. "osnet-x1-0").
+  string model_name = 6;
+
+  // Model version string (semantic version, e.g. "1.0.0").
+  string model_version = 7;
+
+  // Quality of the image crop used for embedding [0.0, 1.0].
+  // Embeddings with quality_score < 0.3 should be excluded from gallery indexing.
+  float quality_score = 8;
+}

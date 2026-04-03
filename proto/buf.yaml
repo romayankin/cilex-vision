@@ -1,9 +1,14 @@
 version: v1
+
 breaking:
   use:
     - FILE
+
 lint:
   use:
-    - STANDARD    # was DEFAULT, renamed by buf
+    - STANDARD
+  enum_zero_value_suffix: _UNSPECIFIED
+  # PACKAGE_VERSION_SUFFIX would require package names like vidanalytics.v1.common.v1
+  # which is redundant; version is already encoded at the v1 level.
   except:
     - PACKAGE_VERSION_SUFFIX

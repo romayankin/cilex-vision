@@ -1,0 +1,46 @@
+name: Proto Check
+
+on:
+  pull_request:
+    paths:
+      - "proto/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "proto/**"
+
+jobs:
+  buf-lint:
+    name: Buf Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ github.token }}
+
+      - name: Lint proto files
+        run: buf lint proto/
+
+  buf-breaking:
+    name: Buf Breaking Change Detection
+    runs-on: ubuntu-latest
+    # Only run breaking-change detection on pull requests so we can compare
+    # against the main branch. Push events to main itself are exempt because
+    # main IS the baseline.
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ github.token }}
+
+      - name: Detect breaking changes against main
+        run: buf breaking proto/ --against "https://github.com/${{ github.repository }}.git#branch=main,subdir=proto"

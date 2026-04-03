@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package vidanalytics.v1.frame;
+
+option java_multiple_files = true;
+option java_package = "com.cilexvision.vidanalytics.v1.frame";
+
+import "vidanalytics/v1/common/common.proto";
+
+// FrameRef is a lightweight reference to a video frame stored in object storage.
+// Raw image bytes are NEVER included in this message — only a URI reference.
+//
+// Downstream services retrieve the actual frame bytes from the URI when needed.
+// The URI MUST point to an immutable object (content-addressable or versioned).
+message FrameRef {
+  // Globally unique frame identifier. Format: UUID v4.
+  string frame_id = 1;
+
+  // Identifier of the camera that captured this frame.
+  string camera_id = 2;
+
+  // Object store URI for the raw frame (e.g. s3://raw-video/cam1/frame-0001.jpg).
+  // MUST NOT contain raw image bytes.
+  string frame_uri = 3;
+
+  // Monotonically increasing sequence number per camera, reset on reconnection.
+  uint64 frame_sequence = 4;
+
+  // Three mandatory pipeline timestamps plus clock quality.
+  vidanalytics.v1.common.VideoTimestamp timestamps = 5;
+
+  // Frame width in pixels at the source resolution.
+  uint32 width_px = 6;
+
+  // Frame height in pixels at the source resolution.
+  uint32 height_px = 7;
+
+  // Codec used for the stored frame (e.g. "jpeg", "h264-keyframe").
+  string codec = 8;
+}

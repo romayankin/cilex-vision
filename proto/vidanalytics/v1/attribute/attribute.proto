@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package vidanalytics.v1.attribute;
+
+option java_multiple_files = true;
+option java_package = "com.cilexvision.vidanalytics.v1.attribute";
+
+// Color enumerates the shared color vocabulary used for vehicle and person
+// attributes. See docs/taxonomy.md §2.1.
+// COLOR_UNKNOWN is an explicit model output (model confidence < 0.30 for all
+// named colors), not a default/unset value.
+enum Color {
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+  COLOR_BLUE = 2;
+  COLOR_WHITE = 3;
+  COLOR_BLACK = 4;
+  COLOR_SILVER = 5;
+  COLOR_GREEN = 6;
+  COLOR_YELLOW = 7;
+  COLOR_BROWN = 8;
+  COLOR_ORANGE = 9;
+  // Explicit model output: model cannot distinguish a named color with confidence ≥ 0.30.
+  COLOR_UNKNOWN = 10;
+}
+
+// AttributeType enumerates the secondary properties that can be predicted
+// alongside a bounding box. See docs/taxonomy.md §2.2.
+enum AttributeType {
+  ATTRIBUTE_TYPE_UNSPECIFIED = 0;
+  // Dominant exterior body color of a vehicle (car, truck, bus, motorcycle).
+  ATTRIBUTE_TYPE_VEHICLE_COLOR = 1;
+  // Dominant color of a person's upper garment.
+  ATTRIBUTE_TYPE_PERSON_UPPER_COLOR = 2;
+  // Dominant color of a person's lower garment.
+  ATTRIBUTE_TYPE_PERSON_LOWER_COLOR = 3;
+}
+
+// Attribute is a secondary property predicted for a detected object.
+// Attributes are only emitted when the parent detection confidence meets
+// the per-class threshold defined in docs/taxonomy.md §2.3.
+//
+// A missing color_value field (proto zero value COLOR_UNSPECIFIED) means the
+// attribute was NOT computed. COLOR_UNKNOWN means it WAS computed but the
+// model could not resolve a named color.
+message Attribute {
+  // Globally unique attribute identifier. Format: UUID v4.
+  string attribute_id = 1;
+
+  // Parent detection identifier. Corresponds to Detection.detection_id.
+  string detection_id = 2;
+
+  // Parent track identifier, if available. Corresponds to Tracklet.track_id.
+  // Empty when the attribute is computed per-detection rather than per-track.
+  string track_id = 3;
+
+  // The kind of attribute this record represents.
+  AttributeType attribute_type = 4;
+
+  // Predicted color value. Valid when attribute_type is a color attribute.
+  // COLOR_UNSPECIFIED means the field was not computed.
+  Color color_value = 5;
+
+  // Model confidence for the predicted attribute value [0.0, 1.0].
+  float confidence = 6;
+
+  // Quality of the image patch used for attribute prediction [0.0, 1.0].
+  // Low quality_score (< 0.3) indicates occlusion, blur, or small bounding box.
+  float quality_score = 7;
+
+  // Model identifier used to produce this attribute (e.g. "resnet18-color-v2").
+  string model_name = 8;
+
+  // Model version string (semantic version, e.g. "2.1.0").
+  string model_version = 9;
+}

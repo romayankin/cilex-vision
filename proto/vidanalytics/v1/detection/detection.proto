@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package vidanalytics.v1.detection;
+
+option java_multiple_files = true;
+option java_package = "com.cilexvision.vidanalytics.v1.detection";
+
+import "vidanalytics/v1/common/common.proto";
+
+// ObjectClass enumerates the detectable entity types.
+// Confidence thresholds are defined in docs/taxonomy.md §1 (all classes: 0.40 pilot threshold).
+enum ObjectClass {
+  OBJECT_CLASS_UNSPECIFIED = 0;
+  OBJECT_CLASS_PERSON = 1;
+  OBJECT_CLASS_CAR = 2;
+  OBJECT_CLASS_TRUCK = 3;
+  OBJECT_CLASS_BUS = 4;
+  OBJECT_CLASS_BICYCLE = 5;
+  OBJECT_CLASS_MOTORCYCLE = 6;
+  OBJECT_CLASS_ANIMAL = 7;
+}
+
+// BoundingBox represents the axis-aligned bounding box of a detected object.
+// All coordinates are normalised to [0.0, 1.0] relative to frame dimensions.
+// Invariant: x_min < x_max, y_min < y_max.
+message BoundingBox {
+  // Normalised left edge of the bounding box.
+  float x_min = 1;
+
+  // Normalised top edge of the bounding box.
+  float y_min = 2;
+
+  // Normalised right edge of the bounding box.
+  float x_max = 3;
+
+  // Normalised bottom edge of the bounding box.
+  float y_max = 4;
+}
+
+// Detection is a single object detection result from the inference service.
+// Detections below the per-class confidence threshold are filtered at ingest
+// (not at source); see docs/taxonomy.md §1.
+message Detection {
+  // Globally unique detection identifier. Format: UUID v4.
+  string detection_id = 1;
+
+  // Parent frame reference. Corresponds to FrameRef.frame_id.
+  string frame_id = 2;
+
+  // Identifier of the originating camera.
+  string camera_id = 3;
+
+  // Predicted object class.
+  ObjectClass object_class = 4;
+
+  // Model confidence score in [0.0, 1.0].
+  float confidence = 5;
+
+  // Normalised bounding box in the source frame.
+  BoundingBox bbox = 6;
+
+  // Model identifier used to produce this detection (e.g. "yolov8n").
+  string model_name = 7;
+
+  // Model version string (semantic version, e.g. "1.2.0").
+  string model_version = 8;
+
+  // Three mandatory pipeline timestamps.
+  vidanalytics.v1.common.VideoTimestamp timestamps = 9;
+}
