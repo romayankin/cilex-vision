@@ -55,7 +55,21 @@ CHANGED_FILES=""
 if [ "$CURRENT_BRANCH" = "feat/${TASK_ID}" ]; then
     # Mode 1: We're on the feature branch — diff against main
     echo "Branch: ${CURRENT_BRANCH} (comparing against main)"
-    CHANGED_FILES=$(git diff --name-only main...HEAD 2>/dev/null || true)
+    # Include BOTH committed and uncommitted changes vs main
+    COMMITTED=$(git diff --name-only main...HEAD 2>/dev/null || true)
+    UNCOMMITTED=$(git diff --name-only main 2>/dev/null || true)
+    UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || true)
+    # Combine and deduplicate
+    CHANGED_FILES=$(printf "%s\n%s\n%s" "$COMMITTED" "$UNCOMMITTED" "$UNTRACKED" | sort -u | grep -v '^$' || true)
+
+    # Warn if there are uncommitted changes
+    UNCOMMITTED_COUNT=$(git status --porcelain 2>/dev/null | wc -l)
+    if [ "$UNCOMMITTED_COUNT" -gt 0 ]; then
+        echo ""
+        echo "  ⚠️  ${UNCOMMITTED_COUNT} uncommitted changes detected."
+        echo "     Consider: git add -A && git commit -m '${TASK_ID}: <description>'"
+        echo ""
+    fi
 elif git rev-parse --verify "feat/${TASK_ID}" >/dev/null 2>&1; then
     # Mode 2: Feature branch exists but we're on main — diff main vs branch
     echo "Branch: feat/${TASK_ID} (exists, comparing from main)"
