@@ -27,7 +27,7 @@ phases:
       title: Kafka Topic Contract & Partitioning Plan
       depends_on:
       - P0-D02
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P0-D03
       prompt: .agents/prompts/P0-D03.md
