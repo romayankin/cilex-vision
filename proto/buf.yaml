@@ -4,6 +4,6 @@ breaking:
     - FILE
 lint:
   use:
-    - DEFAULT
+    - STANDARD    # was DEFAULT, renamed by buf
   except:
     - PACKAGE_VERSION_SUFFIX
