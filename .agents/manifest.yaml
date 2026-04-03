@@ -1,6 +1,29 @@
 # Task Manifest — Multi-Camera Video Analytics Platform
-# Updated by: human orchestrator
-# Read by: agents (context), launcher (dependency checks)
+#
+# OWNERSHIP: Updated by human orchestrator only.
+# READ BY: agents (for context), launch.sh (dependency checks), status.sh (dashboard).
+#
+# BRANCH MODEL:
+# - Every task gets its own branch: feat/{task-id} (e.g., feat/P1-V01)
+# - All branches are created from latest `main` by launch.sh
+# - Agents commit to their branch only
+# - Human merges to `main` after review passes
+# - All agents work in THIS SAME REPOSITORY: https://github.com/romayankin/multicam-video-analytics
+#
+# STATUS VALUES:
+# - pending:     not started, may or may not have dependencies met
+# - in_progress: agent is actively working on feat/{task-id} branch
+# - in_review:   agent finished, human is reviewing via review.sh + checklist
+# - done:        merged to main, other tasks can now depend on it
+#
+# WORKFLOW:
+# 1. Run .agents/status.sh to see what's ready
+# 2. Run .agents/launch.sh {task-id} to start an agent
+# 3. Agent works on feat/{task-id} branch
+# 4. Run .agents/review.sh {task-id} when agent says done
+# 5. Human reviews with .agents/review-checklists/{role}-review.md
+# 6. Merge to main, update status to done, push
+
 
 phases:
   phase-0:
