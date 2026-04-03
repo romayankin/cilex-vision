@@ -27,9 +27,9 @@ phases:
       title: Kafka Topic Contract & Partitioning Plan
       depends_on:
       - P0-D02
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P0-D03
       prompt: .agents/prompts/P0-D03.md
       tool: claude-code
     - id: P0-D04
