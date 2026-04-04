@@ -66,9 +66,9 @@ phases:
       role: design
       title: Time Synchronization & Timestamp Policy
       depends_on: []
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P0-D07
       prompt: .agents/prompts/P0-D07.md
       tool: codex-cli
     - id: P0-D08

@@ -1,0 +1,22 @@
+groups:
+  - name: clock-drift
+    rules:
+      - alert: ClockSkewWarn
+        expr: clock_skew_ms > 500
+        for: 2m
+        labels:
+          severity: warning
+          service: monitoring
+        annotations:
+          summary: "Clock skew warning between {{ $labels.camera_a }} and {{ $labels.camera_b }}"
+          description: "Estimated pairwise clock skew is {{ $value }} ms, above the 500 ms warning threshold."
+
+      - alert: ClockSkewCritical
+        expr: clock_skew_ms > 2000
+        for: 30s
+        labels:
+          severity: critical
+          service: monitoring
+        annotations:
+          summary: "Clock skew critical between {{ $labels.camera_a }} and {{ $labels.camera_b }}"
+          description: "Estimated pairwise clock skew is {{ $value }} ms, above the 2000 ms critical threshold."
