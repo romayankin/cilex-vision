@@ -66,7 +66,7 @@ phases:
       role: design
       title: Time Synchronization & Timestamp Policy
       depends_on: []
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P0-D07
       prompt: .agents/prompts/P0-D07.md
