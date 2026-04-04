@@ -1,0 +1,153 @@
+erDiagram
+    sites ||--o{ cameras : "has"
+    cameras ||--o{ local_tracks : "tracks"
+    cameras ||--o{ events : "produces"
+    cameras ||--o{ topology_edges : "camera_a"
+    cameras ||--o{ topology_edges : "camera_b"
+    local_tracks ||--o{ global_track_links : "linked_via"
+    global_tracks ||--o{ global_track_links : "groups"
+    local_tracks ||--o{ track_attributes : "has"
+    local_tracks ||--o{ events : "triggers"
+    users ||--o{ audit_logs : "performed"
+
+    %% Logical relationships (no enforced FK on hypertables)
+    cameras }o..o{ detections : "camera_id"
+    cameras }o..o{ track_observations : "camera_id"
+    local_tracks }o..o{ detections : "local_track_id"
+    local_tracks }o..o{ track_observations : "local_track_id"
+
+    sites {
+        uuid site_id PK
+        varchar name
+        text address
+        varchar timezone
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    cameras {
+        text camera_id PK
+        uuid site_id FK
+        varchar name
+        text rtsp_uri
+        text location_description
+        float latitude
+        float longitude
+        varchar status
+        jsonb config_json
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    topology_edges {
+        uuid edge_id PK
+        text camera_a_id FK
+        text camera_b_id FK
+        float transition_time_s
+        float confidence
+        boolean enabled
+        timestamptz created_at
+    }
+
+    local_tracks {
+        uuid local_track_id PK
+        text camera_id FK
+        varchar object_class
+        varchar state
+        float mean_confidence
+        timestamptz start_time
+        timestamptz end_time
+        varchar tracker_version
+        timestamptz created_at
+    }
+
+    global_tracks {
+        uuid global_track_id PK
+        varchar object_class
+        timestamptz first_seen
+        timestamptz last_seen
+        timestamptz created_at
+    }
+
+    global_track_links {
+        uuid link_id PK
+        uuid global_track_id FK
+        uuid local_track_id FK
+        text camera_id
+        float confidence
+        timestamptz linked_at
+    }
+
+    track_attributes {
+        uuid attribute_id PK
+        uuid local_track_id FK
+        varchar attribute_type
+        varchar color_value
+        float confidence
+        varchar model_version
+        timestamptz observed_at
+    }
+
+    events {
+        uuid event_id PK
+        varchar event_type
+        uuid track_id FK
+        text camera_id FK
+        timestamptz start_time
+        timestamptz end_time
+        bigint duration_ms
+        text clip_uri
+        varchar state
+        jsonb metadata_jsonb
+        timestamptz source_capture_ts
+        timestamptz edge_receive_ts
+        timestamptz core_ingest_ts
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    users {
+        uuid user_id PK
+        varchar username
+        varchar email
+        text password_hash
+        varchar role
+        boolean is_active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    audit_logs {
+        uuid log_id PK
+        uuid user_id FK
+        text action
+        text resource_type
+        text resource_id
+        jsonb details_jsonb
+        varchar ip_address
+        timestamptz created_at
+    }
+
+    detections {
+        timestamptz time "hypertable partition key"
+        text camera_id
+        bigint frame_seq
+        varchar object_class
+        float confidence
+        float bbox_x
+        float bbox_y
+        float bbox_w
+        float bbox_h
+        uuid local_track_id
+        varchar model_version
+    }
+
+    track_observations {
+        timestamptz time "hypertable partition key"
+        text camera_id
+        uuid local_track_id
+        float centroid_x
+        float centroid_y
+        float bbox_area
+        text embedding_ref
+    }

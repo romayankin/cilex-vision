@@ -37,9 +37,9 @@ phases:
       title: Database Schema (TimescaleDB + PostgreSQL)
       depends_on:
       - P0-D01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P0-D04
       prompt: .agents/prompts/P0-D04.md
       tool: claude-code
     - id: P0-D05
