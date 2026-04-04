@@ -1,31 +1,31 @@
-# Project: Multi-Camera Video Analytics Platform
+# Cilex Vision — Claude Code Context
+
+## FIRST: Read CONVENTIONS.md
+Before doing anything, read CONVENTIONS.md in this repo root. It contains
+all established patterns, coding standards, and file references that have
+been built up across completed tasks. Following these patterns ensures
+consistency with code written by other agents (both Claude Code and Codex CLI).
+
+## SECOND: Read your task context
+If .claude-task-context.md exists, read it — it contains your role config
+and task prompt combined by the launcher script.
+
+## THIRD: Read handoff notes
+Check .agents/handoff/ for recent notes from previous agents. These contain
+decisions, gotchas, and patterns discovered during recent tasks that haven't
+been promoted to CONVENTIONS.md yet.
 
 ## Architecture
-- Monorepo with services in /services, infrastructure in /infra, protobuf in /proto
-- Python 3.11+ for all services, FastAPI for APIs, asyncpg for DB
-- Kafka (central bus), NATS JetStream (edge), TimescaleDB + PostgreSQL
-- Triton Inference Server for model serving, GStreamer for video decode
-- Protobuf for all inter-service messages, Schema Registry for compatibility
+See CONVENTIONS.md for full details. Quick summary:
+- Python 3.11+, FastAPI, asyncpg, Kafka, NATS, TimescaleDB, Triton
+- Protobuf for inter-service messages, buf for linting
+- Three timestamps on every message (edge_receive_ts is PRIMARY)
+- asyncpg COPY for bulk writes, never row-by-row INSERT
 
-## Conventions
-- Use Protobuf schemas from /proto for all inter-service messages
-- Use SQLAlchemy async models from /services/db/models.py
-- All services must expose Prometheus metrics at /metrics
-- Use Pydantic for configuration (settings loaded from YAML)
-- Tests use pytest with fixtures in /tests/conftest.py
-- Docker images use python:3.11-slim base
-
-## Key Files
-- docs/taxonomy.md — object classes, attributes, events, NFRs
-- docs/kafka-contract.md — all Kafka topics and their semantics
-- docs/security-design.md — mTLS, ACLs, trust model
-- docs/adr/ — Architecture Decision Records
-- .agents/manifest.yaml — task queue and dependency tracking
-- .agents/roles/ — role-specific agent configurations
-
-## Rules
-- Never put image/video bytes on Kafka — only references (URIs)
-- All DB writes use COPY protocol via asyncpg, never row-by-row INSERT
-- Every service must have a Dockerfile and tests
-- Protobuf backward compatibility enforced — no breaking changes
-- Three timestamps on every message: source_capture_ts, edge_receive_ts, core_ingest_ts
+## When You Finish a Task
+Before declaring done, write a handoff note:
+1. Create .agents/handoff/{task-id}.md
+2. Document: what you built, key decisions you made, patterns you established,
+   gotchas the next agent should know about, any open questions.
+3. This helps the next agent (which may be Codex CLI, not Claude Code)
+   pick up context without a shared session.

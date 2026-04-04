@@ -1,8 +1,14 @@
-# Multi-Camera Video Analytics Platform
+# Cilex Vision — Codex CLI Context
 
-## Quick Context
-Python monorepo. Services in /services. Protobuf in /proto. Infra in /infra.
-Kafka + NATS + TimescaleDB + PostgreSQL + Triton + GStreamer.
+## FIRST: Read CONVENTIONS.md
+Read CONVENTIONS.md in this repo root before doing anything. It contains
+all coding patterns and standards established by previous agents. Following
+these ensures your code is consistent with work done by Claude Code agents.
+
+## SECOND: Check handoff notes
+Read all files in .agents/handoff/ — these are notes from the previous agent
+that worked on related tasks. They contain decisions and gotchas that are
+critical for consistency.
 
 ## Build & Test
 make test          # Run all tests
@@ -11,13 +17,18 @@ make proto-check   # Validate protobuf compatibility
 make up            # Start local dev stack (docker-compose)
 make down          # Stop local dev stack
 make migrate       # Run Alembic migrations
-make seed          # Seed sample data
 
-## Coding Rules
+## Quick Rules (details in CONVENTIONS.md)
 - Python 3.11+, type hints required
-- asyncpg COPY for bulk DB writes (never row-by-row INSERT)
-- Protobuf for all inter-service messages (see /proto/)
+- asyncpg COPY for bulk DB writes (NEVER row-by-row INSERT)
+- Protobuf for all Kafka messages (no JSON)
 - No image bytes on Kafka — only URI references
-- Every service needs: Dockerfile, tests, Prometheus metrics
-- Config via Pydantic Settings loaded from YAML
-- Three timestamps on every message
+- Every service: Dockerfile, tests, Prometheus metrics at /metrics
+- Config via Pydantic BaseSettings from YAML
+- Three timestamps: source_capture_ts, edge_receive_ts, core_ingest_ts
+
+## When You Finish
+Create .agents/handoff/{task-id}.md with:
+- What you built and key decisions
+- Patterns you established
+- Gotchas for the next agent
