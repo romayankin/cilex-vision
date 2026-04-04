@@ -1,31 +1,95 @@
-# Cilex Vision — Claude Code Context
-
-## FIRST: Read CONVENTIONS.md
-Before doing anything, read CONVENTIONS.md in this repo root. It contains
-all established patterns, coding standards, and file references that have
-been built up across completed tasks. Following these patterns ensures
-consistency with code written by other agents (both Claude Code and Codex CLI).
-
-## SECOND: Read your task context
-If .claude-task-context.md exists, read it — it contains your role config
-and task prompt combined by the launcher script.
-
-## THIRD: Read handoff notes
-Check .agents/handoff/ for recent notes from previous agents. These contain
-decisions, gotchas, and patterns discovered during recent tasks that haven't
-been promoted to CONVENTIONS.md yet.
+# Project: Multi-Camera Video Analytics Platform
 
 ## Architecture
-See CONVENTIONS.md for full details. Quick summary:
-- Python 3.11+, FastAPI, asyncpg, Kafka, NATS, TimescaleDB, Triton
-- Protobuf for inter-service messages, buf for linting
-- Three timestamps on every message (edge_receive_ts is PRIMARY)
-- asyncpg COPY for bulk writes, never row-by-row INSERT
+- Monorepo with services in /services, infrastructure in /infra, protobuf in /proto
+- Python 3.11+ for all services, FastAPI for APIs, asyncpg for DB
+- Kafka (central bus), NATS JetStream (edge), TimescaleDB + PostgreSQL
+- Triton Inference Server for model serving, GStreamer for video decode
+- Protobuf for all inter-service messages, Schema Registry for compatibility
 
-## When You Finish a Task
-Before declaring done, write a handoff note:
-1. Create .agents/handoff/{task-id}.md
-2. Document: what you built, key decisions you made, patterns you established,
-   gotchas the next agent should know about, any open questions.
-3. This helps the next agent (which may be Codex CLI, not Claude Code)
-   pick up context without a shared session.
+## Key Files
+- docs/taxonomy.md — object classes, attributes, events, NFRs
+- docs/kafka-contract.md — all Kafka topics and their semantics
+- docs/security-design.md — mTLS, ACLs, trust model
+- docs/adr/ — Architecture Decision Records (ADR-001..003 exist)
+- docs/diagrams/schema.mermaid — database ER diagram
+- services/db/models.py — SQLAlchemy 2.0 async models (12 tables, canonical schema)
+- services/db/alembic/ — database migrations (async env.py, TimescaleDB-aware)
+- proto/vidanalytics/v1/ — all .proto files (common, detection, tracklet, event, frame, attribute, embedding, debug)
+- proto/buf.yaml — buf lint (STANDARD) + breaking (FILE) config
+- infra/kafka/topics.yaml — machine-readable Kafka topic definitions
+- .agents/manifest.yaml — task queue and dependency tracking
+- .agents/roles/ — role-specific agent configurations
+
+## Rules
+- Never put image/video bytes on Kafka — only references (URIs)
+- All DB writes use COPY protocol via asyncpg, never row-by-row INSERT
+- Every service must have a Dockerfile and tests
+- Protobuf backward compatibility enforced — no breaking changes
+- Three timestamps on every message: source_capture_ts, edge_receive_ts, core_ingest_ts
+
+## Conventions
+
+### General naming
+- Python: snake_case for variables, functions, file names
+- Protobuf field names: snake_case
+- Protobuf enum values: UPPER_SNAKE_CASE with type prefix (e.g., OBJECT_CLASS_PERSON, EVENT_TYPE_STOPPED)
+- Protobuf enum zero value: suffix `_UNSPECIFIED` (enforced by buf lint)
+- Database columns: snake_case
+- Database table names: lowercase plural (e.g., detections, local_tracks, audit_logs)
+- All IDs: UUID v4, stored as `uuid` type in PostgreSQL
+
+### Enum mapping: Proto → Python → Database
+- Proto enums use prefixed UPPER_SNAKE_CASE: `OBJECT_CLASS_PERSON`, `EVENT_STATE_ACTIVE`
+- Python enums are `str, enum.Enum` with lowercase taxonomy values: `ObjectClass.PERSON = "person"`
+- Database stores the lowercase taxonomy string: `'person'`, `'entered_scene'`, `'active'`
+- Enum validation uses CHECK constraints on TEXT columns, not native PostgreSQL ENUM types
+- This avoids `ALTER TYPE ADD VALUE` migration pain when adding new values
+- Canonical enum definitions live in `services/db/models.py`: ObjectClass, EventType, EventState, TrackletState, ColorValue, AttributeType, CameraStatus
+
+### UUID generation
+- All relational table PKs use `server_default=text("gen_random_uuid()")` — built into PostgreSQL 13+, no pgcrypto needed
+- Hypertable rows (detections, track_observations) have no PK to avoid B-tree overhead
+- Proto messages carry UUIDs as `string` fields; convert to `uuid` on DB ingest
+
+### Timestamp handling
+- All timestamps are `TIMESTAMP WITH TIME ZONE` (TSTZ) — never naive
+- Pipeline timestamps: `source_capture_ts`, `edge_receive_ts`, `core_ingest_ts` must be present on every event and can be present on any persisted record
+- `created_at` uses `server_default=func.now()`; `updated_at` uses `onupdate=func.now()`
+- TimescaleDB hypertables partition on a `time` column (TSTZ)
+- Proto uses `google.protobuf.Timestamp`; Python services convert to `datetime` with UTC tzinfo
+
+### Database patterns (services/db/)
+- SQLAlchemy 2.0 style: `DeclarativeBase`, `Mapped[type]`, `mapped_column()`
+- Async engine via `sqlalchemy.ext.asyncio` + `asyncpg` driver (connection string: `postgresql+asyncpg://`)
+- JSONB for flexible/schemaless data: `cameras.config_json`, `events.metadata_jsonb`, `audit_logs.details_jsonb`
+- TimescaleDB hypertables: no foreign keys, no explicit PK, partitioned by `time` with 1-hour chunk interval
+- Compression: `segmentby = camera_id`, `orderby = time DESC`, policy triggers after 2 days
+- Retention: 30 days for hypertables via `add_retention_policy()`; relational tables have no drop policy (indefinite)
+- Bounding boxes stored as `(bbox_x, bbox_y, bbox_w, bbox_h)` in DB; proto uses `(x_min, y_min, x_max, y_max)` — Bulk Collector converts on ingest
+- Alembic migrations are hand-crafted (not autogenerated) because TimescaleDB operations (hypertable creation, retention/compression policies) require raw SQL via `op.execute()`
+- `alembic upgrade head` runs from `services/db/` directory (see Makefile `migrate` target)
+
+### Protobuf patterns (proto/)
+- Package: `vidanalytics.v1.<domain>` (e.g., `vidanalytics.v1.detection`)
+- One domain per directory under `proto/vidanalytics/v1/`
+- Common types (VideoTimestamp, ClockQuality) in `vidanalytics.v1.common`
+- Every message with pipeline context must include a `VideoTimestamp timestamps` field
+- All URIs (frame_uri, clip_uri) are string fields pointing to object storage — never raw bytes
+- `buf lint` (STANDARD rules) and `buf breaking --against .git#branch=main` (FILE level) enforced
+
+### Kafka patterns
+- 7 topics defined in `infra/kafka/topics.yaml` and documented in `docs/kafka-contract.md`
+- Partition keys: `camera_id` for frame/tracklet/archive topics; `local_track_id` for attribute/embedding topics; `event_id` for events
+- Producer requirements: `acks=all`, `enable.idempotence=true`, `compression.type=zstd`
+- Consumer requirements: export `kafka_consumer_lag` Prometheus gauge, upsert (ON CONFLICT) for DB writes, dead-letter to `{topic}.dlq` after 3 retries
+- All messages serialized as protobuf via Schema Registry (BACKWARD compatibility)
+- Header `x-proto-schema` with fully qualified message name on every message
+
+### Service conventions
+- Use Protobuf schemas from /proto for all inter-service messages
+- Use SQLAlchemy models from /services/db/models.py — import enums and table classes from there
+- All services must expose Prometheus metrics at /metrics
+- Use Pydantic for configuration (settings loaded from YAML)
+- Tests use pytest with fixtures in /tests/conftest.py
+- Docker images use python:3.11-slim base
