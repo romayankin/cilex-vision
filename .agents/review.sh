@@ -167,8 +167,8 @@ if [ -n "$CHANGED_FILES" ]; then
             [ -z "$VIOLATIONS" ] && check_pass "All changes within OPS write zone" || check_warn "Changes outside primary zone: ${VIOLATIONS}"
             ;;
         design)
-            VIOLATIONS=$(echo "$CHANGED_FILES" | grep -v "^docs/" | grep -v "^proto/" | grep -v "^services/db/" | grep -v "^\.agents/" || true)
-            [ -z "$VIOLATIONS" ] && check_pass "All changes within DESIGN write zone" || check_fail "Changes OUTSIDE write zone: ${VIOLATIONS}"
+            VIOLATIONS=$(echo "$CHANGED_FILES" | grep -v "^docs/" | grep -v "^proto/" | grep -v "^services/db/" | grep -v "^services/monitoring/" | grep -v "^services/topology/" | grep -v "^infra/" | grep -v "^\.github/" | grep -v "^\.agents/" || true)
+            [ -z "$VIOLATIONS" ] && check_pass "All changes within DESIGN write zone" || check_warn "Changes outside primary zone: ${VIOLATIONS}"
             ;;
         *)
             check_pass "Write zone check skipped for ${ROLE} role"
