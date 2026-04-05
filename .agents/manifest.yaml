@@ -75,7 +75,7 @@ phases:
       role: design
       title: Security Design - mTLS & ACLs
       depends_on: []
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P0-D08
       prompt: .agents/prompts/P0-D08.md
