@@ -32,3 +32,6 @@ Create .agents/handoff/{task-id}.md with:
 - What you built and key decisions
 - Patterns you established
 - Gotchas for the next agent
+
+## First Step — Always
+Read PROJECT-STATUS.md before doing anything. It contains all architecture decisions, completed tasks, component details, and current priorities.

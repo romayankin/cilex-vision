@@ -93,3 +93,6 @@
 - Use Pydantic for configuration (settings loaded from YAML)
 - Tests use pytest with fixtures in /tests/conftest.py
 - Docker images use python:3.11-slim base
+
+## First Step — Always
+Read PROJECT-STATUS.md before doing anything. It contains all architecture decisions, completed tasks, component details, and current priorities.

@@ -106,3 +106,6 @@ services/{name}/
 | Timestamp rules | docs/time-sync-policy.md |
 | Security requirements | docs/security-design.md |
 | All architecture decisions | docs/adr/*.md |
+
+## Project Context
+PROJECT-STATUS.md is the single source of truth for project state. Read it first. Update it after completing any task.
