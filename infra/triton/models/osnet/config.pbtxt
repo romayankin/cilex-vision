@@ -1,0 +1,44 @@
+# OSNet-x1.0 — Re-ID embedding extractor
+# Output: L2-normalized 512-dimensional embedding vector
+# Compute precision: FP16 (TensorRT), I/O precision: FP32
+# ADR-008: never compare embeddings across model versions
+# See docs/triton-placement.md for full placement spec
+
+name: "osnet"
+platform: "tensorrt_plan"
+max_batch_size: 32
+
+input [
+  {
+    name: "images"
+    data_type: TYPE_FP32
+    dims: [3, 256, 128]
+  }
+]
+
+output [
+  {
+    name: "embeddings"
+    data_type: TYPE_FP32
+    dims: [512]
+  }
+]
+
+dynamic_batching {
+  preferred_batch_size: [8, 16, 32]
+  max_queue_delay_microseconds: 100000
+}
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    gpus: [0]
+  }
+]
+
+version_policy {
+  latest {
+    num_versions: 2
+  }
+}

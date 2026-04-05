@@ -1,0 +1,80 @@
+groups:
+  - name: triton-inference
+    rules:
+      # --- VRAM utilization ---
+
+      - alert: TritonVramWarn
+        expr: (nv_gpu_memory_used_bytes / nv_gpu_memory_total_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: triton
+        annotations:
+          summary: "GPU {{ $labels.gpu_uuid }} VRAM usage above 85%"
+          description: "GPU VRAM utilization is {{ $value | printf \"%.1f\" }}%, exceeding the 85% warning threshold."
+
+      - alert: TritonVramCritical
+        expr: (nv_gpu_memory_used_bytes / nv_gpu_memory_total_bytes) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: triton
+        annotations:
+          summary: "GPU {{ $labels.gpu_uuid }} VRAM usage above 95%"
+          description: "GPU VRAM utilization is {{ $value | printf \"%.1f\" }}%, exceeding the 95% critical threshold. Risk of OOM."
+
+      # --- Queue delay ---
+
+      - alert: TritonQueueDelayWarn
+        expr: >
+          (rate(nv_inference_queue_duration_us_sum[5m])
+            / rate(nv_inference_queue_duration_us_count[5m]))
+          > 100000
+        for: 5m
+        labels:
+          severity: warning
+          service: triton
+        annotations:
+          summary: "Model {{ $labels.model }} average queue delay above 100 ms"
+          description: "Average queue delay for model {{ $labels.model }} is {{ $value | printf \"%.0f\" }} us (threshold: 100,000 us)."
+
+      - alert: TritonQueueDelayCritical
+        expr: >
+          (rate(nv_inference_queue_duration_us_sum[5m])
+            / rate(nv_inference_queue_duration_us_count[5m]))
+          > 500000
+        for: 2m
+        labels:
+          severity: critical
+          service: triton
+        annotations:
+          summary: "Model {{ $labels.model }} average queue delay above 500 ms"
+          description: "Average queue delay for model {{ $labels.model }} is {{ $value | printf \"%.0f\" }} us (threshold: 500,000 us). Pipeline is severely backed up."
+
+      # --- Inference errors ---
+
+      - alert: TritonInferenceErrorRate
+        expr: >
+          rate(nv_inference_request_failure[5m])
+            / (rate(nv_inference_request_success[5m])
+              + rate(nv_inference_request_failure[5m]))
+          > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          service: triton
+        annotations:
+          summary: "Model {{ $labels.model }} inference error rate above 1%"
+          description: "Inference error rate for {{ $labels.model }} is {{ $value | printf \"%.3f\" }} ({{ $value | printf \"%.1f\" }}%%)."
+
+      # --- Model availability ---
+
+      - alert: TritonModelNotReady
+        expr: nv_inference_request_success == 0 and nv_inference_request_failure == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: triton
+        annotations:
+          summary: "Model {{ $labels.model }} is not receiving any inference requests"
+          description: "Model {{ $labels.model }} has had zero requests (success or failure) for over 1 minute. Check if model is loaded."

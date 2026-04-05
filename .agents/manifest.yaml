@@ -93,9 +93,9 @@ phases:
       role: design
       title: Triton Model Placement & VRAM Budget
       depends_on: []
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P0-D10
       prompt: .agents/prompts/P0-D10.md
       tool: claude-code
     - id: P0-E01
