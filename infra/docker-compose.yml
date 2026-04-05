@@ -1,0 +1,328 @@
+services:
+  kafka-0:
+    image: bitnami/kafka:3.7.0
+    container_name: kafka-0
+    hostname: kafka-0
+    ports:
+      - "19092:9094"
+    environment:
+      KAFKA_ENABLE_KRAFT: "yes"
+      KAFKA_KRAFT_CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_CFG_NODE_ID: "0"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-0:9092,EXTERNAL://localhost:19092"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - kafka_0_data:/bitnami/kafka
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  kafka-1:
+    image: bitnami/kafka:3.7.0
+    container_name: kafka-1
+    hostname: kafka-1
+    ports:
+      - "19093:9094"
+    environment:
+      KAFKA_ENABLE_KRAFT: "yes"
+      KAFKA_KRAFT_CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-1:9092,EXTERNAL://localhost:19093"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - kafka_1_data:/bitnami/kafka
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  kafka-2:
+    image: bitnami/kafka:3.7.0
+    container_name: kafka-2
+    hostname: kafka-2
+    ports:
+      - "19094:9094"
+    environment:
+      KAFKA_ENABLE_KRAFT: "yes"
+      KAFKA_KRAFT_CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_CFG_NODE_ID: "2"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-2:9092,EXTERNAL://localhost:19094"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - kafka_2_data:/bitnami/kafka
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kafka-ui
+    depends_on:
+      kafka-0:
+        condition: service_healthy
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: "local"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka-0:9092,kafka-1:9092,kafka-2:9092"
+      DYNAMIC_CONFIG_ENABLED: "true"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O - http://localhost:8080/actuator/health | grep -q UP
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  nats:
+    image: nats:2.10.18-alpine
+    container_name: nats
+    command:
+      - --jetstream
+      - --store_dir
+      - /data
+      - --http_port
+      - "8222"
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://localhost:8222/healthz
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  timescaledb:
+    image: timescale/timescaledb:2.18.1-pg16
+    container_name: timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-cilex}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-cilex_dev_password}"
+      POSTGRES_DB: "${POSTGRES_DB:-vidanalytics}"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  minio:
+    image: minio/minio:RELEASE.2024-06-11T03-13-30Z
+    container_name: minio
+    command:
+      - server
+      - /data
+      - --console-address
+      - ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minioadmin}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://localhost:9000/minio/health/live >/dev/null
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  minio-init:
+    image: minio/mc:RELEASE.2024-06-11T21-32-12Z
+    container_name: minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}";
+        mc mb -p local/frame-blobs || true;
+        mc mb -p local/event-clips || true;
+        mc mb -p local/debug-traces || true;
+        mc mb -p local/thumbnails || true;
+        exec tail -f /dev/null
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minioadmin}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mc ls local/frame-blobs >/dev/null 2>&1 && mc ls local/event-clips >/dev/null 2>&1 && mc ls local/debug-traces >/dev/null 2>&1 && mc ls local/thumbnails >/dev/null 2>&1
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7.4.0-alpine
+    container_name: redis
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://localhost:9090/-/healthy
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  grafana:
+    image: grafana/grafana:11.1.3
+    container_name: grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O - http://localhost:3000/api/health | grep -q ok
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  mlflow:
+    image: python:3.11-slim
+    container_name: mlflow
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-cilex}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-cilex_dev_password}"
+      AWS_ACCESS_KEY_ID: "${MINIO_ROOT_USER:-minioadmin}"
+      AWS_SECRET_ACCESS_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+      MLFLOW_S3_ENDPOINT_URL: "http://minio:9000"
+      AWS_DEFAULT_REGION: "us-east-1"
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        pip install --no-cache-dir mlflow==2.14.3 psycopg2-binary==2.9.9 boto3==1.34.144;
+        exec mlflow server \
+          --host 0.0.0.0 \
+          --port 5000 \
+          --backend-store-uri postgresql://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@timescaledb:5432/mlflow \
+          --artifacts-destination s3://debug-traces/mlflow \
+          --serve-artifacts
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/').read()"
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  kafka_0_data:
+  kafka_1_data:
+  kafka_2_data:
+  nats_data:
+  timescaledb_data:
+  minio_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:

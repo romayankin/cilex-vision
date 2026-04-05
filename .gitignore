@@ -16,3 +16,4 @@ data/eval/*.mp4
 data/eval/*.avi
 .claude-task-context.md
 /tmp/
+cilex-vision-knowledge-base.md

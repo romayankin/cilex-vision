@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: Ruff + Mypy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install lint dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            ruff==0.6.9 \
+            mypy==1.11.2 \
+            SQLAlchemy==2.0.36 \
+            alembic==1.13.3
+
+      - name: Run Ruff
+        run: ruff check .
+
+      - name: Run Mypy
+        run: mypy --ignore-missing-imports services/
+
+  test:
+    name: Pytest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest==8.3.3
+
+      - name: Run pytest
+        run: |
+          set +e
+          python -m pytest tests/ -v
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then
+            exit "$status"
+          fi
+
+  proto:
+    name: Buf Lint + Breaking
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ github.token }}
+
+      - name: Run buf lint
+        run: buf lint proto/
+
+      - name: Run buf breaking
+        if: github.event_name == 'pull_request'
+        run: buf breaking proto/ --against "https://github.com/${{ github.repository }}.git#branch=main,subdir=proto"

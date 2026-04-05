@@ -1,26 +1,38 @@
 .PHONY: up down test lint proto-check migrate seed status launch
 
+COMPOSE ?= docker compose
+COMPOSE_FILE ?= infra/docker-compose.yml
+
 up:
-	docker-compose -f infra/docker-compose.yml up -d
+	$(COMPOSE) -f $(COMPOSE_FILE) up -d
 
 down:
-	docker-compose -f infra/docker-compose.yml down
+	$(COMPOSE) -f $(COMPOSE_FILE) down --remove-orphans
 
 test:
-	python -m pytest tests/ -v
+	@python -m pytest tests/ -v; \
+	status=$$?; \
+	if [ $$status -ne 0 ] && [ $$status -ne 5 ]; then \
+		exit $$status; \
+	fi
 
 lint:
 	ruff check .
 	mypy --ignore-missing-imports services/
 
 proto-check:
-	cd proto && buf lint && buf breaking --against ../.git#branch=main
+	buf lint proto/
+	buf breaking proto/ --against '.git#branch=main'
 
 migrate:
 	cd services/db && alembic upgrade head
 
 seed:
-	python scripts/data/seed.py
+	@if [ -f scripts/data/seed.py ]; then \
+		python scripts/data/seed.py; \
+	else \
+		echo "scripts/data/seed.py not implemented yet"; \
+	fi
 
 status:
 	.agents/status.sh
