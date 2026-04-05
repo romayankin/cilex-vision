@@ -109,3 +109,9 @@ services/{name}/
 
 ## Project Context
 PROJECT-STATUS.md is the single source of truth for project state. Read it first. Update it after completing any task.
+
+## Post-Completion Checklist (mandatory after every task)
+1. Update `.agents/manifest.yaml` — set task status to `done`
+2. Update `PROJECT-STATUS.md` — move task to Completed table, document what it produced
+3. Commit both files together: `git commit -m "status: mark P0-XXX done"`
+Never skip these steps. Never commit one without the other.

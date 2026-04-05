@@ -197,8 +197,27 @@ claude --model opus             # "Read CONVENTIONS.md then .claude-task-context
 git add -A && git commit
 .agents/review.sh P0-XXX       # automated quality check
 git checkout main && git merge feat/P0-XXX
-# UPDATE THIS FILE (PROJECT-STATUS.md) with completed task details
-git add PROJECT-STATUS.md && git commit -m "status: mark P0-XXX done"
+
+# POST-COMPLETION (both steps mandatory — never skip):
+# 1. Update manifest
+python3 -c "
+import yaml
+with open('.agents/manifest.yaml') as f:
+    m = yaml.safe_load(f)
+for phase in m['phases'].values():
+    for task in phase['tasks']:
+        if task['id'] == 'P0-XXX':
+            task['status'] = 'done'
+with open('.agents/manifest.yaml', 'w') as f:
+    yaml.dump(m, f, default_flow_style=False, sort_keys=False)
+"
+
+# 2. Update PROJECT-STATUS.md — move task to Completed table with what it produced
+
+git add .agents/manifest.yaml PROJECT-STATUS.md
+git commit -m "status: mark P0-XXX done"
+git push
+
 .agents/status.sh              # see what unlocked
 ```
 
