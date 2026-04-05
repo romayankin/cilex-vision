@@ -156,7 +156,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 9. **Grafana** — 5 dashboards: stream health, inference perf, bus health, storage, model quality
 10. **Chrony** — 3 NTP pools, drift collector pairwise clock_skew_ms, 500ms WARN / 2000ms CRITICAL
 11. **step-ca** — Internal PKI, 90-day certs, daily auto-renewal, CRL revocation
-12. **mTLS** — Bidirectional auth, NATS verify_and_map, Kafka ACLs from cert CN, closed trust chain
+12. **mTLS** — Bidirectional auth, NATS verify_and_map CN→subject ACLs, Kafka SASL_SSL with SCRAM-SHA-256 → topic ACLs, closed trust chain
 13. **JWT+RBAC** — httpOnly cookie, 4 roles, camera scope WHERE IN, audit 2yr, bcrypt+rate limiting
 
 ---
