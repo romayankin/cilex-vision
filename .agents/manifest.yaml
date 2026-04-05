@@ -93,7 +93,7 @@ phases:
       role: design
       title: Triton Model Placement & VRAM Budget
       depends_on: []
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P0-D10
       prompt: .agents/prompts/P0-D10.md

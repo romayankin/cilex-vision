@@ -103,11 +103,11 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P0-D06 | Ingress Bridge Spec | feat/P0-D06 | ADR-001 full spec (8 responsibilities, failure modes, metrics, deployment), ingress-bridge-flow.mermaid |
 | P0-O01 | Infrastructure Scaffolding | feat/P0-O01 | docker-compose.yml (Kafka 3-broker, NATS, TimescaleDB, MinIO, Redis, Prometheus, Grafana, MLflow), CI workflow, Makefile |
 | P0-D08 | Security Design | feat/P0-D08 | Full security spec (trust model, PKI, NATS mTLS, Kafka SASL_SSL, ACL matrices), step-ca config, bootstrap-site.sh, NATS/Kafka templates |
+| P0-D10 | Triton Placement | feat/P0-D10 | Full placement spec (model inventory, VRAM budget, GPU classes, co-location), 3 Triton config.pbtxt files, triton-alerts.yml |
 
 ### Phase 0 — Remaining (priority order)
 | Task | Title | Unblocks | Priority |
 |------|-------|----------|----------|
-| P0-D10 | Triton Placement | P1-V04 | **3** |
 | P0-D05 | Edge Filter Design | — | 4 |
 | P0-D09 | Privacy Framework | — | 4 |
 | P0-E01 | Model Bake-off Protocol | — | 4 |
