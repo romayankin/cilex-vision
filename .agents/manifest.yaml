@@ -112,7 +112,7 @@ phases:
       role: ops
       title: Infrastructure Scaffolding
       depends_on: []
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P0-O01
       prompt: .agents/prompts/P0-O01.md
