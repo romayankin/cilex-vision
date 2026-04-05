@@ -100,20 +100,20 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P0-D03 | Kafka Topic Contract | feat/P0-D03 | docs/kafka-contract.md, infra/kafka/topics.yaml, create-topics.py |
 | P0-D04 | Database Schema | feat/P0-D04 | 12 SQLAlchemy 2.0 models (2 hypertables + 10 relational), Alembic migration, Mermaid ER diagram, ADR-003 |
 | P0-D07 | Time Sync Policy | feat/P0-D07 | Full timestamp policy doc, Chrony configs, clock_drift_check.py with mock smoke test, Prometheus alert rules |
+| P0-D06 | Ingress Bridge Spec | feat/P0-D06 | ADR-001 full spec (8 responsibilities, failure modes, metrics, deployment), ingress-bridge-flow.mermaid |
 
 ### Phase 0 — Remaining (priority order)
 | Task | Title | Unblocks | Priority |
 |------|-------|----------|----------|
 | P0-O01 | Infrastructure Scaffolding | P1-V01, P1-V03, P1-V05, P1-O01 | **1 — HIGHEST** |
 | P0-D08 | Security Design | P1-O01 | **2** |
-| P0-D06 | Ingress Bridge Spec | P1-V02 | **3** |
-| P0-D10 | Triton Placement | P1-V04 | **4** |
-| P0-D05 | Edge Filter Design | — | 5 |
-| P0-D09 | Privacy Framework | — | 5 |
-| P0-E01 | Model Bake-off Protocol | — | 5 |
-| P0-V01 | Throwaway Prototype | — | 5 |
-| P0-X01 | Camera Compat Matrix | — | 5 |
-| P0-X02 | Hardware Sizing | — | 5 |
+| P0-D10 | Triton Placement | P1-V04 | **3** |
+| P0-D05 | Edge Filter Design | — | 4 |
+| P0-D09 | Privacy Framework | — | 4 |
+| P0-E01 | Model Bake-off Protocol | — | 4 |
+| P0-V01 | Throwaway Prototype | — | 4 |
+| P0-X01 | Camera Compat Matrix | — | 4 |
+| P0-X02 | Hardware Sizing | — | 4 |
 
 ### Phase 1 — All Pending (14 tasks, depends on Phase 0 completion)
 ### Phases 2-4 — All Pending (39 tasks, prompts not yet in manifest)

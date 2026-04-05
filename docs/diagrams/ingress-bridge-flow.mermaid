@@ -1,0 +1,70 @@
+%% Ingress Bridge — Three operational flows
+%% Normal, Kafka outage (spool), Spool drain (replay)
+
+flowchart TB
+    subgraph Edge ["Edge Tier"]
+        CAM[Camera / NVR]
+        EA[Edge Agent<br/>motion filter ~15%]
+        NATS[(NATS JetStream<br/>10 GB buffer)]
+    end
+
+    subgraph Bridge ["Ingress Bridge Service"]
+        direction TB
+        RECV[1. NATS Durable Consumer<br/>explicit ack]
+        VALID[2. Schema Validation<br/>Protobuf + field checks]
+        BLOB[3. Blob Offload<br/>payload > 100 KB → MinIO]
+        KEY[4. Idempotent Key<br/>site:camera:ts:seq]
+        STAMP[5. Stamp core_ingest_ts<br/>Chrony UTC clock]
+        RL[8. Rate Limiter<br/>500 msg/s per site]
+    end
+
+    subgraph Spool ["NVMe Spool (50 GB)"]
+        SP[(spool/<br/>topic/key/ts.pb)]
+        DRAIN[7. Drain at 80% rate<br/>FIFO, live priority]
+    end
+
+    subgraph Core ["Core Tier"]
+        KAFKA[(Kafka<br/>frames.sampled.refs)]
+        SR[Schema Registry]
+        MINIO[(MinIO<br/>frame-blobs)]
+    end
+
+    subgraph DLQ ["Dead Letter"]
+        NATSDLQ[(NATS DLQ<br/>frames.dlq.*)]
+    end
+
+    %% ===== NORMAL FLOW =====
+    CAM -->|RTSP stream| EA
+    EA -->|FrameRef protobuf| NATS
+    NATS --> RECV
+    RECV --> VALID
+    VALID -->|valid| BLOB
+    VALID -->|3x fail| NATSDLQ
+    BLOB -->|offload| MINIO
+    BLOB --> KEY
+    KEY --> STAMP
+    STAMP --> RL
+    RL -->|produce| KAFKA
+    RL -.->|ack| NATS
+
+    %% ===== KAFKA OUTAGE FLOW =====
+    RL -->|Kafka unavailable<br/>produce fails 3x| SP
+    SP -.->|ack after spool write| NATS
+
+    %% ===== SPOOL DRAIN FLOW =====
+    SP -->|Kafka recovered| DRAIN
+    DRAIN -->|80% rate limit<br/>FIFO order| KAFKA
+    DRAIN -->|delete after ack| SP
+
+    %% ===== STYLING =====
+    classDef edgeNode fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef bridgeNode fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef spoolNode fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef coreNode fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    classDef dlqNode fill:#ffebee,stroke:#c62828,stroke-width:2px
+
+    class CAM,EA,NATS edgeNode
+    class RECV,VALID,BLOB,KEY,STAMP,RL bridgeNode
+    class SP,DRAIN spoolNode
+    class KAFKA,SR,MINIO coreNode
+    class NATSDLQ dlqNode

@@ -57,9 +57,9 @@ phases:
       title: Ingress Bridge Design Specification
       depends_on:
       - P0-D02
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P0-D06
       prompt: .agents/prompts/P0-D06.md
       tool: claude-code
     - id: P0-D07
