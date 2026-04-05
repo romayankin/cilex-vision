@@ -75,9 +75,9 @@ phases:
       role: design
       title: Security Design - mTLS & ACLs
       depends_on: []
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P0-D08
       prompt: .agents/prompts/P0-D08.md
       tool: codex-cli
     - id: P0-D09

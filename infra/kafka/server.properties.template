@@ -1,0 +1,52 @@
+# P0-D08 Kafka security template
+# Kafka client auth is SASL_SSL with SCRAM-SHA-256.
+# Topic ACLs must be exact-topic grants matching infra/kafka/topics.yaml.
+
+process.roles=broker,controller
+node.id=REPLACE_NODE_ID
+controller.quorum.voters=1@kafka-1.core.cilex.internal:9094,2@kafka-2.core.cilex.internal:9094,3@kafka-3.core.cilex.internal:9094
+
+listeners=INTERNAL://0.0.0.0:9092,CLIENT://0.0.0.0:9093,CONTROLLER://0.0.0.0:9094
+advertised.listeners=INTERNAL://kafka-REPLACE_NODE_ID.core.cilex.internal:9092,CLIENT://kafka-REPLACE_NODE_ID.core.cilex.internal:9093
+listener.security.protocol.map=INTERNAL:SASL_SSL,CLIENT:SASL_SSL,CONTROLLER:SSL
+inter.broker.listener.name=INTERNAL
+controller.listener.names=CONTROLLER
+
+authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer
+allow.everyone.if.no.acl.found=false
+super.users=User:svc-kafka-broker;User:ops-kafka-admin
+
+ssl.keystore.type=PKCS12
+ssl.truststore.type=PKCS12
+ssl.keystore.location=/etc/kafka/tls/broker.keystore.p12
+ssl.keystore.password=${KAFKA_SSL_KEYSTORE_PASSWORD}
+ssl.key.password=${KAFKA_SSL_KEY_PASSWORD}
+ssl.truststore.location=/etc/kafka/tls/broker.truststore.p12
+ssl.truststore.password=${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+ssl.enabled.protocols=TLSv1.2,TLSv1.3
+ssl.protocol=TLSv1.3
+ssl.client.auth=none
+
+sasl.enabled.mechanisms=SCRAM-SHA-256
+sasl.mechanism.inter.broker.protocol=SCRAM-SHA-256
+listener.name.internal.scram-sha-256.sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="svc-kafka-broker" password="${KAFKA_INTER_BROKER_PASSWORD}";
+listener.name.client.scram-sha-256.sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="svc-kafka-broker" password="${KAFKA_INTER_BROKER_PASSWORD}";
+
+# Canonical Kafka topics requiring exact ACLs:
+# - frames.sampled.refs
+# - tracklets.local
+# - attributes.jobs
+# - mtmc.active_embeddings
+# - events.raw
+# - archive.transcode.requested
+# - archive.transcode.completed
+
+# Example ACL principals:
+# User:svc-ingress-bridge -> producer on frames.sampled.refs
+# User:svc-attribute -> consumer on tracklets.local, producer on attributes.jobs
+# User:svc-embedding -> consumer on tracklets.local, producer on mtmc.active_embeddings
+# User:svc-mtmc -> consumer on tracklets.local, attributes.jobs, mtmc.active_embeddings
+# User:svc-event-engine -> consumer on tracklets.local, producer on events.raw and archive.transcode.requested
+# User:svc-archive -> consumer on events.raw and archive.transcode.requested, producer on archive.transcode.completed
+# User:svc-bulk-collector -> consumer on frames.sampled.refs, tracklets.local, attributes.jobs, events.raw, archive.transcode.completed
+# User:svc-debug-trace -> consumer on frames.sampled.refs
