@@ -302,7 +302,7 @@ if [ "$ROLE" = "ops" ]; then
     [ -f "infra/docker-compose.yml" ] && check_pass "docker-compose.yml exists" || check_fail "No docker-compose.yml"
 
     if [ -f "infra/docker-compose.yml" ]; then
-        docker-compose -f infra/docker-compose.yml config -q 2>/dev/null && check_pass "docker-compose validates" || check_warn "docker-compose validation issues"
+        docker compose -f infra/docker-compose.yml config -q 2>/dev/null && check_pass "docker-compose validates" || check_warn "docker-compose validation issues"
     fi
 
     # YAML validity
