@@ -1,0 +1,106 @@
+---
+- name: Deploy Triton Inference Server
+  hosts: triton
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+
+  roles:
+    - common
+
+  tasks:
+    - name: Ensure NVIDIA GPUs are visible on the host
+      ansible.builtin.command:
+        cmd: nvidia-smi -L
+      register: triton_gpu_list
+      changed_when: false
+
+    - name: Ensure Docker exposes the NVIDIA runtime
+      ansible.builtin.command:
+        cmd: "docker info --format '{{json .Runtimes}}'"
+      register: triton_docker_runtimes
+      changed_when: false
+
+    - name: Assert NVIDIA runtime is available
+      ansible.builtin.assert:
+        that:
+          - "'nvidia' in triton_docker_runtimes.stdout"
+        fail_msg: "Docker does not expose the NVIDIA runtime. Configure nvidia-container-toolkit on the Triton host before running this playbook."
+
+    - name: Create Triton model repository
+      ansible.builtin.file:
+        path: "{{ triton_model_repository_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Copy Triton model repository
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/infra/triton/models/"
+        dest: "{{ triton_model_repository_dir }}/"
+        owner: root
+        group: root
+        mode: preserve
+        directory_mode: "0755"
+
+    - name: Start Triton container
+      community.docker.docker_container:
+        name: triton
+        image: "{{ triton_image }}"
+        state: started
+        restart_policy: unless-stopped
+        network_mode: host
+        runtime: "{{ triton_container_runtime }}"
+        device_requests:
+          - device_ids: "{{ triton_gpu_devices }}"
+            capabilities:
+              - - gpu
+        command:
+          - tritonserver
+          - --model-repository=/models
+          - --model-control-mode=explicit
+          - --strict-model-config=true
+          - --grpc-port={{ triton_grpc_port }}
+          - --http-port={{ triton_http_port }}
+          - --metrics-port={{ triton_metrics_port }}
+          - --log-verbose=0
+          - --exit-on-error=true
+        volumes:
+          - "{{ triton_model_repository_dir }}:/models:ro"
+
+    - name: Wait for Triton HTTP endpoint
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ triton_http_port }}"
+        delay: 8
+        timeout: 180
+
+    - name: Wait for Triton metrics endpoint
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ triton_metrics_port }}"
+        delay: 8
+        timeout: 180
+
+    - name: Smoke test Triton health
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ triton_http_port }}/v2/health/ready"
+        status_code: 200
+
+    - name: Smoke test Triton metrics
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ triton_metrics_port }}/metrics"
+        status_code: 200
+        return_content: true
+      register: triton_metrics
+
+    - name: Assert Triton metrics endpoint returned Prometheus text
+      ansible.builtin.assert:
+        that:
+          - "'# ' in triton_metrics.content or 'nv_' in triton_metrics.content"

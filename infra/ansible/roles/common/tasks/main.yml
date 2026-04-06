@@ -1,0 +1,32 @@
+---
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ common_apt_packages }}"
+    state: present
+    update_cache: true
+
+- name: Install Docker SDK for Ansible
+  ansible.builtin.pip:
+    name: "{{ common_pip_packages }}"
+    state: present
+    executable: pip3
+
+- name: Ensure Docker service is enabled
+  ansible.builtin.service:
+    name: "{{ docker_service_name }}"
+    enabled: true
+    state: started
+
+- name: Create shared Cilex directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ cilex_root_dir }}"
+    - "{{ cilex_config_dir }}"
+    - "{{ cilex_data_dir }}"
+    - "{{ cilex_bin_dir }}"
+

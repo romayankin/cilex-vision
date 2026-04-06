@@ -1,0 +1,15 @@
+{
+  "Rules": [
+    {
+      "ID": "{{ minio_lifecycle_rule.bucket }}-expiry",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": ""
+      },
+      "Expiration": {
+        "Days": {{ minio_lifecycle_rule.expiration_days }}
+      }
+    }
+  ]
+}
+

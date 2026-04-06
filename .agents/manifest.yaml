@@ -268,9 +268,9 @@ phases:
       - P0-D03
       - P0-D07
       - P0-D08
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P1-O01
       prompt: .agents/prompts/P1-O01.md
       tool: codex-cli
     - id: P1-O02

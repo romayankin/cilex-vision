@@ -1,0 +1,104 @@
+---
+- name: Deploy MinIO object storage
+  hosts: minio
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+
+  roles:
+    - common
+
+  tasks:
+    - name: Create MinIO directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ minio_base_dir }}"
+        - "{{ minio_policy_dir }}"
+        - "{{ minio_data_dir }}"
+
+    - name: Render MinIO lifecycle policies
+      ansible.builtin.template:
+        src: ../templates/minio/lifecycle-policy.json.j2
+        dest: "{{ minio_policy_dir }}/{{ minio_lifecycle_rule.bucket }}.json"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ minio_lifecycle_rules }}"
+      loop_control:
+        loop_var: minio_lifecycle_rule
+
+    - name: Start MinIO container
+      community.docker.docker_container:
+        name: minio
+        image: "{{ minio_image }}"
+        state: started
+        restart_policy: unless-stopped
+        network_mode: host
+        env:
+          MINIO_ROOT_USER: "{{ minio_root_user }}"
+          MINIO_ROOT_PASSWORD: "{{ minio_root_password }}"
+        command:
+          - server
+          - /data
+          - --console-address
+          - ":{{ minio_console_port }}"
+        volumes:
+          - "{{ minio_data_dir }}:/data"
+      no_log: true
+
+    - name: Wait for MinIO API
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ minio_api_port }}"
+        delay: 3
+        timeout: 90
+
+    - name: Wait for MinIO console
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ minio_console_port }}"
+        delay: 3
+        timeout: 90
+
+    - name: Smoke test MinIO live health endpoint
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ minio_api_port }}/minio/health/live"
+        status_code: 200
+
+    - name: Create required MinIO buckets
+      ansible.builtin.command:
+        cmd: >-
+          docker run --rm --network host
+          -e MC_HOST_local=http://{{ minio_root_user }}:{{ minio_root_password }}@127.0.0.1:{{ minio_api_port }}
+          {{ minio_mc_image }}
+          mb --ignore-existing local/{{ item }}
+      loop: "{{ minio_buckets }}"
+      register: minio_bucket_create
+      changed_when: "'Created' in (minio_bucket_create.stdout | default('') ~ minio_bucket_create.stderr | default(''))"
+      no_log: true
+
+    - name: Smoke test MinIO bucket visibility
+      ansible.builtin.command:
+        cmd: >-
+          docker run --rm --network host
+          -e MC_HOST_local=http://{{ minio_root_user }}:{{ minio_root_password }}@127.0.0.1:{{ minio_api_port }}
+          {{ minio_mc_image }}
+          ls local
+      register: minio_bucket_list
+      changed_when: false
+      no_log: true
+
+    - name: Assert required buckets exist
+      ansible.builtin.assert:
+        that:
+          - item in minio_bucket_list.stdout
+      loop: "{{ minio_buckets }}"
+

@@ -1,0 +1,69 @@
+# P1-O01 NATS security config
+# Rendered from infra/nats/nats-server.conf and inventory vars.
+
+server_name: "nats-{{ nats_site_id }}"
+listen: "0.0.0.0:{{ nats_client_port }}"
+http: "0.0.0.0:{{ nats_http_port }}"
+
+jetstream {
+  store_dir: "/var/lib/nats/jetstream"
+  max_mem_store: {{ nats_jetstream_max_mem_store }}
+  max_file_store: {{ nats_jetstream_max_file_store }}
+}
+
+tls {
+  cert_file: "/etc/nats/pki/server.crt"
+  key_file: "/etc/nats/pki/server.key"
+  ca_file: "/etc/nats/pki/root_ca.crt"
+  verify: true
+  verify_and_map: true
+  timeout: 2
+}
+
+authorization {
+  default_permissions = {
+    publish = []
+    subscribe = []
+  }
+
+  users = [
+    {
+      user: "CN=edge-site-{{ nats_site_id }}"
+      permissions: {
+        publish: [
+          "frames.live.{{ nats_site_id }}.>",
+          "frames.replay.{{ nats_site_id }}.>"
+        ]
+        subscribe: [
+          "_INBOX.>"
+        ]
+      }
+    },
+    {
+      user: "CN=bridge-site-{{ nats_site_id }}"
+      permissions: {
+        publish: [
+          "$JS.API.CONSUMER.MSG.NEXT.CILEX_{{ nats_site_id | replace('-', '_') | upper }}.INGRESS_BRIDGE_{{ nats_site_id | replace('-', '_') | upper }}",
+          "$JS.API.CONSUMER.INFO.CILEX_{{ nats_site_id | replace('-', '_') | upper }}.INGRESS_BRIDGE_{{ nats_site_id | replace('-', '_') | upper }}",
+          "$JS.ACK.CILEX_{{ nats_site_id | replace('-', '_') | upper }}.INGRESS_BRIDGE_{{ nats_site_id | replace('-', '_') | upper }}.>",
+          "frames.dlq.{{ nats_site_id }}.>"
+        ]
+        subscribe: [
+          "_INBOX.>"
+        ]
+      }
+    },
+    {
+      user: "CN={{ nats_ops_admin_cn }}"
+      permissions: {
+        publish: [
+          ">"
+        ]
+        subscribe: [
+          ">"
+        ]
+      }
+    }
+  ]
+}
+

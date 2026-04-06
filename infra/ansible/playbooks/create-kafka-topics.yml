@@ -1,0 +1,71 @@
+---
+- name: Create canonical Kafka topics
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+    kafka_topics_definition: "{{ lookup('file', repo_root + '/infra/kafka/topics.yaml') | from_yaml }}"
+    kafka_bootstrap_host: "{{ groups['kafka'][0] }}"
+    kafka_bootstrap_container: "kafka-{{ hostvars[groups['kafka'][0]].kafka_node_id }}"
+  pre_tasks:
+    - name: Validate Kafka inventory
+      ansible.builtin.assert:
+        that:
+          - groups['kafka'] | length == 3
+        fail_msg: "create-kafka-topics.yml requires the 3-broker kafka inventory group."
+
+  tasks:
+    - name: Wait for every Kafka broker to accept client traffic
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[item].ansible_host | default(item) }}"
+        port: "{{ kafka_client_port }}"
+        delay: 5
+        timeout: 120
+      loop: "{{ groups['kafka'] }}"
+
+    - name: Create canonical Kafka topics
+      ansible.builtin.command:
+        cmd: >-
+          docker exec {{ kafka_bootstrap_container }}
+          /opt/bitnami/kafka/bin/kafka-topics.sh
+          --bootstrap-server localhost:{{ kafka_client_port }}
+          --command-config /opt/bitnami/kafka/config/admin.properties
+          --create
+          --if-not-exists
+          --topic {{ item.name }}
+          --partitions {{ item.partitions }}
+          --replication-factor {{ item.replication_factor | default(kafka_topics_definition.defaults.replication_factor) }}
+          --config cleanup.policy={{ item.cleanup_policy }}
+          --config retention.ms={{ item.retention_ms }}
+          --config min.insync.replicas={{ kafka_topics_definition.defaults.min_insync_replicas }}
+      loop: "{{ kafka_topics_definition.topics }}"
+      register: kafka_topic_create
+      delegate_to: "{{ kafka_bootstrap_host }}"
+      run_once: true
+      changed_when: "'Created topic' in (kafka_topic_create.stdout | default('') ~ kafka_topic_create.stderr | default(''))"
+      no_log: true
+
+    - name: List Kafka topics as a smoke test
+      ansible.builtin.command:
+        cmd: >-
+          docker exec {{ kafka_bootstrap_container }}
+          /opt/bitnami/kafka/bin/kafka-topics.sh
+          --bootstrap-server localhost:{{ kafka_client_port }}
+          --command-config /opt/bitnami/kafka/config/admin.properties
+          --list
+      delegate_to: "{{ kafka_bootstrap_host }}"
+      run_once: true
+      changed_when: false
+      register: kafka_topic_list
+      no_log: true
+
+    - name: Assert canonical topics exist
+      ansible.builtin.assert:
+        that:
+          - item.name in kafka_topic_list.stdout_lines
+      loop: "{{ kafka_topics_definition.topics }}"
+      run_once: true
+

@@ -1,0 +1,43 @@
+global:
+  scrape_interval: {{ monitoring_scrape_interval }}
+  evaluation_interval: {{ monitoring_evaluation_interval }}
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - {{ hostvars[groups['monitoring'][0]].ansible_host | default(groups['monitoring'][0]) }}:{{ prometheus_port }}
+
+  - job_name: node-exporter
+    static_configs:
+      - targets:
+{% set node_targets = namespace(items=[]) %}
+{% for group_name in ['kafka', 'nats', 'timescaledb', 'minio', 'triton', 'monitoring', 'mlflow', 'cvat', 'services'] %}
+{%   for host in groups.get(group_name, []) %}
+{%     set target = (hostvars[host].ansible_host | default(host)) ~ ':' ~ node_exporter_port %}
+{%     if target not in node_targets.items %}
+{%       set _ = node_targets.items.append(target) %}
+{%     endif %}
+{%   endfor %}
+{% endfor %}
+{% for target in node_targets.items %}
+          - {{ target }}
+{% endfor %}
+
+{% if groups.get('triton', []) %}
+  - job_name: triton
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+{%   for host in groups.get('triton', []) %}
+          - {{ hostvars[host].ansible_host | default(host) }}:{{ triton_metrics_port }}
+{%   endfor %}
+
+{% endif %}
+  - job_name: loki
+    static_configs:
+      - targets:
+          - {{ hostvars[groups['monitoring'][0]].ansible_host | default(groups['monitoring'][0]) }}:{{ loki_port }}

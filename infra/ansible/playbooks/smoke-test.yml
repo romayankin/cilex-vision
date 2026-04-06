@@ -1,0 +1,197 @@
+---
+- name: Smoke test Kafka
+  hosts: kafka
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    kafka_container_name: "kafka-{{ kafka_node_id }}"
+  tasks:
+    - name: Wait for Kafka client listener
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ kafka_client_port }}"
+        delay: 3
+        timeout: 120
+
+    - name: Verify Kafka broker API responses
+      ansible.builtin.command:
+        cmd: >-
+          docker exec {{ kafka_container_name }}
+          /opt/bitnami/kafka/bin/kafka-broker-api-versions.sh
+          --bootstrap-server localhost:{{ kafka_client_port }}
+          --command-config /opt/bitnami/kafka/config/admin.properties
+      changed_when: false
+      register: kafka_smoke
+      no_log: true
+
+- name: Smoke test Kafka topics
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+    kafka_topics_definition: "{{ lookup('file', repo_root + '/infra/kafka/topics.yaml') | from_yaml }}"
+    kafka_bootstrap_host: "{{ groups['kafka'][0] }}"
+    kafka_bootstrap_container: "kafka-{{ hostvars[groups['kafka'][0]].kafka_node_id }}"
+  tasks:
+    - name: List Kafka topics
+      ansible.builtin.command:
+        cmd: >-
+          docker exec {{ kafka_bootstrap_container }}
+          /opt/bitnami/kafka/bin/kafka-topics.sh
+          --bootstrap-server localhost:{{ kafka_client_port }}
+          --command-config /opt/bitnami/kafka/config/admin.properties
+          --list
+      delegate_to: "{{ kafka_bootstrap_host }}"
+      changed_when: false
+      register: kafka_topic_list
+      no_log: true
+
+    - name: Assert canonical topics are present
+      ansible.builtin.assert:
+        that:
+          - item.name in kafka_topic_list.stdout_lines
+      loop: "{{ kafka_topics_definition.topics }}"
+
+- name: Smoke test NATS
+  hosts: nats
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Check NATS health endpoint
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ nats_http_port }}/healthz"
+        status_code: 200
+
+    - name: Check NATS JetStream endpoint
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ nats_http_port }}/jsz"
+        status_code: 200
+        return_content: true
+      register: nats_jsz
+
+    - name: Assert NATS JetStream reports capacity
+      ansible.builtin.assert:
+        that:
+          - "'memory' in nats_jsz.content"
+          - "'storage' in nats_jsz.content"
+
+- name: Smoke test TimescaleDB
+  hosts: timescaledb
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Check TimescaleDB readiness
+      ansible.builtin.command:
+        cmd: >-
+          docker exec timescaledb
+          pg_isready -U {{ timescaledb_postgres_user }} -d {{ timescaledb_postgres_db }}
+      changed_when: false
+      register: timescaledb_smoke
+      no_log: true
+
+- name: Smoke test MinIO
+  hosts: minio
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Check MinIO liveness
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ minio_api_port }}/minio/health/live"
+        status_code: 200
+
+- name: Smoke test Triton
+  hosts: triton
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Check Triton health
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ triton_http_port }}/v2/health/ready"
+        status_code: 200
+
+    - name: Check Triton metrics
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ triton_metrics_port }}/metrics"
+        status_code: 200
+        return_content: true
+      register: triton_metrics
+
+    - name: Assert Triton metrics contain Prometheus text
+      ansible.builtin.assert:
+        that:
+          - "'# ' in triton_metrics.content or 'nv_' in triton_metrics.content"
+
+- name: Smoke test monitoring
+  hosts: monitoring
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Check Prometheus
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ prometheus_port }}/-/healthy"
+        status_code: 200
+
+    - name: Check Grafana
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ grafana_port }}/api/health"
+        status_code: 200
+
+    - name: Check Loki
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ loki_port }}/ready"
+        status_code: 200
+
+- name: Smoke test MLflow
+  hosts: mlflow
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Check MLflow
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ mlflow_port }}/"
+        status_code: 200
+
+- name: Smoke test CVAT
+  hosts: cvat
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Check CVAT landing page
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ cvat_http_port }}/"
+        headers:
+          Host: "{{ cvat_host }}"
+        status_code: 200
+
+- name: Smoke test application services
+  hosts: services
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Check configured service health endpoints
+      ansible.builtin.uri:
+        url: "{{ item.smoke_test_url }}"
+        status_code: 200
+      loop: "{{ service_deployments }}"
+      when: item.smoke_test_url is defined

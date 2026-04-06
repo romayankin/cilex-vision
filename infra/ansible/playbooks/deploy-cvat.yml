@@ -1,0 +1,269 @@
+---
+- name: Deploy CVAT
+  hosts: cvat
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    cvat_network_name: cilex-cvat
+    cvat_secret_dir: "{{ cvat_base_dir }}/secrets"
+    cvat_postgres_password_file: "{{ cvat_secret_dir }}/postgres_password"
+    cvat_common_env:
+      CVAT_POSTGRES_HOST: cvat-db
+      CVAT_POSTGRES_PORT: "5432"
+      CVAT_POSTGRES_DBNAME: "{{ cvat_postgres_db }}"
+      CVAT_POSTGRES_USER: "{{ cvat_postgres_user }}"
+      CVAT_POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      CVAT_REDIS_INMEM_HOST: cvat-redis-inmem
+      CVAT_REDIS_INMEM_PORT: "6379"
+      CVAT_REDIS_ONDISK_HOST: cvat-redis-ondisk
+      CVAT_REDIS_ONDISK_PORT: "6666"
+      CVAT_LOG_IMPORT_ERRORS: "true"
+      CVAT_ALLOW_STATIC_CACHE: "no"
+      ALLOWED_HOSTS: "{{ cvat_host }},{{ ansible_host | default(inventory_hostname) }},localhost,127.0.0.1"
+      ADAPTIVE_AUTO_ANNOTATION: "false"
+      CVAT_ANALYTICS: "0"
+      CVAT_BASE_URL: "http://{{ cvat_host }}:{{ cvat_http_port }}"
+      ONE_RUNNING_JOB_IN_QUEUE_PER_USER: ""
+    cvat_worker_containers:
+      - name: cvat-worker-utils
+        command: run worker notifications cleaning
+        env:
+          NUMPROCS: "1"
+      - name: cvat-worker-import
+        command: run worker import
+        env:
+          NUMPROCS: "2"
+      - name: cvat-worker-export
+        command: run worker export
+        env:
+          NUMPROCS: "2"
+      - name: cvat-worker-annotation
+        command: run worker annotation
+        env:
+          NUMPROCS: "1"
+      - name: cvat-worker-webhooks
+        command: run worker webhooks
+        env:
+          NUMPROCS: "1"
+      - name: cvat-worker-quality-reports
+        command: run worker quality_reports
+        env:
+          NUMPROCS: "1"
+      - name: cvat-worker-chunks
+        command: run worker chunks
+        env:
+          NUMPROCS: "2"
+      - name: cvat-worker-consensus
+        command: run worker consensus
+        env:
+          NUMPROCS: "1"
+
+  roles:
+    - common
+
+  tasks:
+    - name: Create CVAT directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ cvat_base_dir }}"
+        - "{{ cvat_secret_dir }}"
+        - "{{ cvat_data_dir }}"
+        - "{{ cvat_data_dir }}/db"
+        - "{{ cvat_data_dir }}/redis-inmem"
+        - "{{ cvat_data_dir }}/redis-ondisk"
+        - "{{ cvat_data_dir }}/data"
+        - "{{ cvat_data_dir }}/keys"
+        - "{{ cvat_data_dir }}/logs"
+
+    - name: Write CVAT PostgreSQL password secret
+      ansible.builtin.copy:
+        dest: "{{ cvat_postgres_password_file }}"
+        content: "{{ cvat_postgres_password }}\n"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: Ensure the CVAT network exists
+      community.docker.docker_network:
+        name: "{{ cvat_network_name }}"
+        state: present
+
+    - name: Start CVAT PostgreSQL
+      community.docker.docker_container:
+        name: cvat-db
+        image: "{{ cvat_postgres_image }}"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ cvat_network_name }}"
+        env:
+          POSTGRES_USER: "{{ cvat_postgres_user }}"
+          POSTGRES_DB: "{{ cvat_postgres_db }}"
+          POSTGRES_PASSWORD: "{{ cvat_postgres_password }}"
+        volumes:
+          - "{{ cvat_data_dir }}/db:/var/lib/postgresql/data"
+      no_log: true
+
+    - name: Start CVAT in-memory Redis
+      community.docker.docker_container:
+        name: cvat-redis-inmem
+        image: "{{ cvat_redis_inmem_image }}"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ cvat_network_name }}"
+        command:
+          - redis-server
+          - --save
+          - "60"
+          - "100"
+          - --appendonly
+          - "yes"
+        volumes:
+          - "{{ cvat_data_dir }}/redis-inmem:/data"
+
+    - name: Start CVAT on-disk queue store
+      community.docker.docker_container:
+        name: cvat-redis-ondisk
+        image: "{{ cvat_kvrocks_image }}"
+        state: started
+        restart_policy: unless-stopped
+        init: true
+        networks:
+          - name: "{{ cvat_network_name }}"
+        command:
+          - --compact-cron
+          - 0 3 * * *
+        volumes:
+          - "{{ cvat_data_dir }}/redis-ondisk:/var/lib/kvrocks"
+
+    - name: Start CVAT OPA
+      community.docker.docker_container:
+        name: cvat-opa
+        image: "{{ cvat_opa_image }}"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ cvat_network_name }}"
+        command:
+          - run
+          - --server
+          - --addr=:8181
+          - --log-level=error
+          - --set=services.cvat.url=http://cvat-server:8080
+          - --set=bundles.cvat.service=cvat
+          - --set=bundles.cvat.resource=/api/auth/rules
+          - --set=bundles.cvat.polling.min_delay_seconds=5
+          - --set=bundles.cvat.polling.max_delay_seconds=15
+
+    - name: Start CVAT server
+      community.docker.docker_container:
+        name: cvat-server
+        image: "{{ cvat_server_image }}"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ cvat_network_name }}"
+        env: "{{ cvat_common_env | combine({'DJANGO_MODWSGI_EXTRA_ARGS': '', 'NUMPROCS': '2'}) }}"
+        command: init run server
+        labels:
+          traefik.enable: "true"
+          traefik.http.services.cvat.loadbalancer.server.port: "8080"
+          traefik.http.routers.cvat.rule: "Host(`{{ cvat_host }}`) && (PathPrefix(`/api/`) || PathPrefix(`/static/`) || PathPrefix(`/admin`) || PathPrefix(`/django-rq`))"
+          traefik.http.routers.cvat.entrypoints: web
+        volumes:
+          - "{{ cvat_data_dir }}/data:/home/django/data"
+          - "{{ cvat_data_dir }}/keys:/home/django/keys"
+          - "{{ cvat_data_dir }}/logs:/home/django/logs"
+          - "{{ cvat_postgres_password_file }}:/run/secrets/postgres_password:ro"
+
+    - name: Start CVAT workers
+      community.docker.docker_container:
+        name: "{{ item.name }}"
+        image: "{{ cvat_server_image }}"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ cvat_network_name }}"
+        env: "{{ cvat_common_env | combine(item.env) }}"
+        command: "{{ item.command }}"
+        volumes:
+          - "{{ cvat_data_dir }}/data:/home/django/data"
+          - "{{ cvat_data_dir }}/keys:/home/django/keys"
+          - "{{ cvat_data_dir }}/logs:/home/django/logs"
+          - "{{ cvat_postgres_password_file }}:/run/secrets/postgres_password:ro"
+      loop: "{{ cvat_worker_containers }}"
+
+    - name: Start CVAT UI
+      community.docker.docker_container:
+        name: cvat-ui
+        image: "{{ cvat_ui_image }}"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ cvat_network_name }}"
+        labels:
+          traefik.enable: "true"
+          traefik.http.services.cvat-ui.loadbalancer.server.port: "8000"
+          traefik.http.routers.cvat-ui.rule: "Host(`{{ cvat_host }}`)"
+          traefik.http.routers.cvat-ui.entrypoints: web
+
+    - name: Start CVAT Traefik gateway
+      community.docker.docker_container:
+        name: cvat-traefik
+        image: "{{ cvat_traefik_image }}"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ cvat_network_name }}"
+        published_ports:
+          - "{{ cvat_bind_address }}:{{ cvat_http_port }}:8080"
+        command:
+          - --providers.docker=true
+          - --providers.docker.exposedbydefault=false
+          - --providers.docker.network={{ cvat_network_name }}
+          - --entrypoints.web.address=:8080
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    - name: Wait for CVAT gateway
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ cvat_http_port }}"
+        delay: 5
+        timeout: 300
+
+    - name: Smoke test CVAT landing page
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ cvat_http_port }}/"
+        headers:
+          Host: "{{ cvat_host }}"
+        status_code: 200
+      register: cvat_health
+      retries: 24
+      delay: 10
+      until: cvat_health.status == 200
+
+    - name: Create CVAT superuser
+      ansible.builtin.command:
+        cmd: >-
+          docker exec
+          -e CVAT_SUPERUSER={{ cvat_admin_user }}
+          -e CVAT_SUPERUSER_EMAIL={{ cvat_admin_email }}
+          -e CVAT_SUPERUSER_PASSWORD={{ cvat_admin_password }}
+          cvat-server
+          /bin/bash -lc
+          "python3 ~/manage.py shell -c \"from django.contrib.auth import get_user_model; import os; User = get_user_model(); username = os.environ['CVAT_SUPERUSER']; email = os.environ['CVAT_SUPERUSER_EMAIL']; password = os.environ['CVAT_SUPERUSER_PASSWORD']; User.objects.filter(username=username).exists() or User.objects.create_superuser(username, email, password)\""
+      when: cvat_create_admin | bool
+      changed_when: false
+      no_log: true

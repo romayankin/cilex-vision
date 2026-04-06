@@ -1,0 +1,290 @@
+---
+- name: Deploy host-side log and metric agents
+  hosts: kafka:nats:timescaledb:minio:triton:monitoring:mlflow:cvat:services
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+
+  roles:
+    - common
+
+  tasks:
+    - name: Create monitoring agent directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ monitoring_promtail_dir }}"
+        - "{{ monitoring_promtail_data_dir }}"
+        - "{{ monitoring_textfile_dir }}"
+
+    - name: Render Promtail config
+      ansible.builtin.template:
+        src: ../templates/monitoring/promtail.yml.j2
+        dest: "{{ monitoring_promtail_dir }}/promtail.yml"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Start node-exporter
+      community.docker.docker_container:
+        name: node-exporter
+        image: "{{ node_exporter_image }}"
+        state: started
+        restart_policy: unless-stopped
+        network_mode: host
+        command:
+          - --path.rootfs=/host
+          - --collector.textfile.directory=/textfile_collector
+        volumes:
+          - "/:/host:ro,rslave"
+          - "/proc:/host/proc:ro"
+          - "/sys:/host/sys:ro"
+          - "{{ monitoring_textfile_dir }}:/textfile_collector"
+
+    - name: Start Promtail
+      community.docker.docker_container:
+        name: promtail
+        image: "{{ promtail_image }}"
+        state: started
+        restart_policy: unless-stopped
+        network_mode: host
+        command:
+          - -config.file=/etc/promtail/promtail.yml
+        volumes:
+          - "{{ monitoring_promtail_dir }}/promtail.yml:/etc/promtail/promtail.yml:ro"
+          - "{{ monitoring_promtail_data_dir }}:/var/lib/promtail"
+          - "/var/lib/docker/containers:/var/lib/docker/containers:ro"
+          - "/var/log:/var/log:ro"
+
+    - name: Wait for node-exporter
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ node_exporter_port }}"
+        delay: 3
+        timeout: 60
+
+- name: Deploy Prometheus, Grafana, Loki, and clock-drift collection
+  hosts: monitoring
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+  pre_tasks:
+    - name: Validate monitoring inventory
+      ansible.builtin.assert:
+        that:
+          - groups['monitoring'] | length >= 1
+        fail_msg: "deploy-monitoring.yml requires at least one host in the monitoring inventory group."
+
+  roles:
+    - common
+
+  tasks:
+    - name: Install chrony client for clock drift checks
+      ansible.builtin.apt:
+        name: chrony
+        state: present
+        update_cache: true
+
+    - name: Create monitoring stack directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ monitoring_prometheus_dir }}"
+        - "{{ monitoring_prometheus_dir }}/rules"
+        - "{{ monitoring_prometheus_data_dir }}"
+        - "{{ monitoring_grafana_dir }}"
+        - "{{ monitoring_grafana_dir }}/provisioning"
+        - "{{ monitoring_grafana_data_dir }}"
+        - "{{ monitoring_loki_dir }}"
+        - "{{ monitoring_loki_data_dir }}"
+        - "{{ cilex_bin_dir }}"
+
+    - name: Copy Prometheus alert rules
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/infra/prometheus/rules/"
+        dest: "{{ monitoring_prometheus_dir }}/rules/"
+        owner: root
+        group: root
+        mode: preserve
+
+    - name: Render Prometheus config
+      ansible.builtin.template:
+        src: ../templates/monitoring/prometheus.yml.j2
+        dest: "{{ monitoring_prometheus_dir }}/prometheus.yml"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy Grafana provisioning
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/infra/grafana/provisioning/"
+        dest: "{{ monitoring_grafana_dir }}/provisioning/"
+        owner: root
+        group: root
+        mode: preserve
+
+    - name: Copy Grafana dashboards
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/infra/grafana/dashboards/"
+        dest: "{{ monitoring_grafana_dir }}/dashboards/"
+        owner: root
+        group: root
+        mode: preserve
+
+    - name: Render Grafana Loki datasource
+      ansible.builtin.template:
+        src: ../templates/monitoring/grafana-loki-datasource.yml.j2
+        dest: "{{ monitoring_grafana_dir }}/provisioning/datasources/loki.yml"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Render Loki config
+      ansible.builtin.template:
+        src: ../templates/monitoring/loki-config.yml.j2
+        dest: "{{ monitoring_loki_dir }}/loki-config.yml"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy clock drift collector
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/services/monitoring/clock_drift_check.py"
+        dest: "{{ cilex_bin_dir }}/clock_drift_check.py"
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Render clock drift target file
+      ansible.builtin.template:
+        src: ../templates/monitoring/clock-targets.json.j2
+        dest: "{{ monitoring_promtail_dir }}/clock-targets.json"
+        owner: root
+        group: root
+        mode: "0644"
+      when: monitoring_clock_targets | length > 0
+
+    - name: Install clock drift collector cron job
+      ansible.builtin.cron:
+        name: cilex clock drift collector
+        user: root
+        minute: "*/1"
+        job: >-
+          /usr/bin/python3 {{ cilex_bin_dir }}/clock_drift_check.py
+          --targets {{ monitoring_promtail_dir }}/clock-targets.json
+          --output {{ monitoring_textfile_dir }}/clock_skew.prom
+      when: monitoring_clock_targets | length > 0
+
+    - name: Start Loki
+      community.docker.docker_container:
+        name: loki
+        image: "{{ loki_image }}"
+        state: started
+        restart_policy: unless-stopped
+        network_mode: host
+        command:
+          - -config.file=/etc/loki/loki-config.yml
+        volumes:
+          - "{{ monitoring_loki_dir }}/loki-config.yml:/etc/loki/loki-config.yml:ro"
+          - "{{ monitoring_loki_data_dir }}:/var/lib/loki"
+
+    - name: Start Prometheus
+      community.docker.docker_container:
+        name: prometheus
+        image: "{{ prometheus_image }}"
+        state: started
+        restart_policy: unless-stopped
+        network_mode: host
+        command:
+          - --config.file=/etc/prometheus/prometheus.yml
+          - --storage.tsdb.path=/prometheus
+          - --web.enable-lifecycle
+        volumes:
+          - "{{ monitoring_prometheus_dir }}/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+          - "{{ monitoring_prometheus_dir }}/rules:/etc/prometheus/rules:ro"
+          - "{{ monitoring_prometheus_data_dir }}:/prometheus"
+
+    - name: Start Grafana
+      community.docker.docker_container:
+        name: grafana
+        image: "{{ grafana_image }}"
+        state: started
+        restart_policy: unless-stopped
+        network_mode: host
+        env:
+          GF_SECURITY_ADMIN_USER: "{{ grafana_admin_user }}"
+          GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_admin_password }}"
+          GF_USERS_ALLOW_SIGN_UP: "false"
+        volumes:
+          - "{{ monitoring_grafana_data_dir }}:/var/lib/grafana"
+          - "{{ monitoring_grafana_dir }}/provisioning:/etc/grafana/provisioning:ro"
+          - "{{ monitoring_grafana_dir }}/dashboards:/var/lib/grafana/dashboards:ro"
+      no_log: true
+
+    - name: Wait for Loki
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ loki_port }}"
+        delay: 3
+        timeout: 90
+
+    - name: Wait for Prometheus
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ prometheus_port }}"
+        delay: 3
+        timeout: 90
+
+    - name: Wait for Grafana
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ grafana_port }}"
+        delay: 3
+        timeout: 90
+
+    - name: Prime clock drift metrics immediately
+      ansible.builtin.command:
+        cmd: >-
+          /usr/bin/python3 {{ cilex_bin_dir }}/clock_drift_check.py
+          --targets {{ monitoring_promtail_dir }}/clock-targets.json
+          --output {{ monitoring_textfile_dir }}/clock_skew.prom
+      when: monitoring_clock_targets | length > 0
+      changed_when: false
+
+    - name: Smoke test Loki readiness
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ loki_port }}/ready"
+        status_code: 200
+
+    - name: Smoke test Prometheus readiness
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ prometheus_port }}/-/healthy"
+        status_code: 200
+
+    - name: Smoke test Grafana health
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ grafana_port }}/api/health"
+        status_code: 200
+        return_content: true
+      register: grafana_health
+
+    - name: Assert Grafana reported a healthy database
+      ansible.builtin.assert:
+        that:
+          - "'ok' in grafana_health.content"

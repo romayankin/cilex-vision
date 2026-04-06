@@ -1,0 +1,199 @@
+---
+- name: Deploy Kafka brokers
+  hosts: kafka
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+    kafka_advertised_host: "{{ hostvars[inventory_hostname].kafka_advertised_host | default(ansible_host | default(inventory_hostname)) }}"
+    kafka_container_name: "kafka-{{ kafka_node_id }}"
+  pre_tasks:
+    - name: Validate Kafka inventory shape
+      ansible.builtin.assert:
+        that:
+          - groups['kafka'] | length == 3
+          - kafka_node_id is defined
+          - kafka_ssl_keystore_src is defined
+          - kafka_ssl_truststore_src is defined
+        fail_msg: "Kafka requires exactly 3 brokers with kafka_node_id, kafka_ssl_keystore_src, and kafka_ssl_truststore_src set."
+
+  roles:
+    - common
+
+  tasks:
+    - name: Create Kafka directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ kafka_base_dir }}"
+        - "{{ kafka_config_dir }}"
+        - "{{ kafka_tls_dir }}"
+        - "{{ kafka_data_dir }}"
+
+    - name: Copy Kafka TLS keystore
+      ansible.builtin.copy:
+        src: "{{ kafka_ssl_keystore_src }}"
+        dest: "{{ kafka_tls_dir }}/broker.keystore.p12"
+        owner: root
+        group: root
+        mode: "0640"
+      no_log: true
+
+    - name: Copy Kafka TLS truststore
+      ansible.builtin.copy:
+        src: "{{ kafka_ssl_truststore_src }}"
+        dest: "{{ kafka_tls_dir }}/broker.truststore.p12"
+        owner: root
+        group: root
+        mode: "0640"
+      no_log: true
+
+    - name: Render Kafka broker config
+      ansible.builtin.template:
+        src: ../templates/kafka/server.properties.j2
+        dest: "{{ kafka_config_dir }}/server.properties"
+        owner: root
+        group: root
+        mode: "0640"
+      no_log: true
+
+    - name: Render Kafka admin client config
+      ansible.builtin.template:
+        src: ../templates/kafka/admin.properties.j2
+        dest: "{{ kafka_config_dir }}/admin.properties"
+        owner: root
+        group: root
+        mode: "0640"
+      no_log: true
+
+    - name: Check whether KRaft metadata is already formatted
+      ansible.builtin.stat:
+        path: "{{ kafka_data_dir }}/meta.properties"
+      register: kafka_meta_properties
+
+    - name: Format Kafka storage with SCRAM bootstrap users
+      ansible.builtin.command:
+        cmd: >-
+          docker run --rm --network host
+          -v {{ kafka_config_dir }}:/opt/bitnami/kafka/config
+          -v {{ kafka_data_dir }}:/bitnami/kafka/data
+          -v {{ kafka_tls_dir }}:/etc/kafka/tls
+          {{ kafka_image }}
+          /bin/bash -lc
+          "/opt/bitnami/kafka/bin/kafka-storage.sh format
+          --ignore-formatted
+          --cluster-id {{ kafka_cluster_id }}
+          --config /opt/bitnami/kafka/config/server.properties
+          --add-scram 'SCRAM-SHA-256=[name={{ kafka_inter_broker_user }},password={{ kafka_inter_broker_password }}]'
+          --add-scram 'SCRAM-SHA-256=[name={{ kafka_admin_user }},password={{ kafka_admin_password }}]'"
+      when: not kafka_meta_properties.stat.exists
+      no_log: true
+
+    - name: Start Kafka broker container
+      community.docker.docker_container:
+        name: "{{ kafka_container_name }}"
+        image: "{{ kafka_image }}"
+        state: started
+        restart_policy: unless-stopped
+        network_mode: host
+        command:
+          - /bin/bash
+          - -lc
+          - exec /opt/bitnami/kafka/bin/kafka-server-start.sh /opt/bitnami/kafka/config/server.properties
+        volumes:
+          - "{{ kafka_config_dir }}:/opt/bitnami/kafka/config"
+          - "{{ kafka_data_dir }}:/bitnami/kafka/data"
+          - "{{ kafka_tls_dir }}:/etc/kafka/tls"
+
+    - name: Wait for Kafka client listener
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ kafka_client_port }}"
+        delay: 5
+        timeout: 120
+
+    - name: Smoke test Kafka broker API
+      ansible.builtin.command:
+        cmd: >-
+          docker exec {{ kafka_container_name }}
+          /opt/bitnami/kafka/bin/kafka-broker-api-versions.sh
+          --bootstrap-server localhost:{{ kafka_client_port }}
+          --command-config /opt/bitnami/kafka/config/admin.properties
+      register: kafka_api_versions
+      changed_when: false
+      retries: 10
+      delay: 6
+      until: kafka_api_versions.rc == 0
+      no_log: true
+
+- name: Bootstrap Kafka topics and smoke test the cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+    kafka_topics_definition: "{{ lookup('file', repo_root + '/infra/kafka/topics.yaml') | from_yaml }}"
+    kafka_bootstrap_host: "{{ groups['kafka'][0] }}"
+    kafka_bootstrap_container: "kafka-{{ hostvars[groups['kafka'][0]].kafka_node_id }}"
+  tasks:
+    - name: Wait for every Kafka broker to accept client traffic
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[item].ansible_host | default(item) }}"
+        port: "{{ kafka_client_port }}"
+        delay: 5
+        timeout: 120
+      loop: "{{ groups['kafka'] }}"
+
+    - name: Create canonical Kafka topics
+      ansible.builtin.command:
+        cmd: >-
+          docker exec {{ kafka_bootstrap_container }}
+          /opt/bitnami/kafka/bin/kafka-topics.sh
+          --bootstrap-server localhost:{{ kafka_client_port }}
+          --command-config /opt/bitnami/kafka/config/admin.properties
+          --create
+          --if-not-exists
+          --topic {{ item.name }}
+          --partitions {{ item.partitions }}
+          --replication-factor {{ item.replication_factor | default(kafka_topics_definition.defaults.replication_factor) }}
+          --config cleanup.policy={{ item.cleanup_policy }}
+          --config retention.ms={{ item.retention_ms }}
+          --config min.insync.replicas={{ kafka_topics_definition.defaults.min_insync_replicas }}
+      loop: "{{ kafka_topics_definition.topics }}"
+      register: kafka_topic_create
+      delegate_to: "{{ kafka_bootstrap_host }}"
+      run_once: true
+      changed_when: "'Created topic' in (kafka_topic_create.stdout | default('') ~ kafka_topic_create.stderr | default(''))"
+      no_log: true
+
+    - name: List Kafka topics as a smoke test
+      ansible.builtin.command:
+        cmd: >-
+          docker exec {{ kafka_bootstrap_container }}
+          /opt/bitnami/kafka/bin/kafka-topics.sh
+          --bootstrap-server localhost:{{ kafka_client_port }}
+          --command-config /opt/bitnami/kafka/config/admin.properties
+          --list
+      delegate_to: "{{ kafka_bootstrap_host }}"
+      run_once: true
+      changed_when: false
+      register: kafka_topic_list
+      no_log: true
+
+    - name: Assert canonical topics exist
+      ansible.builtin.assert:
+        that:
+          - item.name in kafka_topic_list.stdout_lines
+      loop: "{{ kafka_topics_definition.topics }}"
+      run_once: true
+

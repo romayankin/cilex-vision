@@ -1,0 +1,110 @@
+---
+- name: Discover locally buildable application services
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+  tasks:
+    - name: Discover service Dockerfiles in the repo
+      ansible.builtin.find:
+        paths: "{{ repo_root }}/services"
+        patterns: Dockerfile
+        recurse: true
+        file_type: file
+      register: local_service_dockerfiles
+
+    - name: Record deployable service directories
+      ansible.builtin.set_fact:
+        deployable_service_dirs: "{{ local_service_dockerfiles.files | map(attribute='path') | map('regex_replace', '/Dockerfile$', '') | list }}"
+
+- name: Deploy application services with Dockerfiles
+  hosts: services
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+    deployable_service_dirs: "{{ hostvars['localhost'].deployable_service_dirs | default([]) }}"
+
+  roles:
+    - common
+
+  tasks:
+    - name: Report when no service deployments are configured
+      ansible.builtin.debug:
+        msg: "No application services are configured for {{ inventory_hostname }}."
+      when: service_deployments | length == 0
+
+    - name: Create the remote service build root
+      ansible.builtin.file:
+        path: "{{ service_build_root }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: service_deployments | length > 0
+
+    - name: Validate requested service build contexts exist locally
+      ansible.builtin.assert:
+        that:
+          - (repo_root ~ '/' ~ item.source_dir) in deployable_service_dirs
+        fail_msg: "Requested service {{ item.name }} points at {{ item.source_dir }}, but that directory does not currently contain a Dockerfile."
+      loop: "{{ service_deployments }}"
+      when: service_deployments | length > 0
+
+    - name: Copy service build contexts to the target host
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/{{ item.source_dir }}/"
+        dest: "{{ service_build_root }}/{{ item.name }}/"
+        owner: root
+        group: root
+        mode: preserve
+        directory_mode: "0755"
+      loop: "{{ service_deployments }}"
+      when: service_deployments | length > 0
+
+    - name: Build service images from local Dockerfiles
+      community.docker.docker_image:
+        name: "{{ item.image }}"
+        source: build
+        force_source: false
+        build:
+          path: "{{ service_build_root }}/{{ item.name }}"
+          pull: true
+      loop: "{{ service_deployments }}"
+      when: service_deployments | length > 0
+
+    - name: Start service containers
+      community.docker.docker_container:
+        name: "{{ item.container_name | default(item.name) }}"
+        image: "{{ item.image }}"
+        state: started
+        restart_policy: unless-stopped
+        network_mode: "{{ item.network_mode | default(omit) }}"
+        env: "{{ item.env | default(omit) }}"
+        command: "{{ item.command | default(omit) }}"
+        volumes: "{{ item.volumes | default(omit) }}"
+        published_ports: "{{ item.ports | default(omit) }}"
+      loop: "{{ service_deployments }}"
+      when: service_deployments | length > 0
+      no_log: "{{ item.no_log | default(false) | bool }}"
+
+    - name: Smoke test deployed services that expose health endpoints
+      ansible.builtin.uri:
+        url: "{{ item.smoke_test_url }}"
+        status_code: 200
+      loop: "{{ service_deployments }}"
+      when:
+        - service_deployments | length > 0
+        - item.smoke_test_url is defined
+      register: service_smoke_results
+      retries: 12
+      delay: 5
+      until: service_smoke_results.status == 200
+

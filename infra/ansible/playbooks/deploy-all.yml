@@ -1,0 +1,12 @@
+---
+- import_playbook: deploy-timescaledb.yml
+- import_playbook: deploy-minio.yml
+- import_playbook: deploy-nats.yml
+- import_playbook: deploy-kafka.yml
+- import_playbook: create-kafka-topics.yml
+- import_playbook: deploy-triton.yml
+- import_playbook: deploy-monitoring.yml
+- import_playbook: deploy-mlflow.yml
+- import_playbook: deploy-cvat.yml
+- import_playbook: deploy-services.yml
+- import_playbook: smoke-test.yml

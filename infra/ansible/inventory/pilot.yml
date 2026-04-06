@@ -1,0 +1,104 @@
+---
+all:
+  vars:
+    ansible_user: ubuntu
+    ansible_become: true
+    ansible_python_interpreter: /usr/bin/python3
+
+    kafka_inter_broker_password: replace-me
+    kafka_admin_password: replace-me
+    kafka_ssl_keystore_password: replace-me
+    kafka_ssl_key_password: replace-me
+    kafka_ssl_truststore_password: replace-me
+    minio_root_password: replace-me
+    grafana_admin_password: replace-me
+    cvat_postgres_password: replace-me
+    cvat_admin_password: replace-me
+
+    monitoring_clock_targets:
+      - camera_id: cam-001
+        chrony_host: edge-a.internal
+        site_id: site-a
+      - camera_id: cam-002
+        chrony_host: edge-b.internal
+        site_id: site-a
+
+  children:
+    kafka:
+      hosts:
+        kafka-1.core.cilex.internal:
+          ansible_host: 10.43.10.11
+          kafka_node_id: 1
+          kafka_ssl_keystore_src: /secure/kafka/kafka-1/broker.keystore.p12
+          kafka_ssl_truststore_src: /secure/kafka/kafka-1/broker.truststore.p12
+        kafka-2.core.cilex.internal:
+          ansible_host: 10.43.10.12
+          kafka_node_id: 2
+          kafka_ssl_keystore_src: /secure/kafka/kafka-2/broker.keystore.p12
+          kafka_ssl_truststore_src: /secure/kafka/kafka-2/broker.truststore.p12
+        kafka-3.core.cilex.internal:
+          ansible_host: 10.43.10.13
+          kafka_node_id: 3
+          kafka_ssl_keystore_src: /secure/kafka/kafka-3/broker.keystore.p12
+          kafka_ssl_truststore_src: /secure/kafka/kafka-3/broker.truststore.p12
+
+    nats:
+      hosts:
+        nats-site-a.edge.cilex.internal:
+          ansible_host: 10.42.10.10
+          nats_site_id: site-a
+          nats_server_cert_src: /secure/sites/site-a/nats-server/server.crt
+          nats_server_key_src: /secure/sites/site-a/nats-server/server.key
+          nats_root_ca_src: /secure/sites/site-a/nats-server/root_ca.crt
+
+    timescaledb:
+      hosts:
+        timescaledb-1.core.cilex.internal:
+          ansible_host: 10.43.20.11
+
+    minio:
+      hosts:
+        minio-1.core.cilex.internal:
+          ansible_host: 10.43.20.12
+
+    triton:
+      hosts:
+        triton-1.core.cilex.internal:
+          ansible_host: 10.43.30.11
+          triton_gpu_devices:
+            - "0"
+
+    monitoring:
+      hosts:
+        monitoring-1.core.cilex.internal:
+          ansible_host: 10.43.40.11
+
+    mlflow:
+      hosts:
+        mlflow-1.core.cilex.internal:
+          ansible_host: 10.43.50.11
+
+    cvat:
+      hosts:
+        cvat-1.core.cilex.internal:
+          ansible_host: 10.43.60.11
+
+    services:
+      hosts:
+        app-1.core.cilex.internal:
+          ansible_host: 10.43.70.11
+          service_deployments: []
+          # Example:
+          # service_deployments:
+          #   - name: ingress-bridge
+          #     source_dir: services/ingress-bridge
+          #     image: cilex/ingress-bridge:pilot
+          #     container_name: ingress-bridge
+          #     env:
+          #       CILEX_ENV: pilot
+          #     ports:
+          #       - "8081:8080"
+          #     volumes:
+          #       - /var/lib/cilex/ingress-bridge:/var/lib/cilex/ingress-bridge
+          #     smoke_test_url: http://127.0.0.1:8081/ready
+
