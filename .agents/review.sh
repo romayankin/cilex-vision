@@ -328,7 +328,7 @@ if [ "$ROLE" = "dev" ]; then
         # Dockerfile
         if [ -f "${SVC_DIR}/Dockerfile" ]; then
             check_pass "Dockerfile exists"
-            docker build -q "${SVC_DIR}" > /dev/null 2>&1 && check_pass "Docker build succeeds" || check_warn "Docker build failed (may need running dependencies)"
+            docker build -q -f "${SVC_DIR}/Dockerfile" . > /dev/null 2>&1 && check_pass "Docker build succeeds" || check_warn "Docker build failed (may need running dependencies)"
         else
             check_fail "No Dockerfile"
         fi
