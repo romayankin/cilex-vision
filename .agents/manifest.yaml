@@ -103,9 +103,9 @@ phases:
       title: Model Bake-Off Protocol
       depends_on:
       - P0-D01
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P0-E01
       prompt: .agents/prompts/P0-E01.md
       tool: codex-cli
     - id: P0-O01
