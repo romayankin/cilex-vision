@@ -201,7 +201,7 @@ phases:
       depends_on:
       - P0-D04
       - P0-D03
-      status: pending
+      status: done
       assigned_to: null
       branch: null
       prompt: .agents/prompts/P1-V05.md
