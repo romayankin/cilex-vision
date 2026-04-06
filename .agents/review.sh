@@ -178,6 +178,46 @@ fi
 
 echo ""
 
+# ── Deliverable Audit ────────────────────────────────────────
+echo "📋 Deliverable Audit"
+echo "───────────────────"
+
+PROMPT_FULL="${REPO_ROOT}/${PROMPT_FILE}"
+if [ ! -f "$PROMPT_FULL" ]; then
+    check_warn "Prompt file not found: ${PROMPT_FILE}"
+else
+    DELIVERABLES=$(python3 - "$PROMPT_FULL" << 'PYEOF'
+import sys, re
+with open(sys.argv[1]) as f:
+    content = f.read()
+m = re.search(r'##\s+Expected Deliverables\s*\n(.*?)(?=\n##\s|\Z)', content, re.DOTALL)
+if not m:
+    sys.exit(0)
+for path in re.findall(r'`([^`]+)`', m.group(1)):
+    print(path)
+PYEOF
+    )
+
+    if [ -z "$DELIVERABLES" ]; then
+        check_warn "No ## Expected Deliverables section found in prompt"
+    else
+        while IFS= read -r filepath; do
+            [ -z "$filepath" ] && continue
+            if [ -n "$CHANGED_FILES" ]; then
+                echo "$CHANGED_FILES" | grep -qxF "$filepath" \
+                    && check_pass "In diff: ${filepath}" \
+                    || check_fail "Missing from diff: ${filepath}"
+            else
+                [ -f "${REPO_ROOT}/${filepath}" ] \
+                    && check_pass "Exists: ${filepath}" \
+                    || check_fail "File not found: ${filepath}"
+            fi
+        done <<< "$DELIVERABLES"
+    fi
+fi
+
+echo ""
+
 # ── Role-specific checks ────────────────────────────────────
 
 if [ "$ROLE" = "design" ]; then
