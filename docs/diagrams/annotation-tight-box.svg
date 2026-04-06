@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
+  <title id="title">Bounding box examples</title>
+  <desc id="desc">Comparison of a tight visible-pixel box and an incorrect loose box.</desc>
+  <rect width="960" height="360" fill="#f8fafc"/>
+  <rect x="40" y="40" width="400" height="280" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <rect x="520" y="40" width="400" height="280" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="80" y="82" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#0f172a">Correct: tight visible box</text>
+  <text x="560" y="82" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#991b1b">Incorrect: loose / guessed box</text>
+
+  <rect x="120" y="110" width="180" height="180" rx="14" fill="#dbeafe"/>
+  <circle cx="210" cy="148" r="28" fill="#fcd34d"/>
+  <rect x="178" y="176" width="64" height="68" rx="12" fill="#60a5fa"/>
+  <rect x="150" y="248" width="40" height="48" rx="10" fill="#1e3a8a"/>
+  <rect x="230" y="248" width="40" height="48" rx="10" fill="#1e3a8a"/>
+  <rect x="136" y="128" width="148" height="168" fill="none" stroke="#16a34a" stroke-width="6"/>
+  <text x="76" y="320" font-family="Arial, sans-serif" font-size="22" fill="#166534">Visible pixels only. Do not include background.</text>
+
+  <rect x="600" y="110" width="180" height="180" rx="14" fill="#dbeafe"/>
+  <circle cx="690" cy="148" r="28" fill="#fcd34d"/>
+  <rect x="658" y="176" width="64" height="68" rx="12" fill="#60a5fa"/>
+  <rect x="630" y="248" width="40" height="48" rx="10" fill="#1e3a8a"/>
+  <rect x="710" y="248" width="40" height="48" rx="10" fill="#1e3a8a"/>
+  <rect x="560" y="94" width="260" height="218" fill="none" stroke="#dc2626" stroke-width="6" stroke-dasharray="14 10"/>
+  <text x="544" y="320" font-family="Arial, sans-serif" font-size="22" fill="#991b1b">Too much empty space and guessed occluded area.</text>
+</svg>
