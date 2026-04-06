@@ -104,13 +104,13 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P0-O01 | Infrastructure Scaffolding | feat/P0-O01 | docker-compose.yml (Kafka 3-broker, NATS, TimescaleDB, MinIO, Redis, Prometheus, Grafana, MLflow), CI workflow, Makefile |
 | P0-D08 | Security Design | feat/P0-D08 | Full security spec (trust model, PKI, NATS mTLS, Kafka SASL_SSL, ACL matrices), step-ca config, bootstrap-site.sh, NATS/Kafka templates |
 | P0-D10 | Triton Placement | feat/P0-D10 | Full placement spec (model inventory, VRAM budget, GPU classes, co-location), 3 Triton config.pbtxt files, triton-alerts.yml |
+| P0-E01 | Bake-Off Protocol | feat/P0-E01 | Full bake-off protocol (detector/tracker/attribute), run_detector_bakeoff.py, compare_bakeoff.py |
 
 ### Phase 0 — Remaining (priority order)
 | Task | Title | Unblocks | Priority |
 |------|-------|----------|----------|
 | P0-D05 | Edge Filter Design | — | 4 |
 | P0-D09 | Privacy Framework | — | 4 |
-| P0-E01 | Model Bake-off Protocol | — | 4 |
 | P0-V01 | Throwaway Prototype | — | 4 |
 | P0-X01 | Camera Compat Matrix | — | 4 |
 | P0-X02 | Hardware Sizing | — | 4 |
@@ -120,6 +120,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 |------|-------|--------|-----------------|
 | P1-O01 | Pilot Infrastructure | feat/P1-O01 | 13 Ansible playbooks (Kafka, NATS, TimescaleDB, MinIO, Triton, monitoring, MLflow, CVAT, services, topics, smoke-test), pilot inventory, templates, common role |
 | P1-V01 | Edge Agent | feat/P1-V01 | 9 Python modules (main, camera_pipeline, motion_detector, rtsp_client, nats_publisher, local_buffer, config, metrics, gen_proto), Dockerfile, 23 tests, handoff |
+
 
 ### Phase 1 — Pending (13 tasks remaining)
 ### Phases 2-4 — All Pending (39 tasks, prompts not yet in manifest)

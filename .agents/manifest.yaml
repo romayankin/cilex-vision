@@ -103,7 +103,7 @@ phases:
       title: Model Bake-Off Protocol
       depends_on:
       - P0-D01
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P0-E01
       prompt: .agents/prompts/P0-E01.md
