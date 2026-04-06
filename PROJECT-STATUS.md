@@ -196,7 +196,21 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 claude --model opus             # "Read CONVENTIONS.md then .claude-task-context.md"
 git add -A && git commit
 .agents/review.sh P0-XXX       # automated quality check
+
+# DELIVERABLE AUDIT (mandatory — compare prompt to actual output):
+cat .agents/prompts/P0-XXX.md
+git diff --name-only main...feat/P0-XXX
+# Every file listed in the prompt must appear in the diff.
+# If anything is missing, send feedback to the agent before merging.
+
+# VERIFY before merge:
+git status                     # must be clean
+git log --oneline feat/P0-XXX ^main   # must show commits ahead of main
+
 git checkout main && git merge feat/P0-XXX
+
+# VERIFY after merge:
+git diff HEAD~1 --stat         # must show expected files changed
 
 # POST-COMPLETION (both steps mandatory — never skip):
 # 1. Update manifest
