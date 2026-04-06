@@ -106,6 +106,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P0-D10 | Triton Placement | feat/P0-D10 | Full placement spec (model inventory, VRAM budget, GPU classes, co-location), 3 Triton config.pbtxt files, triton-alerts.yml |
 | P0-E01 | Bake-Off Protocol | feat/P0-E01 | Full bake-off protocol (detector/tracker/attribute), run_detector_bakeoff.py, compare_bakeoff.py |
 
+
 ### Phase 0 — Remaining (priority order)
 | Task | Title | Unblocks | Priority |
 |------|-------|----------|----------|
@@ -121,8 +122,9 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P1-O01 | Pilot Infrastructure | feat/P1-O01 | 13 Ansible playbooks (Kafka, NATS, TimescaleDB, MinIO, Triton, monitoring, MLflow, CVAT, services, topics, smoke-test), pilot inventory, templates, common role |
 | P1-V01 | Edge Agent | feat/P1-V01 | 9 Python modules (main, camera_pipeline, motion_detector, rtsp_client, nats_publisher, local_buffer, config, metrics, gen_proto), Dockerfile, 23 tests, handoff |
 | P1-A01 | CVAT Setup & Annotation Baseline | feat/P1-A01 | setup_cvat_projects.py (3 CVAT projects), annotation-guidelines.md, compute_iaa.py (IAA scorecard), split_dataset.py (temporal split), 3 SVG diagrams |
+| P1-E01 | Detector Bake-Off (10 days) | feat/P1-E01 | Published-benchmark proxy comparison, enhanced run_detector_bakeoff.py (git state, dataset metadata, operational slice), enhanced compare_bakeoff.py (offline JSON mode, SVG charts), detector-comparison.md recommending YOLOv8-L |
 
-### Phase 1 — Pending (13 tasks remaining)
+### Phase 1 — Pending (12 tasks remaining)
 ### Phases 2-4 — All Pending (39 tasks, prompts not yet in manifest)
 
 ---

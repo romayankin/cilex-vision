@@ -234,7 +234,7 @@ phases:
       - P0-E01
       - P1-A01
       - P1-O01
-      status: pending
+      status: done
       assigned_to: null
       branch: null
       prompt: .agents/prompts/P1-E01.md
