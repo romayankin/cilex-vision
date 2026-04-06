@@ -186,15 +186,20 @@ PROMPT_FULL="${REPO_ROOT}/${PROMPT_FILE}"
 if [ ! -f "$PROMPT_FULL" ]; then
     check_warn "Prompt file not found: ${PROMPT_FILE}"
 else
+    # Extract lines from ## Expected Deliverables to next ## heading (or EOF)
     DELIVERABLES=$(python3 - "$PROMPT_FULL" << 'PYEOF'
 import sys, re
 with open(sys.argv[1]) as f:
     content = f.read()
-m = re.search(r'##\s+Expected Deliverables\s*\n(.*?)(?=\n##\s|\Z)', content, re.DOTALL)
+m = re.search(r'^##\s+Expected Deliverables\s*\n(.*?)(?=\n##\s|\Z)', content, re.DOTALL | re.MULTILINE)
 if not m:
     sys.exit(0)
-for path in re.findall(r'`([^`]+)`', m.group(1)):
-    print(path)
+for line in m.group(1).splitlines():
+    s = line.strip()
+    if s.startswith('- '):
+        path = s[2:].split('#')[0].strip()
+        if path:
+            print(path)
 PYEOF
     )
 
@@ -203,14 +208,42 @@ PYEOF
     else
         while IFS= read -r filepath; do
             [ -z "$filepath" ] && continue
-            if [ -n "$CHANGED_FILES" ]; then
-                echo "$CHANGED_FILES" | grep -qxF "$filepath" \
-                    && check_pass "In diff: ${filepath}" \
-                    || check_fail "Missing from diff: ${filepath}"
+
+            if echo "$filepath" | grep -qF '*'; then
+                # ── Wildcard path: check at least one matching file exists ──
+                if [ -n "$CHANGED_FILES" ]; then
+                    REGEX=$(echo "$filepath" | sed 's/\./\\./g; s/\*/[^\/]*/g')
+                    if echo "$CHANGED_FILES" | grep -qE "^${REGEX}$"; then
+                        check_pass "Wildcard match in diff: ${filepath}"
+                    else
+                        check_fail "No diff files matching: ${filepath}"
+                    fi
+                else
+                    if compgen -G "${REPO_ROOT}/${filepath}" > /dev/null 2>&1; then
+                        MC=$(compgen -G "${REPO_ROOT}/${filepath}" 2>/dev/null | wc -l)
+                        check_pass "Wildcard match (${MC} files): ${filepath}"
+                    else
+                        check_fail "No files matching: ${filepath}"
+                    fi
+                fi
             else
-                [ -f "${REPO_ROOT}/${filepath}" ] \
-                    && check_pass "Exists: ${filepath}" \
-                    || check_fail "File not found: ${filepath}"
+                # ── Exact path ──────────────────────────────────────────────
+                if [ -n "$CHANGED_FILES" ]; then
+                    if echo "$CHANGED_FILES" | grep -qxF "$filepath"; then
+                        check_pass "In diff: ${filepath}"
+                    else
+                        check_fail "Missing from diff: ${filepath}"
+                    fi
+                else
+                    FULL="${REPO_ROOT}/${filepath}"
+                    if [ ! -f "$FULL" ]; then
+                        check_fail "Missing: ${filepath}"
+                    elif grep -q "This is a placeholder" "$FULL" 2>/dev/null; then
+                        check_fail "Stub not replaced: ${filepath}"
+                    else
+                        check_pass "Exists: ${filepath}"
+                    fi
+                fi
             fi
         done <<< "$DELIVERABLES"
     fi
