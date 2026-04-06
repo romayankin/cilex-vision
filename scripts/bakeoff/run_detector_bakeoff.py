@@ -79,6 +79,13 @@ class ImageRecord:
 
 
 @dataclass(frozen=True)
+class DatasetMetadata:
+    manifest_path: Path
+    split_identifiers: tuple[str, ...]
+    dataset_revision: str | None
+
+
+@dataclass(frozen=True)
 class PreparedImage:
     record: ImageRecord
     tensor: Any
@@ -103,6 +110,14 @@ class LatencyStats:
 
 
 @dataclass(frozen=True)
+class OperationalSliceMetrics:
+    threshold: float
+    precision: float
+    recall: float
+    f1: float
+
+
+@dataclass(frozen=True)
 class DetectorMetrics:
     map_50: float
     map_50_95: float
@@ -114,6 +129,10 @@ class DetectorMetrics:
     latency_p99_ms: float
     score: float
     best_batch_size: int
+    operational_threshold: float
+    operational_precision: float
+    operational_recall: float
+    operational_f1: float
     per_class_ap: dict[str, float]
     per_class_ap50: dict[str, float]
 
@@ -272,7 +291,40 @@ def resolve_candidates(args: argparse.Namespace) -> list[CandidateProfile]:
     return resolved
 
 
-def load_dataset(manifest_path: Path, dataset_root: Path) -> list[ImageRecord]:
+def normalize_identifier_list(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, (str, int, float)):
+        return (str(value),)
+    if isinstance(value, (list, tuple, set)):
+        return tuple(str(item) for item in value if item is not None)
+    raise ValueError(f"manifest split identifier must be a scalar or sequence, got {type(value).__name__}")
+
+
+def build_dataset_metadata(payload: dict[str, Any], manifest_path: Path) -> DatasetMetadata:
+    split_identifiers: list[str] = []
+    for key in ("split_ids", "splits"):
+        split_identifiers.extend(normalize_identifier_list(payload.get(key)))
+    for key in ("split_id", "split", "dataset_split"):
+        split_identifiers.extend(normalize_identifier_list(payload.get(key)))
+    if not split_identifiers:
+        split_identifiers.append(manifest_path.stem)
+
+    dataset_revision = None
+    for key in ("dataset_revision", "dataset_version", "revision", "version"):
+        raw = payload.get(key)
+        if raw is not None:
+            dataset_revision = str(raw)
+            break
+
+    return DatasetMetadata(
+        manifest_path=manifest_path,
+        split_identifiers=tuple(dict.fromkeys(split_identifiers)),
+        dataset_revision=dataset_revision,
+    )
+
+
+def load_dataset(manifest_path: Path, dataset_root: Path) -> tuple[list[ImageRecord], DatasetMetadata]:
     if not manifest_path.exists():
         raise FileNotFoundError(
             f"evaluation manifest not found: {manifest_path}. "
@@ -280,6 +332,7 @@ def load_dataset(manifest_path: Path, dataset_root: Path) -> list[ImageRecord]:
         )
 
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    dataset_metadata = build_dataset_metadata(payload, manifest_path)
     images_raw = payload.get("images")
     annotations_raw = payload.get("annotations")
     categories_raw = payload.get("categories")
@@ -339,7 +392,28 @@ def load_dataset(manifest_path: Path, dataset_root: Path) -> list[ImageRecord]:
             f"{missing_files[0]}"
         )
 
-    return records
+    return records, dataset_metadata
+
+
+def detect_git_state() -> tuple[str | None, bool | None]:
+    try:
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                ["git", "status", "--porcelain"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None, None
+    return revision or None, dirty
 
 
 def letterbox_image(image: Any, target_size: int = 640) -> tuple[Any, float, float, float]:
@@ -817,12 +891,69 @@ def mean_defined(values: Iterable[float | None]) -> float:
     return statistics.fmean(materialized)
 
 
+def compute_operational_slice(
+    predictions: Sequence[PredictionRecord],
+    dataset: Sequence[ImageRecord],
+    confidence_threshold: float,
+    iou_threshold: float = 0.50,
+) -> OperationalSliceMetrics:
+    filtered_predictions = [prediction for prediction in predictions if prediction.confidence >= confidence_threshold]
+    gt_by_key: dict[tuple[str, str], list[AnnotationRecord]] = {}
+    for record in dataset:
+        for class_name in OBJECT_CLASSES:
+            gt_by_key[(record.image_id, class_name)] = [
+                annotation for annotation in record.annotations if annotation.class_name == class_name
+            ]
+
+    predictions_by_key: dict[tuple[str, str], list[PredictionRecord]] = {}
+    for prediction in filtered_predictions:
+        predictions_by_key.setdefault((prediction.image_id, prediction.class_name), []).append(prediction)
+
+    true_positives = 0
+    false_positives = 0
+    false_negatives = 0
+    for key, ground_truths in gt_by_key.items():
+        matched = [False] * len(ground_truths)
+        candidate_predictions = sorted(
+            predictions_by_key.get(key, []),
+            key=lambda item: item.confidence,
+            reverse=True,
+        )
+        for prediction in candidate_predictions:
+            best_index = -1
+            best_iou = 0.0
+            for index, annotation in enumerate(ground_truths):
+                if matched[index]:
+                    continue
+                iou = compute_iou(prediction.bbox_xyxy, xywh_to_xyxy(annotation.bbox_xywh))
+                if iou > best_iou:
+                    best_iou = iou
+                    best_index = index
+            if best_index >= 0 and best_iou >= iou_threshold:
+                matched[best_index] = True
+                true_positives += 1
+            else:
+                false_positives += 1
+        false_negatives += sum(1 for item in matched if not item)
+
+    precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) else 0.0
+    recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) else 0.0
+    f1 = (2.0 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+    return OperationalSliceMetrics(
+        threshold=confidence_threshold,
+        precision=precision,
+        recall=recall,
+        f1=f1,
+    )
+
+
 def evaluate_predictions(
     predictions: Sequence[PredictionRecord],
     dataset: Sequence[ImageRecord],
     throughput_fps: float,
     latencies: LatencyStats,
     best_batch_size: int,
+    operational_threshold: float,
 ) -> DetectorMetrics:
     per_class_ap50: dict[str, float] = {}
     per_class_ap: dict[str, float] = {}
@@ -853,6 +984,12 @@ def evaluate_predictions(
         for class_name in OBJECT_CLASSES
         for threshold in IOU_THRESHOLDS
     )
+    operational_slice = compute_operational_slice(
+        predictions,
+        dataset,
+        confidence_threshold=operational_threshold,
+        iou_threshold=0.50,
+    )
     throughput_term = min(throughput_fps / PILOT_AGGREGATE_FPS_TARGET, 1.0)
     score = (
         0.35 * map_50_95
@@ -871,6 +1008,10 @@ def evaluate_predictions(
         latency_p99_ms=latencies.p99_ms,
         score=score,
         best_batch_size=best_batch_size,
+        operational_threshold=operational_slice.threshold,
+        operational_precision=operational_slice.precision,
+        operational_recall=operational_slice.recall,
+        operational_f1=operational_slice.f1,
         per_class_ap=per_class_ap,
         per_class_ap50=per_class_ap50,
     )
@@ -882,6 +1023,9 @@ def log_run_to_mlflow(
     candidate: CandidateProfile,
     metrics: DetectorMetrics,
     args: argparse.Namespace,
+    dataset_metadata: DatasetMetadata,
+    git_revision: str | None,
+    git_dirty: bool | None,
 ) -> str:
     mlflow = require_module("mlflow", "mlflow")
     mlflow.set_tracking_uri(tracking_uri)
@@ -895,23 +1039,29 @@ def log_run_to_mlflow(
                 "bakeoff.protocol_version": "1.0.0",
             }
         )
-        mlflow.log_params(
-            {
-                "candidate_name": candidate.name,
-                "onnx_path": str(candidate.onnx_path),
-                "parser_kind": candidate.parser_kind,
-                "input_name": candidate.input_name,
-                "output_names": ",".join(candidate.output_names),
-                "max_batch_size": candidate.max_batch_size,
-                "preferred_batch_sizes": ",".join(str(value) for value in candidate.preferred_batch_sizes),
-                "max_queue_delay_us": candidate.max_queue_delay_us,
-                "confidence_threshold": candidate.confidence_threshold,
-                "nms_iou_threshold": candidate.nms_iou_threshold,
-                "dataset_manifest": str(args.dataset_manifest),
-                "triton_url": args.triton_url,
-                "throughput_target_fps": PILOT_AGGREGATE_FPS_TARGET,
-            }
-        )
+        params = {
+            "candidate_name": candidate.name,
+            "onnx_path": str(candidate.onnx_path),
+            "parser_kind": candidate.parser_kind,
+            "input_name": candidate.input_name,
+            "output_names": ",".join(candidate.output_names),
+            "max_batch_size": candidate.max_batch_size,
+            "preferred_batch_sizes": ",".join(str(value) for value in candidate.preferred_batch_sizes),
+            "max_queue_delay_us": candidate.max_queue_delay_us,
+            "confidence_threshold": candidate.confidence_threshold,
+            "nms_iou_threshold": candidate.nms_iou_threshold,
+            "dataset_manifest": str(dataset_metadata.manifest_path),
+            "dataset_split_identifiers": ",".join(dataset_metadata.split_identifiers),
+            "triton_url": args.triton_url,
+            "throughput_target_fps": PILOT_AGGREGATE_FPS_TARGET,
+        }
+        if dataset_metadata.dataset_revision is not None:
+            params["dataset_revision"] = dataset_metadata.dataset_revision
+        if git_revision is not None:
+            params["git_revision"] = git_revision
+        if git_dirty is not None:
+            params["git_dirty"] = str(git_dirty).lower()
+        mlflow.log_params(params)
         mlflow.log_metrics(
             {
                 "detector_map_50": metrics.map_50,
@@ -924,6 +1074,10 @@ def log_run_to_mlflow(
                 "detector_latency_p99_ms": metrics.latency_p99_ms,
                 "detector_score": metrics.score,
                 "detector_best_batch_size": metrics.best_batch_size,
+                "detector_operational_threshold": metrics.operational_threshold,
+                "detector_operational_precision": metrics.operational_precision,
+                "detector_operational_recall": metrics.operational_recall,
+                "detector_operational_f1": metrics.operational_f1,
             }
         )
         for class_name, value in metrics.per_class_ap.items():
@@ -935,11 +1089,30 @@ def log_run_to_mlflow(
             "candidate": candidate.name,
             "metrics": asdict(metrics),
             "safe_default_detector": SAFE_DEFAULT_DETECTOR,
+            "dataset_metadata": {
+                "manifest_path": str(dataset_metadata.manifest_path),
+                "split_identifiers": list(dataset_metadata.split_identifiers),
+                "dataset_revision": dataset_metadata.dataset_revision,
+            },
+            "git": {
+                "revision": git_revision,
+                "dirty": git_dirty,
+            },
         }
         with tempfile.TemporaryDirectory(prefix="bakeoff-") as tmp_dir:
             summary_path = Path(tmp_dir) / f"{candidate.name}_summary.json"
             summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
             mlflow.log_artifact(str(summary_path), artifact_path="summaries")
+            comparison_input_path = Path(tmp_dir) / f"{candidate.name}_comparison_input.md"
+            comparison_input_lines = [
+                "| Candidate | mAP@0.5 | mAP@0.5:0.95 | Small AP | Night AP | Throughput FPS | p95 Latency ms | Op. Precision @0.40 | Op. Recall @0.40 | Op. F1 @0.40 |",
+                "|-----------|---------|--------------|----------|----------|----------------|----------------|--------------------|-----------------|-------------|",
+                f"| {candidate.name} | {metrics.map_50:.4f} | {metrics.map_50_95:.4f} | {metrics.small_object_ap:.4f} | "
+                f"{metrics.night_ap:.4f} | {metrics.throughput_fps:.2f} | {metrics.latency_p95_ms:.2f} | "
+                f"{metrics.operational_precision:.4f} | {metrics.operational_recall:.4f} | {metrics.operational_f1:.4f} |",
+            ]
+            comparison_input_path.write_text("\n".join(comparison_input_lines) + "\n", encoding="utf-8")
+            mlflow.log_artifact(str(comparison_input_path), artifact_path="comparison-inputs")
         return run.info.run_id
 
 
@@ -976,7 +1149,14 @@ def evaluate_candidate(
             args.triton_url,
             batch_size=batch_size,
         )
-        metrics = evaluate_predictions(predictions, [prepared.record for prepared in prepared_images], throughput_fps, latencies, batch_size)
+        metrics = evaluate_predictions(
+            predictions,
+            [prepared.record for prepared in prepared_images],
+            throughput_fps,
+            latencies,
+            batch_size,
+            operational_threshold=candidate.confidence_threshold,
+        )
         if best_metrics is None or metrics.score > best_metrics.score:
             best_metrics = metrics
             best_predictions = predictions
@@ -995,13 +1175,23 @@ def evaluate_candidate(
 def main() -> None:
     args = parse_args()
     candidates = resolve_candidates(args)
-    dataset = load_dataset(args.dataset_manifest, args.dataset_root)
+    dataset, dataset_metadata = load_dataset(args.dataset_manifest, args.dataset_root)
     prepared_images = prepare_images(dataset)
+    git_revision, git_dirty = detect_git_state()
 
     summaries: list[tuple[str, DetectorMetrics, str]] = []
     for candidate in candidates:
         metrics = evaluate_candidate(candidate, prepared_images, args)
-        run_id = log_run_to_mlflow(args.tracking_uri, args.mlflow_experiment, candidate, metrics, args)
+        run_id = log_run_to_mlflow(
+            args.tracking_uri,
+            args.mlflow_experiment,
+            candidate,
+            metrics,
+            args,
+            dataset_metadata,
+            git_revision,
+            git_dirty,
+        )
         summaries.append((candidate.name, metrics, run_id))
 
     print("Detector bake-off completed.\n")

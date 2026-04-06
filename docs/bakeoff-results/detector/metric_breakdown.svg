@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="440" viewBox="0 0 920 440">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="460.0" y="28" text-anchor="middle" font-family="monospace" font-size="20">Detector metric breakdown</text>
+<line x1="70" y1="70" x2="70" y2="360" stroke="#333333" stroke-width="1"/>
+<line x1="70" y1="360" x2="880" y2="360" stroke="#333333" stroke-width="1"/>
+<line x1="66" y1="360.0" x2="880" y2="360.0" stroke="#dddddd" stroke-width="1"/>
+<text x="62" y="364.0" text-anchor="end" font-family="monospace" font-size="11">0.00</text>
+<line x1="66" y1="215.0" x2="880" y2="215.0" stroke="#dddddd" stroke-width="1"/>
+<text x="62" y="219.0" text-anchor="end" font-family="monospace" font-size="11">0.53</text>
+<line x1="66" y1="70.0" x2="880" y2="70.0" stroke="#dddddd" stroke-width="1"/>
+<text x="62" y="74.0" text-anchor="end" font-family="monospace" font-size="11">1.05</text>
+<rect x="70" y="40" width="14" height="14" fill="#1f77b4"/>
+<text x="90" y="52" font-family="monospace" font-size="12">mAP@0.5:0.95</text>
+<rect x="240" y="40" width="14" height="14" fill="#ff7f0e"/>
+<text x="260" y="52" font-family="monospace" font-size="12">Throughput term</text>
+<rect x="410" y="40" width="14" height="14" fill="#2ca02c"/>
+<text x="430" y="52" font-family="monospace" font-size="12">Small AP</text>
+<rect x="580" y="40" width="14" height="14" fill="#d62728"/>
+<text x="600" y="52" font-family="monospace" font-size="12">Night AP</text>
+<rect x="110.5" y="213.6" width="47.2" height="146.4" fill="#1f77b4"/>
+<rect x="157.8" y="83.8" width="47.2" height="276.2" fill="#ff7f0e"/>
+<rect x="205.0" y="260.0" width="47.2" height="100.0" fill="#2ca02c"/>
+<rect x="252.2" y="213.7" width="47.2" height="146.3" fill="#d62728"/>
+<text x="205.0" y="410" text-anchor="middle" font-family="monospace" font-size="12">yolov9c</text>
+<rect x="380.5" y="213.9" width="47.2" height="146.1" fill="#1f77b4"/>
+<rect x="427.8" y="83.8" width="47.2" height="276.2" fill="#ff7f0e"/>
+<rect x="475.0" y="262.4" width="47.2" height="97.6" fill="#2ca02c"/>
+<rect x="522.2" y="213.7" width="47.2" height="146.3" fill="#d62728"/>
+<text x="475.0" y="410" text-anchor="middle" font-family="monospace" font-size="12">yolov8l</text>
+<rect x="650.5" y="213.6" width="47.2" height="146.4" fill="#1f77b4"/>
+<rect x="697.8" y="83.8" width="47.2" height="276.2" fill="#ff7f0e"/>
+<rect x="745.0" y="264.7" width="47.2" height="95.3" fill="#2ca02c"/>
+<rect x="792.2" y="213.7" width="47.2" height="146.3" fill="#d62728"/>
+<text x="745.0" y="410" text-anchor="middle" font-family="monospace" font-size="12">rtdetr-l</text>
+</svg>

@@ -1,0 +1,85 @@
+{
+  "generated_on": "2026-04-06",
+  "mode": "published-benchmarks-proxy",
+  "notes": [
+    "This bundle is a proxy comparison for P1-E01. The repository does not contain a GPU, a live Triton instance, or a populated detector evaluation set, so the full protocol cannot be executed in this environment.",
+    "Composite scores follow docs/bake-off-protocol.md. Throughput is evaluated against the pilot target of 40 FPS aggregate, so every candidate saturates the throughput term on the target 24 GB GPU class.",
+    "night_ap is neutralized to the mean overall mAP across the three candidates because no primary-source night-slice benchmark was found for YOLOv8-L, YOLOv9-C, or RT-DETR-L.",
+    "YOLOv8-L small_object_ap is imputed as the neutral median of the published YOLOv9-C and RT-DETR-L AP_small values because no primary-source COCO AP_small slice was found for YOLOv8-L."
+  ],
+  "runs": [
+    {
+      "run_id": "published:yolov8l",
+      "candidate": "yolov8l",
+      "map_50": 0.702,
+      "map_50_95": 0.529,
+      "small_object_ap": 0.3535,
+      "night_ap": 0.5296666667,
+      "throughput_fps": 275.0,
+      "latency_p95_ms": 3.93,
+      "best_batch_size": 8,
+      "score": 0.6117833333,
+      "throughput_estimate": "200-350 FPS on 24 GB GPU class",
+      "latency_estimate": "~2.9-5.0 ms frame-equivalent",
+      "notes": [
+        "mAP and params come from the official Ultralytics YOLOv8 model card.",
+        "The 24 GB target-GPU throughput band comes directly from docs/triton-placement.md.",
+        "Because the throughput term caps at 1.0 above 40 FPS, YOLOv8-L's score is driven by accuracy and the neutralized slice terms rather than speed."
+      ],
+      "sources": [
+        "https://docs.ultralytics.com/models/yolov8/",
+        "docs/triton-placement.md"
+      ]
+    },
+    {
+      "run_id": "published:yolov9c",
+      "candidate": "yolov9c",
+      "map_50": 0.702,
+      "map_50_95": 0.53,
+      "small_object_ap": 0.362,
+      "night_ap": 0.5296666667,
+      "throughput_fps": 310.25,
+      "latency_p95_ms": 3.48,
+      "best_batch_size": 8,
+      "score": 0.6138333333,
+      "throughput_estimate": "226-395 FPS on 24 GB GPU class",
+      "latency_estimate": "~2.5-4.4 ms frame-equivalent",
+      "notes": [
+        "mAP and AP_small come from the official YOLOv9 README / repo evaluation block.",
+        "The 24 GB target-GPU estimate is inferred by scaling the repo's YOLOv8-L baseline from docs/triton-placement.md by the official YOLOv9 issue benchmark ratio on Tesla T4 (154.20 FPS vs 136.71 FPS for YOLOv8-L).",
+        "YOLOv9-C has the best published small-object slice among the three candidates, but the advantage is not large enough to create a 0.02 composite-score lead after the protocol's safe-default rule is applied."
+      ],
+      "sources": [
+        "https://docs.ultralytics.com/models/yolov9/",
+        "https://raw.githubusercontent.com/WongKinYiu/yolov9/main/README.md",
+        "https://github.com/WongKinYiu/yolov9/issues/178",
+        "docs/triton-placement.md"
+      ]
+    },
+    {
+      "run_id": "published:rtdetr-l",
+      "candidate": "rtdetr-l",
+      "map_50": 0.714,
+      "map_50_95": 0.53,
+      "small_object_ap": 0.345,
+      "night_ap": 0.5296666667,
+      "throughput_fps": 229.35,
+      "latency_p95_ms": 4.71,
+      "best_batch_size": 8,
+      "score": 0.6104333333,
+      "throughput_estimate": "167-292 FPS on 24 GB GPU class",
+      "latency_estimate": "~3.4-6.0 ms frame-equivalent",
+      "notes": [
+        "mAP and T4 FPS come from the official RT-DETR model card / README.",
+        "AP_small comes from the official RT-DETR COCO training log attachment for the HGNetv2-L checkpoint that matches the published 53.0 AP / 114 FPS profile.",
+        "RT-DETR-L likely has the strongest global-context story for unusual or crowded scenes, but published benchmark data still leaves it marginally behind on the proxy score."
+      ],
+      "sources": [
+        "https://docs.ultralytics.com/models/rtdetr/",
+        "https://raw.githubusercontent.com/lyuwenyu/RT-DETR/main/README.md",
+        "https://github.com/lyuwenyu/RT-DETR/issues/8",
+        "docs/triton-placement.md"
+      ]
+    }
+  ]
+}
