@@ -123,6 +123,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P1-V01 | Edge Agent | feat/P1-V01 | 9 Python modules (main, camera_pipeline, motion_detector, rtsp_client, nats_publisher, local_buffer, config, metrics, gen_proto), Dockerfile, 23 tests, handoff |
 | P1-A01 | CVAT Setup & Annotation Baseline | feat/P1-A01 | setup_cvat_projects.py (3 CVAT projects), annotation-guidelines.md, compute_iaa.py (IAA scorecard), split_dataset.py (temporal split), 3 SVG diagrams |
 | P1-E01 | Detector Bake-Off (10 days) | feat/P1-E01 | Published-benchmark proxy comparison, enhanced run_detector_bakeoff.py (git state, dataset metadata, operational slice), enhanced compare_bakeoff.py (offline JSON mode, SVG charts), detector-comparison.md recommending YOLOv8-L |
+| P1-V02 | Ingress Bridge Service | feat/P1-V02 | main.py (NATS→Kafka bridge with spool, schema validation, blob offload, DLQ), config.py, metrics.py (18 Prometheus instruments), Dockerfile, 6 tests including chaos scenario |
 
 ### Phase 1 — Pending (12 tasks remaining)
 ### Phases 2-4 — All Pending (39 tasks, prompts not yet in manifest)
