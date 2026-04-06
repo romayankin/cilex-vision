@@ -190,9 +190,9 @@ phases:
       - P0-D02
       - P0-D10
       - P1-E01
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P1-V04
       prompt: .agents/prompts/P1-V04.md
       tool: claude-code
     - id: P1-V05
