@@ -120,7 +120,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 |------|-------|--------|-----------------|
 | P1-O01 | Pilot Infrastructure | feat/P1-O01 | 13 Ansible playbooks (Kafka, NATS, TimescaleDB, MinIO, Triton, monitoring, MLflow, CVAT, services, topics, smoke-test), pilot inventory, templates, common role |
 | P1-V01 | Edge Agent | feat/P1-V01 | 9 Python modules (main, camera_pipeline, motion_detector, rtsp_client, nats_publisher, local_buffer, config, metrics, gen_proto), Dockerfile, 23 tests, handoff |
-
+| P1-A01 | CVAT Setup & Annotation Baseline | feat/P1-A01 | setup_cvat_projects.py (3 CVAT projects), annotation-guidelines.md, compute_iaa.py (IAA scorecard), split_dataset.py (temporal split), 3 SVG diagrams |
 
 ### Phase 1 — Pending (13 tasks remaining)
 ### Phases 2-4 — All Pending (39 tasks, prompts not yet in manifest)
