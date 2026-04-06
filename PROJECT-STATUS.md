@@ -119,6 +119,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | Task | Title | Branch | What it produced |
 |------|-------|--------|-----------------|
 | P1-O01 | Pilot Infrastructure | feat/P1-O01 | 13 Ansible playbooks (Kafka, NATS, TimescaleDB, MinIO, Triton, monitoring, MLflow, CVAT, services, topics, smoke-test), pilot inventory, templates, common role |
+| P1-V01 | Edge Agent | feat/P1-V01 | 9 Python modules (main, camera_pipeline, motion_detector, rtsp_client, nats_publisher, local_buffer, config, metrics, gen_proto), Dockerfile, 23 tests, handoff |
 
 ### Phase 1 — Pending (13 tasks remaining)
 ### Phases 2-4 — All Pending (39 tasks, prompts not yet in manifest)
