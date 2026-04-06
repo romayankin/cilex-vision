@@ -268,7 +268,7 @@ phases:
       - P0-D03
       - P0-D07
       - P0-D08
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P1-O01
       prompt: .agents/prompts/P1-O01.md

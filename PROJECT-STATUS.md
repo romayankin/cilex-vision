@@ -115,7 +115,12 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P0-X01 | Camera Compat Matrix | — | 4 |
 | P0-X02 | Hardware Sizing | — | 4 |
 
-### Phase 1 — All Pending (14 tasks, depends on Phase 0 completion)
+### Phase 1 — Completed
+| Task | Title | Branch | What it produced |
+|------|-------|--------|-----------------|
+| P1-O01 | Pilot Infrastructure | feat/P1-O01 | 13 Ansible playbooks (Kafka, NATS, TimescaleDB, MinIO, Triton, monitoring, MLflow, CVAT, services, topics, smoke-test), pilot inventory, templates, common role |
+
+### Phase 1 — Pending (13 tasks remaining)
 ### Phases 2-4 — All Pending (39 tasks, prompts not yet in manifest)
 
 ---
