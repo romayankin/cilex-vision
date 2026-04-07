@@ -47,3 +47,10 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover
 - [ ] Inference worker has no in-process model-swap endpoint — SOP assumes pod restart via kubectl. A graceful hot-swap mechanism would reduce cutover downtime
 - [ ] FAISS flush + tracker reset (ADR-008) cannot be tested end-to-end until the MTMC service exists (Phase 2)
+
+## Privacy & Compliance Gaps (P0-X02)
+
+- [ ] No committed MinIO lifecycle policies — retention intent exists in Ansible vars but `infra/minio/lifecycle/` directory does not exist. Add lifecycle JSON for `raw-video`, `event-clips`, `thumbnails`
+- [ ] DSAR export endpoint missing — no API for data subject access request packaging (admin-only, job-based, spans PostgreSQL + TimescaleDB + MinIO)
+- [ ] Data subject deletion workflow missing — no admin-only deletion job with dry-run, approval metadata, and coordinated cross-store deletes
+- [ ] Relational metadata retention is indefinite — `events`, `local_tracks`, `global_tracks`, `track_attributes` have no expiry. Add explicit retention jobs if customer contracts require hard ceilings

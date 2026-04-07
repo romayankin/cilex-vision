@@ -139,9 +139,9 @@ phases:
       role: doc
       title: Privacy & Compliance Framework
       depends_on: []
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P0-X02
       prompt: .agents/prompts/P0-X02.md
       tool: codex-cli
   phase-1:
