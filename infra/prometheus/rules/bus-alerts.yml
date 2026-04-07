@@ -1,0 +1,62 @@
+groups:
+  - name: bus-health
+    rules:
+      - alert: KafkaConsumerLagHigh
+        expr: bulk_consumer_lag > 10000
+        for: 5m
+        labels:
+          severity: warning
+          service: bulk-collector
+        annotations:
+          summary: "Kafka consumer lag above 10,000 for {{ $labels.group }}/{{ $labels.topic }}"
+          description: "Consumer lag for group={{ $labels.group }} topic={{ $labels.topic }} partition={{ $labels.partition }} is {{ $value }}. The bulk collector may be falling behind."
+
+      - alert: KafkaConsumerLagCritical
+        expr: bulk_consumer_lag > 50000
+        for: 2m
+        labels:
+          severity: critical
+          service: bulk-collector
+        annotations:
+          summary: "Kafka consumer lag above 50,000 for {{ $labels.group }}/{{ $labels.topic }}"
+          description: "Consumer lag is {{ $value }}. Data loss risk — investigate immediately."
+
+      - alert: BridgeSpoolFillWarn
+        expr: bridge_spool_fill_pct > 80
+        for: 2m
+        labels:
+          severity: warning
+          service: ingress-bridge
+        annotations:
+          summary: "Ingress bridge spool fill above 80%"
+          description: "bridge_spool_fill_pct is {{ $value | printf \"%.1f\" }}%%. Kafka may be unreachable or producing too slowly."
+
+      - alert: BridgeSpoolFillCritical
+        expr: bridge_spool_fill_pct > 95
+        for: 1m
+        labels:
+          severity: critical
+          service: ingress-bridge
+        annotations:
+          summary: "Ingress bridge spool fill above 95%"
+          description: "bridge_spool_fill_pct is {{ $value | printf \"%.1f\" }}%%. Message loss imminent if Kafka does not recover."
+
+      - alert: BridgeSchemaRejectionRate
+        expr: sum(rate(bridge_schema_rejection_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: ingress-bridge
+        annotations:
+          summary: "Ingress bridge schema rejections detected"
+          description: "Schema rejections at {{ $value | printf \"%.2f\" }}/s. Check edge agent protobuf version compatibility."
+
+      - alert: BridgeDLQPublishing
+        expr: rate(bridge_dlq_published_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: ingress-bridge
+        annotations:
+          summary: "Messages being published to DLQ for site {{ $labels.site_id }}"
+          description: "Dead-letter queue messages at {{ $value | printf \"%.2f\" }}/s. Investigate redelivery failures."

@@ -1,0 +1,54 @@
+groups:
+  - name: inference-performance
+    rules:
+      - alert: InferenceLatencyP99High
+        expr: histogram_quantile(0.99, sum by (le) (rate(inference_latency_ms_bucket[5m]))) > 200
+        for: 5m
+        labels:
+          severity: warning
+          service: inference-worker
+        annotations:
+          summary: "Detection inference p99 latency above 200 ms"
+          description: "inference_latency_ms p99 is {{ $value | printf \"%.0f\" }} ms. Check GPU utilization, Triton queue depth, and batch sizes."
+
+      # VRAM headroom < 15% — complements TritonVramWarn (>85% used) in triton-alerts.yml.
+      # This alert uses the headroom framing referenced by docs/triton-placement.md.
+      - alert: InferenceVramHeadroomLow
+        expr: (1 - (nv_gpu_memory_used_bytes / nv_gpu_memory_total_bytes)) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+          service: inference-worker
+        annotations:
+          summary: "GPU {{ $labels.gpu_uuid }} VRAM headroom below 15%"
+          description: "VRAM headroom is {{ $value | printf \"%.1f\" }}%%. Shadow model deployment or future model additions may cause OOM. See docs/triton-placement.md."
+
+      - alert: EmbeddingLatencyP99High
+        expr: histogram_quantile(0.99, sum by (le) (rate(inference_embedding_latency_ms_bucket[5m]))) > 500
+        for: 5m
+        labels:
+          severity: warning
+          service: inference-worker
+        annotations:
+          summary: "Re-ID embedding p99 latency above 500 ms"
+          description: "inference_embedding_latency_ms p99 is {{ $value | printf \"%.0f\" }} ms. Check OSNet model health and GPU contention."
+
+      - alert: InferenceConsumerLagHigh
+        expr: inference_consumer_lag > 5000
+        for: 5m
+        labels:
+          severity: warning
+          service: inference-worker
+        annotations:
+          summary: "Inference worker consumer lag above 5000"
+          description: "Consumer lag for topic={{ $labels.topic }} partition={{ $labels.partition }} is {{ $value }}. The inference worker may be falling behind."
+
+      - alert: InferencePublishErrors
+        expr: rate(inference_publish_errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: inference-worker
+        annotations:
+          summary: "Inference worker Kafka publish errors on topic {{ $labels.topic }}"
+          description: "Sustained publish failures at {{ $value | printf \"%.2f\" }}/s to {{ $labels.topic }}. Check Kafka broker connectivity."

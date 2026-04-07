@@ -1,0 +1,38 @@
+# Clock health alerts.
+#
+# The primary clock skew alerts (ClockSkewWarn >500ms, ClockSkewCritical >2000ms)
+# are defined in clock-drift.yml per docs/time-sync-policy.md.
+# This file adds complementary clock health alerts.
+
+groups:
+  - name: clock-health
+    rules:
+      - alert: ClockDriftCollectorDown
+        expr: absent(clock_skew_ms) == 1
+        for: 10m
+        labels:
+          severity: warning
+          service: monitoring
+        annotations:
+          summary: "Clock drift collector not reporting"
+          description: "The clock_skew_ms metric has been absent for 10 minutes. The clock drift collector (services/monitoring/clock_drift_check.py) may not be running."
+
+      - alert: BridgeClockDriftDetected
+        expr: sum(rate(bridge_clock_drift_detected_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: ingress-bridge
+        annotations:
+          summary: "Bridge detecting core_ingest_ts < edge_receive_ts"
+          description: "The ingress bridge is seeing messages where core_ingest_ts precedes edge_receive_ts, indicating clock drift between edge and core hosts. Rate: {{ $value | printf \"%.2f\" }}/s."
+
+      - alert: ClockSkewMultiplePairsWarn
+        expr: count(clock_skew_ms > 500) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: monitoring
+        annotations:
+          summary: "Multiple camera pairs have clock skew above 500 ms"
+          description: "{{ $value }} camera pairs exceed the 500 ms skew threshold from docs/time-sync-policy.md. This may indicate a systemic NTP issue rather than an isolated host problem."

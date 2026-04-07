@@ -1,0 +1,169 @@
+{
+  "uid": "model-quality",
+  "title": "Model Quality",
+  "tags": ["cilex-vision", "model", "detection"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "prometheus" }
+      },
+      {
+        "name": "camera_id",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(inference_tracks_active, camera_id)",
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "object_class",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(inference_detections_total, object_class)",
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Detection Count per Class / hour",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "rate(inference_detections_total{object_class=~\"$object_class\"}[5m]) * 3600",
+          "legendFormat": "{{ object_class }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } } }
+    },
+    {
+      "id": 2,
+      "type": "bargauge",
+      "title": "Total Detections by Class (last 1h)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "increase(inference_detections_total{object_class=~\"$object_class\"}[1h])",
+          "legendFormat": "{{ object_class }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Detection Rate by Camera / min",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum by (camera_id) (rate(inference_tracks_closed_total{camera_id=~\"$camera_id\"}[5m]) * 60 + rate(inference_tracks_active{camera_id=~\"$camera_id\"}[5m]))",
+          "legendFormat": "{{ camera_id }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } } }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Active Tracks per Camera",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "inference_tracks_active{camera_id=~\"$camera_id\"}",
+          "legendFormat": "{{ camera_id }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Track Close Rate / min (ID switch proxy)",
+      "description": "Tracks reaching TERMINATED state per minute. A sustained high close rate relative to active tracks may indicate tracking instability or frequent ID switches.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "rate(inference_tracks_closed_total{camera_id=~\"$camera_id\"}[5m]) * 60",
+          "legendFormat": "{{ camera_id }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Track Turnover Ratio",
+      "description": "closed/active ratio — higher values suggest shorter track lifetimes or instability.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "rate(inference_tracks_closed_total{camera_id=~\"$camera_id\"}[5m]) / (inference_tracks_active{camera_id=~\"$camera_id\"} > 0)",
+          "legendFormat": "{{ camera_id }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Inference Pipeline Throughput",
+      "description": "End-to-end: frames consumed vs detections produced vs embeddings extracted.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "rate(inference_frames_consumed_total[5m])",
+          "legendFormat": "Frames consumed/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(inference_detections_total[5m]))",
+          "legendFormat": "Detections/s",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 10 } } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Publish Errors by Topic",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "rate(inference_publish_errors_total[5m]) * 60",
+          "legendFormat": "{{ topic }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } } }
+    }
+  ]
+}

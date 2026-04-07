@@ -1,0 +1,56 @@
+groups:
+  - name: stream-health
+    rules:
+      - alert: CameraOffline
+        expr: edge_camera_uptime_ratio == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: edge-agent
+        annotations:
+          summary: "Camera {{ $labels.camera_id }} offline for over 5 minutes"
+          description: "edge_camera_uptime_ratio for {{ $labels.camera_id }} is 0. The RTSP connection may be down or the edge agent is not running."
+
+      - alert: DecodeErrorRateHigh
+        expr: sum by (camera_id) (rate(edge_decode_errors_total[5m])) * 60 > 100
+        for: 2m
+        labels:
+          severity: warning
+          service: edge-agent
+        annotations:
+          summary: "Camera {{ $labels.camera_id }} decode errors exceed 100/min"
+          description: "GStreamer decode errors for {{ $labels.camera_id }} are at {{ $value | printf \"%.0f\" }}/min. Check RTSP stream health or codec negotiation."
+
+      - alert: MotionDutyCycleAnomaly
+        expr: >
+          (
+            rate(edge_motion_frames_total[30m])
+            / (rate(edge_motion_frames_total[30m]) + rate(edge_static_frames_filtered_total[30m]))
+          ) < 0.01
+        for: 15m
+        labels:
+          severity: warning
+          service: edge-agent
+        annotations:
+          summary: "Camera {{ $labels.camera_id }} motion duty cycle below 1%"
+          description: "Motion pass-through rate for {{ $labels.camera_id }} has been below 1% for 15 minutes. The camera may be obstructed, misconfigured, or pointing at a static scene."
+
+      - alert: NatsPublishLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le, camera_id) (rate(edge_nats_publish_latency_ms_bucket[5m]))) > 500
+        for: 5m
+        labels:
+          severity: warning
+          service: edge-agent
+        annotations:
+          summary: "Camera {{ $labels.camera_id }} NATS publish p95 latency above 500 ms"
+          description: "NATS JetStream publish latency for {{ $labels.camera_id }} is {{ $value | printf \"%.0f\" }} ms. Check NATS server health and network connectivity."
+
+      - alert: EdgeBufferFillHigh
+        expr: edge_buffer_fill_bytes > 500000000
+        for: 5m
+        labels:
+          severity: warning
+          service: edge-agent
+        annotations:
+          summary: "Edge local buffer exceeds 500 MB"
+          description: "The local ring buffer is at {{ $value | humanize1024 }}B. This indicates sustained NATS connectivity issues."

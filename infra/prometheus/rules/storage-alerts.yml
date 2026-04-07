@@ -1,0 +1,52 @@
+groups:
+  - name: storage-health
+    rules:
+      - alert: TimescaleDBWriteErrors
+        expr: rate(bulk_write_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          service: bulk-collector
+        annotations:
+          summary: "TimescaleDB COPY write errors on table {{ $labels.table }}"
+          description: "bulk_write_errors_total is increasing at {{ $value | printf \"%.2f\" }}/s for table={{ $labels.table }}. Check database connectivity and disk space."
+
+      - alert: BulkWriteLatencyHigh
+        expr: histogram_quantile(0.99, sum by (le, table) (rate(bulk_write_latency_ms_bucket[5m]))) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: bulk-collector
+        annotations:
+          summary: "Bulk COPY write p99 latency above 1s for table {{ $labels.table }}"
+          description: "Write latency for {{ $labels.table }} is {{ $value | printf \"%.0f\" }} ms. Check TimescaleDB chunk compression, disk I/O, and connection pool."
+
+      - alert: BulkRowsStagedHigh
+        expr: bulk_rows_staged > 10000
+        for: 5m
+        labels:
+          severity: warning
+          service: bulk-collector
+        annotations:
+          summary: "Bulk collector staging buffer above 10,000 rows for table {{ $labels.table }}"
+          description: "{{ $value }} rows staged for {{ $labels.table }}. The collector may not be flushing fast enough."
+
+      - alert: DecodeServiceErrorRateHigh
+        expr: sum(rate(decode_errors_total[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: decode-service
+        annotations:
+          summary: "Decode service error rate elevated"
+          description: "Decode errors at {{ $value | printf \"%.2f\" }}/s across all codecs. Check source frame encoding and codec support."
+
+      - alert: DecodePublishErrors
+        expr: rate(decode_publish_errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: decode-service
+        annotations:
+          summary: "Decode service Kafka publish failures"
+          description: "Sustained publish errors at {{ $value | printf \"%.2f\" }}/s to decoded frame topic."
