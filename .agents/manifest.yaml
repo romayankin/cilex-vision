@@ -299,8 +299,8 @@ phases:
       title: Camera Compatibility Matrix
       depends_on:
       - P1-V01
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P1-X01
       prompt: .agents/prompts/P1-X01.md
       tool: codex-cli
