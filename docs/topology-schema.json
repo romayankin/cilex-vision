@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cilex.vision/schemas/topology-graph.json",
+  "title": "TopologyGraph",
+  "description": "Camera topology graph for import/export. Describes cameras, directed edges, and per-class transit-time distributions for one site.",
+  "type": "object",
+  "required": ["site_id", "cameras", "edges"],
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "UUID of the site this topology belongs to."
+    },
+    "cameras": {
+      "type": "array",
+      "description": "Camera nodes in the topology graph.",
+      "items": { "$ref": "#/$defs/CameraNode" }
+    },
+    "edges": {
+      "type": "array",
+      "description": "Directed transition edges between cameras.",
+      "items": { "$ref": "#/$defs/TransitionEdge" }
+    }
+  },
+  "$defs": {
+    "CameraNode": {
+      "type": "object",
+      "required": ["camera_id", "site_id", "name"],
+      "properties": {
+        "camera_id": {
+          "type": "string",
+          "description": "Unique camera identifier (e.g. 'cam-entrance')."
+        },
+        "site_id": {
+          "type": "string",
+          "description": "UUID of the parent site."
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable camera name."
+        },
+        "zone_id": {
+          "type": ["string", "null"],
+          "description": "Logical zone this camera belongs to (for zone-based events)."
+        },
+        "latitude": {
+          "type": ["number", "null"],
+          "description": "WGS-84 latitude."
+        },
+        "longitude": {
+          "type": ["number", "null"],
+          "description": "WGS-84 longitude."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["online", "offline", "maintenance", "error"],
+          "default": "offline"
+        },
+        "location_description": {
+          "type": ["string", "null"],
+          "description": "Free-text description of the camera's physical location."
+        }
+      }
+    },
+    "TransitionEdge": {
+      "type": "object",
+      "required": ["camera_a_id", "camera_b_id", "transition_time_s"],
+      "properties": {
+        "edge_id": {
+          "type": ["string", "null"],
+          "description": "UUID of the edge (assigned by the database)."
+        },
+        "camera_a_id": {
+          "type": "string",
+          "description": "Source camera of the directed edge."
+        },
+        "camera_b_id": {
+          "type": "string",
+          "description": "Destination camera of the directed edge."
+        },
+        "transition_time_s": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Median person transit time in seconds."
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1.0,
+          "description": "Confidence that this edge represents a real physical path."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether this edge is active for MTMC matching."
+        },
+        "transit_distributions": {
+          "type": "array",
+          "description": "Per-class transit-time distributions.",
+          "items": { "$ref": "#/$defs/TransitTimeDistribution" }
+        }
+      }
+    },
+    "TransitTimeDistribution": {
+      "type": "object",
+      "required": ["object_class", "p50_ms", "p90_ms", "p99_ms"],
+      "properties": {
+        "object_class": {
+          "type": "string",
+          "enum": ["person", "car", "truck", "bus", "bicycle", "motorcycle", "animal"],
+          "description": "Object class from taxonomy.md."
+        },
+        "p50_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "50th percentile transit time in milliseconds."
+        },
+        "p90_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "90th percentile transit time in milliseconds."
+        },
+        "p99_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "99th percentile transit time in milliseconds."
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of Re-ID matches used to compute this distribution. Zero means seed values."
+        },
+        "last_updated": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Timestamp of the last distribution update."
+        }
+      }
+    }
+  }
+}

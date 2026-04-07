@@ -35,3 +35,9 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] Edge agent does not subscribe to `site.{site_id}.control.{camera_id}.calibrate` — calibration harness publishes this command but the agent has no control consumer to disable motion filtering
 - [ ] NATS ACL template (`infra/nats/nats-server.conf`) missing control subject authorization — add `site.<site_id>.control.>` to the appropriate user blocks
 - [ ] Prometheus node-exporter textfile collector not configured to scrape `artifacts/calibration/prometheus/` — calibration metrics won't appear in Grafana until this path is added to the monitoring stack
+
+## Topology Service Gaps (P0-D05)
+
+- [ ] Topology FastAPI router (`services/topology/api.py`) not registered in any running app — wire into `services/query-api/main.py` or deploy as a standalone service
+- [ ] Run `seed.py --apply` against the pilot DB during infrastructure setup to populate the demo 4-camera topology
+- [ ] `zone_id` is stored in `cameras.config_json` JSONB — document this convention for the MTMC service (Phase 2) which needs zone-aware matching

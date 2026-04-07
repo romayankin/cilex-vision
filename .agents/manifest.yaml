@@ -47,9 +47,9 @@ phases:
       title: Camera Topology Graph Data Model
       depends_on:
       - P0-D04
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P0-D05
       prompt: .agents/prompts/P0-D05.md
       tool: claude-code
     - id: P0-D06
