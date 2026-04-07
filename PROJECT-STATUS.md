@@ -128,6 +128,8 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P1-V04 | Detection & Tracking Inference Worker | feat/P1-V04 | main.py (Kafka pipeline), detector_client.py (Triton YOLOv8-L + NMS), tracker.py (ByteTrack), embedder_client.py (OSNet Re-ID), publisher.py (3 Kafka topics), debug_trace.py (1-5% sampling), Dockerfile, 37 tests |
 | P1-V05 | Metadata Bulk Collector | feat/P1-V05 | main.py (Kafka→TimescaleDB COPY), collector.py (commit-safe batching), writer.py (asyncpg COPY + dedup), Dockerfile, 6 tests, load-test-collector.py (zero-loss assertion) |
 | P1-V06 | Basic Query API | feat/P1-V06 | FastAPI app (main.py, 3 routers, JWT httpOnly auth, RBAC 4 roles, camera scope filtering, audit middleware, asyncpg raw SQL, signed MinIO URLs), Dockerfile, 36 tests |
+| P1-V07 | Debug Trace Pipeline | feat/P1-V07 | Enhanced debug_trace.py (TraceCollector with pre-NMS capture, tracker delta, 30d MinIO lifecycle), query-api routers/debug.py (engineering-only, signed URLs), 42 new tests |
+
 
 ### Phase 1 — Pending (12 tasks remaining)
 ### Phases 2-4 — All Pending (39 tasks, prompts not yet in manifest)
@@ -247,6 +249,9 @@ git commit -m "status: mark P0-XXX done"
 git push
 
 .agents/status.sh              # see what unlocked
+# 3. Check handoff for deployment TODOs
+# Read .agents/handoff/P0-XXX.md for gaps, missing wiring, or prerequisites
+# Append any findings to todo_before_deployment.md
 ```
 
 ---

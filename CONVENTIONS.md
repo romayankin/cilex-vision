@@ -115,3 +115,10 @@ PROJECT-STATUS.md is the single source of truth for project state. Read it first
 2. Update `PROJECT-STATUS.md` — move task to Completed table, document what it produced
 3. Commit both files together: `git commit -m "status: mark P0-XXX done"`
 Never skip these steps. Never commit one without the other.
+
+## Post-Task TODO Check (mandatory after every task)
+After every task review passes, before merging:
+1. Read the handoff note (.agents/handoff/P0-XXX.md)
+2. Check for any gaps, missing wiring, or deployment prerequisites
+3. Append findings to `todo_before_deployment.md`
+4. This file is committed alongside manifest.yaml and PROJECT-STATUS.md updates

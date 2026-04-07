@@ -222,7 +222,7 @@ phases:
       title: Debug Trace Pipeline
       depends_on:
       - P1-V04
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P1-V07
       prompt: .agents/prompts/P1-V07.md
