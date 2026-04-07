@@ -244,7 +244,7 @@ phases:
       title: Tracker Bake-Off (5 days)
       depends_on:
       - P1-E01
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P1-E02
       prompt: .agents/prompts/P1-E02.md
