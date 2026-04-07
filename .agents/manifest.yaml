@@ -121,7 +121,7 @@ phases:
       role: dev
       title: Throwaway 1-Camera Prototype
       depends_on: []
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P0-V01
       prompt: .agents/prompts/P0-V01.md

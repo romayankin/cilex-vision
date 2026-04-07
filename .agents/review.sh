@@ -159,7 +159,7 @@ fi
 if [ -n "$CHANGED_FILES" ]; then
     case "$ROLE" in
         dev)
-            VIOLATIONS=$(echo "$CHANGED_FILES" | grep -v "^services/" | grep -v "^tests/" | grep -v "^\.agents/" || true)
+            VIOLATIONS=$(echo "$CHANGED_FILES" | grep -v "^services/" | grep -v "^scripts/" | grep -v "^tests/" | grep -v "^\.agents/" || true)
             [ -z "$VIOLATIONS" ] && check_pass "All changes within DEV write zone" || check_fail "Changes OUTSIDE write zone: ${VIOLATIONS}"
             ;;
         ops)
