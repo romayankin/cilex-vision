@@ -84,9 +84,9 @@ phases:
       role: design
       title: Model Rollout & Cutover SOP
       depends_on: []
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P0-D09
       prompt: .agents/prompts/P0-D09.md
       tool: claude-code
     - id: P0-D10

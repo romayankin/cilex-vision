@@ -41,3 +41,9 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] Topology FastAPI router (`services/topology/api.py`) not registered in any running app — wire into `services/query-api/main.py` or deploy as a standalone service
 - [ ] Run `seed.py --apply` against the pilot DB during infrastructure setup to populate the demo 4-camera topology
 - [ ] `zone_id` is stored in `cameras.config_json` JSONB — document this convention for the MTMC service (Phase 2) which needs zone-aware matching
+
+## Model Rollout SOP Gaps (P0-D09)
+
+- [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover
+- [ ] Inference worker has no in-process model-swap endpoint — SOP assumes pod restart via kubectl. A graceful hot-swap mechanism would reduce cutover downtime
+- [ ] FAISS flush + tracker reset (ADR-008) cannot be tested end-to-end until the MTMC service exists (Phase 2)
