@@ -121,9 +121,9 @@ phases:
       role: dev
       title: Throwaway 1-Camera Prototype
       depends_on: []
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P0-V01
       prompt: .agents/prompts/P0-V01.md
       tool: claude-code
     - id: P0-X01
