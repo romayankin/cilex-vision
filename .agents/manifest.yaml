@@ -212,7 +212,7 @@ phases:
       depends_on:
       - P0-D04
       - P1-V05
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P1-V06
       prompt: .agents/prompts/P1-V06.md

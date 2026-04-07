@@ -127,6 +127,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P1-V03 | Central Decode & Frame Sampling | feat/P1-V03 | decoder.py (Pillow JPEG + GStreamer H.264/H.265), color_space.py (BT.601/709 detection + YCbCr→RGB), sampler.py (per-camera FPS gating), publisher.py, Dockerfile with GStreamer, 51 tests |
 | P1-V04 | Detection & Tracking Inference Worker | feat/P1-V04 | main.py (Kafka pipeline), detector_client.py (Triton YOLOv8-L + NMS), tracker.py (ByteTrack), embedder_client.py (OSNet Re-ID), publisher.py (3 Kafka topics), debug_trace.py (1-5% sampling), Dockerfile, 37 tests |
 | P1-V05 | Metadata Bulk Collector | feat/P1-V05 | main.py (Kafka→TimescaleDB COPY), collector.py (commit-safe batching), writer.py (asyncpg COPY + dedup), Dockerfile, 6 tests, load-test-collector.py (zero-loss assertion) |
+| P1-V06 | Basic Query API | feat/P1-V06 | FastAPI app (main.py, 3 routers, JWT httpOnly auth, RBAC 4 roles, camera scope filtering, audit middleware, asyncpg raw SQL, signed MinIO URLs), Dockerfile, 36 tests |
 
 ### Phase 1 — Pending (12 tasks remaining)
 ### Phases 2-4 — All Pending (39 tasks, prompts not yet in manifest)
