@@ -1,0 +1,8 @@
+version: 1
+updated_at: null
+defaults:
+  target_pass_through_rate: 0.15
+  capture_window_s: 600
+  detector_model: yolov8l
+  detector_confidence_threshold: 0.4
+cameras: {}
