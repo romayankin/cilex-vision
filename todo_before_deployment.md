@@ -1,0 +1,15 @@
+# Pre-Deployment TODO
+
+Items discovered during development that must be resolved before pilot deployment.
+Updated after each task completion. Referenced in PROJECT-STATUS.md.
+
+---
+
+## Kafka Topic Gaps
+
+- [ ] Add `frames.decoded.refs` to `infra/kafka/topics.yaml` — introduced by P1-V03 (decode service publishes here), not yet in canonical topic list
+- [ ] Add `bulk.detections` to `infra/kafka/topics.yaml` — introduced by P1-V04/P1-V05 (inference worker publishes, bulk collector consumes), not yet in canonical topic list
+
+## Service Reconfiguration
+
+- [ ] Inference worker (P1-V04) `input_topic` must change from `frames.sampled.refs` to `frames.decoded.refs` when decode service (P1-V03) is deployed — currently both services consume the same topic
