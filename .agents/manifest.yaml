@@ -84,7 +84,7 @@ phases:
       role: design
       title: Model Rollout & Cutover SOP
       depends_on: []
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P0-D09
       prompt: .agents/prompts/P0-D09.md

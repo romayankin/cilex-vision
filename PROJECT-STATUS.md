@@ -100,11 +100,12 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P0-D03 | Kafka Topic Contract | feat/P0-D03 | docs/kafka-contract.md, infra/kafka/topics.yaml, create-topics.py |
 | P0-D04 | Database Schema | feat/P0-D04 | 12 SQLAlchemy 2.0 models (2 hypertables + 10 relational), Alembic migration, Mermaid ER diagram, ADR-003 |
 | P0-D05 | Camera Topology Graph Data Model | feat/P0-D05 | models.py (TopologyGraph, CameraNode with zone_id, TransitionEdge with per-class transit distributions), api.py (CRUD router), seed.py (4-camera demo site), topology-schema.json, 37 tests |
-| P0-D07 | Time Sync Policy | feat/P0-D07 | Full timestamp policy doc, Chrony configs, clock_drift_check.py with mock smoke test, Prometheus alert rules |
 | P0-D06 | Ingress Bridge Spec | feat/P0-D06 | ADR-001 full spec (8 responsibilities, failure modes, metrics, deployment), ingress-bridge-flow.mermaid |
-| P0-O01 | Infrastructure Scaffolding | feat/P0-O01 | docker-compose.yml (Kafka 3-broker, NATS, TimescaleDB, MinIO, Redis, Prometheus, Grafana, MLflow), CI workflow, Makefile |
+| P0-D07 | Time Sync Policy | feat/P0-D07 | Full timestamp policy doc, Chrony configs, clock_drift_check.py with mock smoke test, Prometheus alert rules |
 | P0-D08 | Security Design | feat/P0-D08 | Full security spec (trust model, PKI, NATS mTLS, Kafka SASL_SSL, ACL matrices), step-ca config, bootstrap-site.sh, NATS/Kafka templates |
+| P0-D09 | Model Rollout & Cutover SOP | feat/P0-D09 | docs/runbooks/model-rollout-sop.md (4-stage SOP: offline qualification, shadow deployment, site-level cutover with ADR-008 FAISS flush, post-cutover watch with 15% rollback trigger) |
 | P0-D10 | Triton Placement | feat/P0-D10 | Full placement spec (model inventory, VRAM budget, GPU classes, co-location), 3 Triton config.pbtxt files, triton-alerts.yml |
+| P0-O01 | Infrastructure Scaffolding | feat/P0-O01 | docker-compose.yml (Kafka 3-broker, NATS, TimescaleDB, MinIO, Redis, Prometheus, Grafana, MLflow), CI workflow, Makefile |
 | P0-E01 | Bake-Off Protocol | feat/P0-E01 | Full bake-off protocol (detector/tracker/attribute), run_detector_bakeoff.py, compare_bakeoff.py |
 
 
