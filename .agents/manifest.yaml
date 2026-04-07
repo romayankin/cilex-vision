@@ -178,7 +178,7 @@ phases:
       depends_on:
       - P0-D03
       - P0-O01
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P1-V03
       prompt: .agents/prompts/P1-V03.md
