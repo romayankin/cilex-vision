@@ -136,6 +136,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P1-V05 | Metadata Bulk Collector | feat/P1-V05 | main.py (Kafka→TimescaleDB COPY), collector.py (commit-safe batching), writer.py (asyncpg COPY + dedup), Dockerfile, 6 tests, load-test-collector.py (zero-loss assertion) |
 | P1-V06 | Basic Query API | feat/P1-V06 | FastAPI app (main.py, 3 routers, JWT httpOnly auth, RBAC 4 roles, camera scope filtering, audit middleware, asyncpg raw SQL, signed MinIO URLs), Dockerfile, 36 tests |
 | P1-V07 | Debug Trace Pipeline | feat/P1-V07 | Enhanced debug_trace.py (TraceCollector with pre-NMS capture, tracker delta, 30d MinIO lifecycle), query-api routers/debug.py (engineering-only, signed URLs), 42 new tests |
+| P1-X01 | Camera Compatibility Matrix | feat/P1-X01 | docs/camera-compatibility.md (Dahua WizMind + Hikvision ColorVu seeded as UNTESTED), probe_camera.py (ONVIF+RTSP live probe + published-only mode), run_compat_suite.sh (CSV/YAML inventory → JSON reports + Markdown matrix) |
 
 
 ### Phase 1 — Pending (12 tasks remaining)

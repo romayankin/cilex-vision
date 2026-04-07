@@ -299,7 +299,7 @@ phases:
       title: Camera Compatibility Matrix
       depends_on:
       - P1-V01
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P1-X01
       prompt: .agents/prompts/P1-X01.md
