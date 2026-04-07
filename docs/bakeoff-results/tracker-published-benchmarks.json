@@ -1,0 +1,37 @@
+{
+  "phase": "tracker",
+  "benchmark": "MOT17 test set, private detections",
+  "detector_context": "published proxy only; official tracker submissions use each paper's private detector, not the local YOLOv8-L winner",
+  "runs": [
+    {
+      "run_id": "published:bytetrack-mot17-private",
+      "candidate": "bytetrack",
+      "mota": 80.3,
+      "idf1": 77.3,
+      "id_switches": 2196,
+      "fragmentation": 2277,
+      "mostly_tracked_pct": 53.2,
+      "mostly_lost_pct": 14.5,
+      "throughput_fps": 29.6,
+      "notes": [
+        "Official MOT17 private-detection submission from the MOTChallenge leaderboard.",
+        "Published speed note from the ByteTrack README is 29.6 FPS on a single V100 GPU."
+      ]
+    },
+    {
+      "run_id": "published:botsort-mot17-private",
+      "candidate": "botsort",
+      "mota": 80.5,
+      "idf1": 80.2,
+      "id_switches": 1212,
+      "fragmentation": 1803,
+      "mostly_tracked_pct": 54.4,
+      "mostly_lost_pct": 16.2,
+      "throughput_fps": 6.8,
+      "notes": [
+        "Official MOT17 private-detection submission from the MOTChallenge leaderboard.",
+        "This published result corresponds to the ReID-enabled BoT-SORT submission path described in the paper and repo materials."
+      ]
+    }
+  ]
+}

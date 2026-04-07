@@ -23,3 +23,9 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] Wire `TraceCollector` into inference worker `main.py` pipeline loop — currently `main.py` still uses the old `DebugTracer`, new enrichment methods (raw detections, tracker delta, attributes, model versions) are not called
 - [ ] Call `TraceCollector.ensure_bucket()` at inference worker startup to create `debug-traces` bucket with 30-day lifecycle
 - [ ] Debug trace query endpoint lists MinIO objects directly (no DB index) — acceptable for pilot but will need a metadata table at scale
+
+## Tracker Bake-Off Gaps (P1-E02)
+
+- [ ] BoT-SORT is not implemented in the repo — only ByteTrack exists in `services/inference-worker/tracker.py`. Need to implement or integrate BoT-SORT before promoting it to production
+- [ ] Live tracker bake-off still needed — proxy uses MOT17 private detections, not YOLOv8-L on pilot clips. Re-validate recommendation once `data/eval/mot/` is populated
+- [ ] BoT-SORT published throughput (6.8 FPS) is ~4x slower than ByteTrack (29.6 FPS) — measure real latency on target GPU stack before committing to BoT-SORT in production
