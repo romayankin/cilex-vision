@@ -13,3 +13,7 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 ## Service Reconfiguration
 
 - [ ] Inference worker (P1-V04) `input_topic` must change from `frames.sampled.refs` to `frames.decoded.refs` when decode service (P1-V03) is deployed — currently both services consume the same topic
+
+## Query API Gaps
+
+- [ ] Track detail endpoint (`GET /tracks/{id}`) returns `thumbnail_url: null` — needs a frame-reference lookup table or stored thumbnail URI in `local_tracks` to resolve
