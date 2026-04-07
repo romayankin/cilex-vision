@@ -24,6 +24,19 @@ topics:
       object storage — never raw image bytes. Keyed by camera_id so all frames
       from a single camera are ordered within the same partition.
 
+  - name: frames.decoded.refs
+    partitions: 12
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 7200000        # 2 hours
+    key_schema: string(camera_id)
+    value_schema: vidanalytics.v1.frame.FrameRef
+    description: >
+      Decoded frame references published by the decode service (P1-V03).
+      Consumed by the inference worker. Each message is a FrameRef pointing
+      to a decoded, color-normalized, resized JPEG in object storage.
+      Keyed by camera_id for per-camera ordering.
+
   - name: tracklets.local
     partitions: 12
     replication_factor: 3
@@ -36,6 +49,19 @@ topics:
       is a Tracklet protobuf containing trajectory points and the current
       track state. Keyed by camera_id to preserve per-camera track ordering
       (state transitions must be consumed in order).
+
+  - name: bulk.detections
+    partitions: 12
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 21600000       # 6 hours
+    key_schema: string(camera_id)
+    value_schema: vidanalytics.v1.detection.Detection
+    description: >
+      Detection protobuf messages published by the inference worker (P1-V04),
+      consumed by the bulk collector (P1-V05) for COPY ingest to TimescaleDB.
+      Keyed by camera_id. Headers include x-proto-schema, x-frame-seq, and
+      x-local-track-id for consumer-side correlation.
 
   - name: attributes.jobs
     partitions: 6

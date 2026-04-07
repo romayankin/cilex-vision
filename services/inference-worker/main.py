@@ -2,7 +2,7 @@
 
 Kafka consumer pipeline:
 
-1. Consume ``FrameRef`` from ``frames.sampled.refs``
+1. Consume ``FrameRef`` from ``frames.decoded.refs``
 2. Download frame JPEG from MinIO
 3. Detect objects via Triton YOLOv8-L
 4. Track per camera via ByteTrack (CPU)
@@ -29,7 +29,7 @@ from typing import Any
 import numpy as np
 
 from config import Settings
-from debug_trace import DebugTracer, TraceStage
+from debug_trace import TraceCollector, TraceStage
 from detector_client import DetectorClient
 from embedder_client import EmbedderClient
 from metrics import (
@@ -89,16 +89,19 @@ class InferenceWorker:
 
         # MinIO client for frame download and debug traces
         self._minio = None  # lazy init
-        self._debug_tracer = None  # lazy init
+        self._trace_collector = None  # lazy init
 
     async def start(self) -> None:
         """Connect to Kafka, MinIO, and start the consumer loop."""
         self._minio = self._create_minio()
-        self._debug_tracer = DebugTracer(
-            self.settings.debug,
-            self.settings.minio,
-            self._minio,
-        )
+        if self.settings.debug.enabled:
+            self._trace_collector = TraceCollector(
+                sample_rate=self.settings.debug.sample_rate_pct / 100.0,
+                low_confidence_threshold=self.settings.debug.low_confidence_threshold,
+                minio_client=self._minio,
+                bucket=self.settings.minio.debug_bucket,
+            )
+            await self._trace_collector.ensure_bucket()
 
         await self._publisher.connect()
         logger.info("Kafka publisher connected")
@@ -208,11 +211,18 @@ class InferenceWorker:
         if edge_ts <= 0:
             edge_ts = time.time()
 
+        source_ts = (
+            timestamps.source_capture_ts.seconds
+            + timestamps.source_capture_ts.nanos / 1e9
+        )
+        if source_ts <= 0:
+            source_ts = None
+
         # --- Debug trace: decide early ---
         should_trace, trace_reason = False, ""
         trace = None
-        if self._debug_tracer:
-            should_trace, trace_reason = self._debug_tracer.should_sample()
+        if self._trace_collector:
+            should_trace, trace_reason = self._trace_collector.should_collect()
 
         # --- Download frame from MinIO ---
         t_download_start = time.monotonic()
@@ -223,9 +233,13 @@ class InferenceWorker:
             logger.warning("Failed to download frame %s", frame_uri)
             return
 
-        if should_trace and self._debug_tracer:
-            trace = self._debug_tracer.begin_trace(
-                frame_id, camera_id, frame_uri, trace_reason
+        if should_trace and self._trace_collector:
+            trace = self._trace_collector.begin(
+                frame_id, camera_id, frame_uri, trace_reason,
+                kafka_offset=msg.offset,
+                source_capture_ts=source_ts,
+                edge_receive_ts=edge_ts,
+                core_ingest_ts=time.time(),
             )
             trace.stages.append(
                 TraceStage("download", t_download_start, t_download_end)
@@ -240,14 +254,18 @@ class InferenceWorker:
             trace.stages.append(
                 TraceStage("detect", t_detect_start, t_detect_end)
             )
-            self._debug_tracer.add_detection_info(trace, detections)  # type: ignore[union-attr]
+            self._trace_collector.collect_post_nms_detections(trace, detections)
 
         # Check for low-confidence detections to force trace
-        if not should_trace and self._debug_tracer:
-            should_trace, trace_reason = self._debug_tracer.should_sample(detections)
+        if not should_trace and self._trace_collector:
+            should_trace, trace_reason = self._trace_collector.should_collect(detections)
             if should_trace and trace is None:
-                trace = self._debug_tracer.begin_trace(
-                    frame_id, camera_id, frame_uri, trace_reason
+                trace = self._trace_collector.begin(
+                    frame_id, camera_id, frame_uri, trace_reason,
+                    kafka_offset=msg.offset,
+                    source_capture_ts=source_ts,
+                    edge_receive_ts=edge_ts,
+                    core_ingest_ts=time.time(),
                 )
                 trace.stages.append(
                     TraceStage("download", t_download_start, t_download_end)
@@ -255,10 +273,11 @@ class InferenceWorker:
                 trace.stages.append(
                     TraceStage("detect", t_detect_start, t_detect_end)
                 )
-                self._debug_tracer.add_detection_info(trace, detections)
+                self._trace_collector.collect_post_nms_detections(trace, detections)
 
         # --- Track ---
         tracker = self._get_tracker(camera_id)
+        active_before = tracker.active_track_count
         t_track_start = time.monotonic()
         updated_tracks, terminated_tracks = tracker.update(
             detections, edge_ts, frame_data
@@ -269,8 +288,18 @@ class InferenceWorker:
             trace.stages.append(
                 TraceStage("track", t_track_start, t_track_end)
             )
-            trace.labels["active_tracks"] = str(tracker.active_track_count)
-            trace.labels["terminated_tracks"] = str(len(terminated_tracks))
+            self._trace_collector.collect_tracker_delta(
+                trace,
+                active_before=active_before,
+                active_after=tracker.active_track_count,
+                new_track_ids=[
+                    t.track_id for t in updated_tracks
+                    if t.state == TrackState.NEW
+                ],
+                closed_track_ids=[
+                    t.track_id for t in terminated_tracks
+                ],
+            )
 
         # Update metrics
         TRACKS_ACTIVE.labels(camera_id=camera_id).set(tracker.active_track_count)
@@ -357,10 +386,14 @@ class InferenceWorker:
             trace.stages.append(
                 TraceStage("publish", t_pub_start, t_pub_end)
             )
+            self._trace_collector.set_model_versions(trace, {
+                "detector": self.settings.triton.detector_model,
+                "embedder": self.settings.triton.embedder_model,
+            })
 
         # --- Store debug trace ---
-        if trace and self._debug_tracer:
-            await self._debug_tracer.store(trace)
+        if trace and self._trace_collector:
+            await self._trace_collector.store(trace)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -419,14 +452,6 @@ class InferenceWorker:
             secret_key=cfg.secret_key,
             secure=cfg.secure,
         )
-
-        # Ensure debug bucket exists
-        try:
-            if not client.bucket_exists(cfg.debug_bucket):
-                client.make_bucket(cfg.debug_bucket)
-        except Exception:
-            logger.warning("Cannot ensure debug bucket: %s", cfg.debug_bucket)
-
         return client
 
     def _build_ssl_context(self) -> ssl.SSLContext | None:

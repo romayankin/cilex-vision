@@ -26,7 +26,7 @@ class TritonConfig(BaseModel):
 class KafkaConfig(BaseModel):
     bootstrap_servers: str = "localhost:9092"
     consumer_group: str = "detector-worker"
-    input_topic: str = "frames.sampled.refs"
+    input_topic: str = "frames.decoded.refs"
     tracklet_topic: str = "tracklets.local"
     embedding_topic: str = "mtmc.active_embeddings"
     detection_topic: str = "bulk.detections"
