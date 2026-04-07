@@ -1,0 +1,421 @@
+# Cilex Vision — CPU-Only 4-Camera Pilot
+#
+# Target: Ubuntu 24, Intel i5-13500, 16 GB RAM, no GPU.
+# Run from infra/:  docker compose -f docker-compose.pilot.yml up -d
+# First-time setup:  bash ../scripts/pilot/setup-pilot.sh
+
+name: cilex-pilot
+
+services:
+  # ====================================================================
+  #  Infrastructure
+  # ====================================================================
+
+  kafka:
+    image: bitnami/kafka:3.7.0
+    container_name: pilot-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "19092:9094"
+    environment:
+      KAFKA_ENABLE_KRAFT: "yes"
+      KAFKA_KRAFT_CLUSTER_ID: "PILOT_CLUSTER_0001"
+      KAFKA_CFG_NODE_ID: "0"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,EXTERNAL://localhost:19092"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - ./pilot-data/kafka:/bitnami/kafka
+    mem_limit: 1536m
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - cilex-pilot
+
+  nats:
+    image: nats:2.10.18-alpine
+    container_name: pilot-nats
+    command: ["--jetstream", "--store_dir", "/data", "--http_port", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - ./pilot-data/nats:/data
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8222/healthz"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    networks:
+      - cilex-pilot
+
+  timescaledb:
+    image: timescale/timescaledb:2.18.1-pg16
+    container_name: pilot-timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cilex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cilex_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-vidanalytics}
+    volumes:
+      - ./pilot-data/postgres:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    mem_limit: 2048m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - cilex-pilot
+
+  minio:
+    image: minio/minio:RELEASE.2024-06-11T03-13-30Z
+    container_name: pilot-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    volumes:
+      - ./pilot-data/minio:/data
+    mem_limit: 1024m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live >/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    networks:
+      - cilex-pilot
+
+  minio-init:
+    image: minio/mc:RELEASE.2024-06-11T21-32-12Z
+    container_name: pilot-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}";
+        mc mb -p local/frame-blobs || true;
+        mc mb -p local/decoded-frames || true;
+        mc mb -p local/event-clips || true;
+        mc mb -p local/debug-traces || true;
+        mc mb -p local/thumbnails || true;
+        echo "MinIO buckets ready";
+        exec tail -f /dev/null
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    healthcheck:
+      test: ["CMD-SHELL", "mc ls local/frame-blobs >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    networks:
+      - cilex-pilot
+
+  redis:
+    image: redis:7.4.0-alpine
+    container_name: pilot-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./pilot-data/redis:/data
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - cilex-pilot
+
+  # ====================================================================
+  #  Monitoring
+  # ====================================================================
+
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    container_name: pilot-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.pilot.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - ./pilot-data/prometheus:/prometheus
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    networks:
+      - cilex-pilot
+
+  grafana:
+    image: grafana/grafana:11.1.3
+    container_name: pilot-grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./pilot-data/grafana:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/health | grep -q ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - cilex-pilot
+
+  # ====================================================================
+  #  Triton Inference Server (CPU only)
+  # ====================================================================
+
+  triton:
+    image: nvcr.io/nvidia/tritonserver:24.06-py3
+    container_name: pilot-triton
+    command:
+      - tritonserver
+      - --model-repository=/models
+      - --strict-model-config=true
+      - --log-verbose=0
+    ports:
+      - "8001:8001"
+      - "8002:8002"
+    volumes:
+      - ./triton/model-repo:/models:ro
+    mem_limit: 2048m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/v2/health/ready >/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+    networks:
+      - cilex-pilot
+
+  # ====================================================================
+  #  Application services
+  # ====================================================================
+
+  edge-agent:
+    build:
+      context: ..
+      dockerfile: services/edge-agent/Dockerfile
+    container_name: pilot-edge-agent
+    depends_on:
+      nats:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    environment:
+      EDGE_CONFIG: /app/cameras.yaml
+      EDGE_SITE_ID: pilot-site
+      EDGE_NATS__URL: nats://nats:4222
+      EDGE_MINIO__ENDPOINT: minio:9000
+      EDGE_MINIO__ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      EDGE_MINIO__SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      EDGE_MINIO__SECURE: "false"
+      EDGE_MINIO__BUCKET: frame-blobs
+      EDGE_METRICS_PORT: "9090"
+      EDGE_LOG_LEVEL: INFO
+    volumes:
+      - ./pilot/cameras.yaml:/app/cameras.yaml:ro
+    mem_limit: 512m
+    restart: unless-stopped
+    networks:
+      - cilex-pilot
+
+  ingress-bridge:
+    build:
+      context: ..
+      dockerfile: services/ingress-bridge/Dockerfile
+    container_name: pilot-ingress-bridge
+    depends_on:
+      nats:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    environment:
+      BRIDGE__NATS__URL: nats://nats:4222
+      BRIDGE__KAFKA__BOOTSTRAP_SERVERS: kafka:9092
+      BRIDGE__KAFKA__SECURITY_PROTOCOL: PLAINTEXT
+      BRIDGE__KAFKA__SASL_MECHANISM: ""
+      BRIDGE__KAFKA__SASL_USERNAME: ""
+      BRIDGE__KAFKA__SASL_PASSWORD: ""
+      BRIDGE__KAFKA__OUTPUT_TOPIC: frames.sampled.refs
+      BRIDGE__MINIO__ENDPOINT: minio:9000
+      BRIDGE__MINIO__ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      BRIDGE__MINIO__SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      BRIDGE__MINIO__SECURE: "false"
+      BRIDGE__METRICS_PORT: "9091"
+      BRIDGE__LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+    networks:
+      - cilex-pilot
+
+  decode-service:
+    build:
+      context: ..
+      dockerfile: services/decode-service/Dockerfile
+    container_name: pilot-decode-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    environment:
+      DECODE__KAFKA__BOOTSTRAP_SERVERS: kafka:9092
+      DECODE__KAFKA__SECURITY_PROTOCOL: PLAINTEXT
+      DECODE__KAFKA__INPUT_TOPIC: frames.sampled.refs
+      DECODE__KAFKA__OUTPUT_TOPIC: frames.decoded.refs
+      DECODE__MINIO__ENDPOINT: minio:9000
+      DECODE__MINIO__ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      DECODE__MINIO__SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      DECODE__MINIO__SECURE: "false"
+      DECODE__MINIO__SOURCE_BUCKET: frame-blobs
+      DECODE__MINIO__DECODED_BUCKET: decoded-frames
+      DECODE__SAMPLER__TARGET_FPS: "5.0"
+      DECODE__METRICS_PORT: "9090"
+      DECODE__LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+    networks:
+      - cilex-pilot
+
+  inference-worker:
+    build:
+      context: ..
+      dockerfile: services/inference-worker/Dockerfile
+    container_name: pilot-inference-worker
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+      triton:
+        condition: service_healthy
+    environment:
+      INFERENCE__TRITON__URL: triton:8001
+      INFERENCE__TRITON__DETECTOR_MODEL: yolov8n
+      INFERENCE__TRITON__DETECTOR_INPUT_NAME: images
+      INFERENCE__TRITON__DETECTOR_OUTPUT_NAME: output0
+      INFERENCE__DETECTOR__CONFIDENCE_THRESHOLD: "0.35"
+      INFERENCE__DETECTOR__NMS_IOU_THRESHOLD: "0.45"
+      INFERENCE__DETECTOR__NUM_CLASSES: "80"
+      INFERENCE__KAFKA__BOOTSTRAP_SERVERS: kafka:9092
+      INFERENCE__KAFKA__SECURITY_PROTOCOL: PLAINTEXT
+      INFERENCE__KAFKA__INPUT_TOPIC: frames.decoded.refs
+      INFERENCE__KAFKA__TRACKLET_TOPIC: tracklets.local
+      INFERENCE__KAFKA__EMBEDDING_TOPIC: mtmc.active_embeddings
+      INFERENCE__KAFKA__DETECTION_TOPIC: bulk.detections
+      INFERENCE__KAFKA__CONSUMER_GROUP: detector-worker
+      INFERENCE__MINIO__ENDPOINT: minio:9000
+      INFERENCE__MINIO__ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      INFERENCE__MINIO__SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      INFERENCE__MINIO__SECURE: "false"
+      INFERENCE__DEBUG__ENABLED: "true"
+      INFERENCE__DEBUG__SAMPLE_RATE_PCT: "5.0"
+      INFERENCE__METRICS_PORT: "9090"
+      INFERENCE__LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+    networks:
+      - cilex-pilot
+
+  bulk-collector:
+    build:
+      context: ..
+      dockerfile: services/bulk-collector/Dockerfile
+    container_name: pilot-bulk-collector
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    environment:
+      BULK__KAFKA__BOOTSTRAP_SERVERS: kafka:9092
+      BULK__KAFKA__SECURITY_PROTOCOL: PLAINTEXT
+      BULK__KAFKA__SASL_MECHANISM: ""
+      BULK__KAFKA__SASL_USERNAME: ""
+      BULK__KAFKA__SASL_PASSWORD: ""
+      BULK__DB__DSN: postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics
+      BULK__METRICS_PORT: "9091"
+      BULK__LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+    networks:
+      - cilex-pilot
+
+  query-api:
+    build:
+      context: ..
+      dockerfile: services/query-api/Dockerfile
+    container_name: pilot-query-api
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    ports:
+      - "8080:8000"
+    environment:
+      QUERY__DB__DSN: postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics
+      QUERY__MINIO__ENDPOINT: minio:9000
+      QUERY__MINIO__ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      QUERY__MINIO__SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      QUERY__MINIO__SECURE: "false"
+      QUERY__JWT__SECRET_KEY: ${JWT_SECRET:-pilot-jwt-secret-change-me}
+      QUERY__LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+    networks:
+      - cilex-pilot
+
+networks:
+  cilex-pilot:
+    driver: bridge

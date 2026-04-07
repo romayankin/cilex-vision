@@ -1,0 +1,41 @@
+# YOLOv8n — COCO-pretrained object detector (CPU / ONNX Runtime)
+# 80 COCO classes, input 640x640, output [84, 8400]
+# For pilot deployment only — production uses yolov8l with 7 taxonomy classes.
+
+name: "yolov8n"
+platform: "onnxruntime_onnx"
+max_batch_size: 4
+
+input [
+  {
+    name: "images"
+    data_type: TYPE_FP32
+    dims: [3, 640, 640]
+  }
+]
+
+output [
+  {
+    name: "output0"
+    data_type: TYPE_FP32
+    dims: [84, 8400]
+  }
+]
+
+dynamic_batching {
+  preferred_batch_size: [1, 2, 4]
+  max_queue_delay_microseconds: 100000
+}
+
+instance_group [
+  {
+    count: 2
+    kind: KIND_CPU
+  }
+]
+
+version_policy {
+  latest {
+    num_versions: 1
+  }
+}

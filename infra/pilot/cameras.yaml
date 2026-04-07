@@ -1,0 +1,21 @@
+# Pilot camera configuration — loaded by the edge-agent.
+# Edit the rtsp_url values to match your camera network.
+
+site_id: pilot-site
+
+cameras:
+  - camera_id: cam-1
+    rtsp_url: "rtsp://admin:admin@192.168.1.100/stream1"
+    enabled: true
+
+  - camera_id: cam-2
+    rtsp_url: "rtsp://admin:admin@192.168.1.101/stream1"
+    enabled: true
+
+  - camera_id: cam-3
+    rtsp_url: "rtsp://admin:admin@192.168.1.102/stream1"
+    enabled: true
+
+  - camera_id: cam-4
+    rtsp_url: "rtsp://admin:admin@192.168.1.103/stream1"
+    enabled: true

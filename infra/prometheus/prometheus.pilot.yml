@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  - job_name: edge-agent
+    static_configs:
+      - targets: ["edge-agent:9090"]
+
+  - job_name: ingress-bridge
+    static_configs:
+      - targets: ["ingress-bridge:9091"]
+
+  - job_name: decode-service
+    static_configs:
+      - targets: ["decode-service:9090"]
+
+  - job_name: inference-worker
+    static_configs:
+      - targets: ["inference-worker:9090"]
+
+  - job_name: bulk-collector
+    static_configs:
+      - targets: ["bulk-collector:9091"]
+
+  - job_name: query-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["query-api:8000"]
+
+  - job_name: triton
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["triton:8002"]
