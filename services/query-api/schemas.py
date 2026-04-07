@@ -109,6 +109,26 @@ class EventListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Debug Traces
+# ---------------------------------------------------------------------------
+
+
+class DebugTraceSummary(BaseModel):
+    """Lightweight trace entry returned by the listing endpoint."""
+
+    trace_id: str
+    camera_id: str
+    date: str
+    url: Optional[str] = None
+    size_bytes: Optional[int] = None
+
+
+class DebugTraceListResponse(BaseModel):
+    traces: list[DebugTraceSummary]
+    total: int
+
+
+# ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
 

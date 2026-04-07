@@ -26,6 +26,7 @@ class MinioConfig(BaseModel):
     secret_key: str = "minioadmin"
     secure: bool = False
     signed_url_expiry_s: int = 3600  # 1 hour
+    debug_bucket: str = "debug-traces"
 
 
 class JwtConfig(BaseModel):
