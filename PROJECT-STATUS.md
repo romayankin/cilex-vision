@@ -99,6 +99,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P0-D02 | Protobuf Schema Package | feat/P0-D02 | 8 .proto files in proto/vidanalytics/v1/, buf.yaml, README, CI workflow. buf lint clean |
 | P0-D03 | Kafka Topic Contract | feat/P0-D03 | docs/kafka-contract.md, infra/kafka/topics.yaml, create-topics.py |
 | P0-D04 | Database Schema | feat/P0-D04 | 12 SQLAlchemy 2.0 models (2 hypertables + 10 relational), Alembic migration, Mermaid ER diagram, ADR-003 |
+| P0-D05 | Camera Topology Graph Data Model | feat/P0-D05 | models.py (TopologyGraph, CameraNode with zone_id, TransitionEdge with per-class transit distributions), api.py (CRUD router), seed.py (4-camera demo site), topology-schema.json, 37 tests |
 | P0-D07 | Time Sync Policy | feat/P0-D07 | Full timestamp policy doc, Chrony configs, clock_drift_check.py with mock smoke test, Prometheus alert rules |
 | P0-D06 | Ingress Bridge Spec | feat/P0-D06 | ADR-001 full spec (8 responsibilities, failure modes, metrics, deployment), ingress-bridge-flow.mermaid |
 | P0-O01 | Infrastructure Scaffolding | feat/P0-O01 | docker-compose.yml (Kafka 3-broker, NATS, TimescaleDB, MinIO, Redis, Prometheus, Grafana, MLflow), CI workflow, Makefile |

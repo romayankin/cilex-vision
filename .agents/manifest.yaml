@@ -47,7 +47,7 @@ phases:
       title: Camera Topology Graph Data Model
       depends_on:
       - P0-D04
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P0-D05
       prompt: .agents/prompts/P0-D05.md
