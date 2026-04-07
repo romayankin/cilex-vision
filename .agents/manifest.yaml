@@ -130,7 +130,7 @@ phases:
       role: doc
       title: Parametric Cost Model
       depends_on: []
-      status: pending
+      status: done
       assigned_to: null
       branch: null
       prompt: .agents/prompts/P0-X01.md

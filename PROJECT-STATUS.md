@@ -107,6 +107,8 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P0-D10 | Triton Placement | feat/P0-D10 | Full placement spec (model inventory, VRAM budget, GPU classes, co-location), 3 Triton config.pbtxt files, triton-alerts.yml |
 | P0-O01 | Infrastructure Scaffolding | feat/P0-O01 | docker-compose.yml (Kafka 3-broker, NATS, TimescaleDB, MinIO, Redis, Prometheus, Grafana, MLflow), CI workflow, Makefile |
 | P0-E01 | Bake-Off Protocol | feat/P0-E01 | Full bake-off protocol (detector/tracker/attribute), run_detector_bakeoff.py, compare_bakeoff.py |
+| P0-V01 | Throwaway 1-Camera Prototype | feat/P0-V01 | demo.py (382 lines, RTSP/webcam → YOLOv8n → SQLite → Flask MJPEG + detection table + chart), Dockerfile, README (marked disposable) |
+| P0-X01 | Parametric Cost Model | feat/P0-X01 | Extended params.yaml with cost_model section (all values marked REPLACE WITH MEASURED), cost_model.py (P25/P50/P90 × 4/10/100, stdout tables + Excel via openpyxl), 5 tests |
 
 
 ### Phase 0 — Remaining (priority order)
