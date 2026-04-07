@@ -139,7 +139,7 @@ phases:
       role: doc
       title: Privacy & Compliance Framework
       depends_on: []
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P0-X02
       prompt: .agents/prompts/P0-X02.md

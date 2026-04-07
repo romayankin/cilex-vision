@@ -109,6 +109,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P0-E01 | Bake-Off Protocol | feat/P0-E01 | Full bake-off protocol (detector/tracker/attribute), run_detector_bakeoff.py, compare_bakeoff.py |
 | P0-V01 | Throwaway 1-Camera Prototype | feat/P0-V01 | demo.py (382 lines, RTSP/webcam → YOLOv8n → SQLite → Flask MJPEG + detection table + chart), Dockerfile, README (marked disposable) |
 | P0-X01 | Parametric Cost Model | feat/P0-X01 | Extended params.yaml with cost_model section (all values marked REPLACE WITH MEASURED), cost_model.py (P25/P50/P90 × 4/10/100, stdout tables + Excel via openpyxl), 5 tests |
+| P0-X02 | Privacy & Compliance Framework | feat/P0-X02 | docs/privacy-framework.md (data classification table, RBAC permissions matrix aligned to 4 existing roles, architectural hooks checklist with gap analysis, DPIA trigger criteria with EDPB/ICO/PDPC references) |
 
 
 ### Phase 0 — Remaining (priority order)
