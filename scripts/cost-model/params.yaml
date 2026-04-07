@@ -6,3 +6,152 @@ defaults:
   detector_model: yolov8l
   detector_confidence_threshold: 0.4
 cameras: {}
+cost_model:
+  assumption_marker: REPLACE WITH MEASURED
+  camera_counts:
+    values:
+      - 4
+      - 10
+      - 100
+    note: REPLACE WITH MEASURED
+  motion_duty_cycle_scenarios:
+    P25:
+      value: 0.08
+      note: REPLACE WITH MEASURED
+    P50:
+      value: 0.15
+      note: REPLACE WITH MEASURED
+    P90:
+      value: 0.35
+      note: REPLACE WITH MEASURED
+  workload:
+    bitrate_mbps:
+      value: 4.0
+      note: REPLACE WITH MEASURED
+    inference_fps:
+      value: 10.0
+      note: REPLACE WITH MEASURED
+    detections_per_frame:
+      value: 5.0
+      note: REPLACE WITH MEASURED
+    active_tracks_per_camera:
+      value: 5.0
+      note: REPLACE WITH MEASURED
+    avg_event_clip_seconds:
+      value: 12.0
+      note: REPLACE WITH MEASURED
+    events_per_active_track_hour:
+      value: 0.08
+      note: REPLACE WITH MEASURED
+    clip_transcode_ratio:
+      value: 0.3
+      note: REPLACE WITH MEASURED
+    attribute_messages_per_detection:
+      value: 1.5
+      note: REPLACE WITH MEASURED
+    embedding_updates_per_active_track_hour:
+      value: 2.0
+      note: REPLACE WITH MEASURED
+  gpu:
+    gpu_cost_monthly_usd:
+      value: 1200.0
+      note: REPLACE WITH MEASURED
+    cameras_per_gpu:
+      value: 32.0
+      note: REPLACE WITH MEASURED
+    gpu_headroom_factor:
+      value: 1.15
+      note: REPLACE WITH MEASURED
+  retention_days:
+    central_frame_blobs:
+      value: 30.0
+      note: REPLACE WITH MEASURED
+    warm_event_clips:
+      value: 90.0
+      note: REPLACE WITH MEASURED
+    timeseries_metadata:
+      value: 30.0
+      note: REPLACE WITH MEASURED
+    timeseries_compress_after:
+      value: 2.0
+      note: REPLACE WITH MEASURED
+  storage_costs_usd_per_gb_month:
+    hot_object:
+      value: 0.023
+      note: REPLACE WITH MEASURED
+    warm_object:
+      value: 0.0125
+      note: REPLACE WITH MEASURED
+    kafka_broker_disk:
+      value: 0.1
+      note: REPLACE WITH MEASURED
+    timescaledb_nvme:
+      value: 0.12
+      note: REPLACE WITH MEASURED
+  database:
+    detection_row_kb_uncompressed:
+      value: 0.35
+      note: REPLACE WITH MEASURED
+    track_observation_row_kb_uncompressed:
+      value: 0.22
+      note: REPLACE WITH MEASURED
+    hypertable_compression_ratio:
+      value: 10.0
+      note: REPLACE WITH MEASURED
+    index_overhead_factor:
+      value: 1.35
+      note: REPLACE WITH MEASURED
+  kafka:
+    broker_storage_overhead_factor:
+      value: 1.2
+      note: REPLACE WITH MEASURED
+    avg_message_kb:
+      frames.sampled.refs:
+        value: 0.5
+        note: REPLACE WITH MEASURED
+      tracklets.local:
+        value: 1.5
+        note: REPLACE WITH MEASURED
+      attributes.jobs:
+        value: 0.35
+        note: REPLACE WITH MEASURED
+      mtmc.active_embeddings:
+        value: 3.0
+        note: REPLACE WITH MEASURED
+      events.raw:
+        value: 1.0
+        note: REPLACE WITH MEASURED
+      archive.transcode.requested:
+        value: 0.5
+        note: REPLACE WITH MEASURED
+      archive.transcode.completed:
+        value: 0.5
+        note: REPLACE WITH MEASURED
+  service_unit_costs_monthly_usd:
+    kafka_broker:
+      value: 150.0
+      note: REPLACE WITH MEASURED
+    kafka_ui:
+      value: 15.0
+      note: REPLACE WITH MEASURED
+    nats:
+      value: 25.0
+      note: REPLACE WITH MEASURED
+    timescaledb:
+      value: 325.0
+      note: REPLACE WITH MEASURED
+    minio:
+      value: 120.0
+      note: REPLACE WITH MEASURED
+    redis:
+      value: 35.0
+      note: REPLACE WITH MEASURED
+    prometheus:
+      value: 40.0
+      note: REPLACE WITH MEASURED
+    grafana:
+      value: 30.0
+      note: REPLACE WITH MEASURED
+    mlflow:
+      value: 45.0
+      note: REPLACE WITH MEASURED
