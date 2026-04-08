@@ -304,3 +304,440 @@ phases:
       branch: feat/P1-X01
       prompt: .agents/prompts/P1-X01.md
       tool: codex-cli
+  phase-2:
+    name: Intelligence Layer
+    weeks: 14-26
+    tasks:
+    - id: P2-FIX01
+      role: dev
+      title: Pilot Readiness Fixes
+      depends_on:
+      - P1-V03
+      - P1-V04
+      - P1-V05
+      - P1-V07
+      status: done
+      assigned_to: null
+      branch: feat/P2-FIX01
+      prompt: .agents/prompts/P2-FIX01.md
+      tool: claude-code
+    - id: P2-PILOT01
+      role: ops
+      title: 4-Camera CPU-Only Pilot Deployment
+      depends_on:
+      - P2-FIX01
+      status: done
+      assigned_to: null
+      branch: feat/P2-PILOT01
+      prompt: .agents/prompts/P2-PILOT01.md
+      tool: claude-code
+    - id: P2-V01
+      role: dev
+      title: Attribute Extraction Service
+      depends_on:
+      - P1-V04
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-V01.md
+      tool: claude-code
+    - id: P2-V02
+      role: dev
+      title: MTMC Re-ID Association Service
+      depends_on:
+      - P1-V04
+      - P0-D05
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-V02.md
+      tool: claude-code
+    - id: P2-V03
+      role: dev
+      title: Event Engine
+      depends_on:
+      - P1-V04
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-V03.md
+      tool: codex-cli
+    - id: P2-V04
+      role: dev
+      title: Clip Pipeline
+      depends_on:
+      - P2-V03
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-V04.md
+      tool: codex-cli
+    - id: P2-V05
+      role: dev
+      title: Search UI & Timeline
+      depends_on:
+      - P1-V06
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-V05.md
+      tool: claude-code
+    - id: P2-E01
+      role: eval
+      title: Attribute Classifier Bake-Off
+      depends_on:
+      - P2-V01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-E01.md
+      tool: codex-cli
+    - id: P2-E02
+      role: eval
+      title: MTMC Evaluation
+      depends_on:
+      - P2-V02
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-E02.md
+      tool: codex-cli
+    - id: P2-E03
+      role: eval
+      title: End-to-End Stress Test
+      depends_on:
+      - P2-V02
+      - P2-V03
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-E03.md
+      tool: codex-cli
+    - id: P2-O01
+      role: ops
+      title: MTMC Infrastructure
+      depends_on:
+      - P2-V02
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-O01.md
+      tool: codex-cli
+    - id: P2-O02
+      role: ops
+      title: Storage Tiering
+      depends_on:
+      - P1-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-O02.md
+      tool: codex-cli
+    - id: P2-O03
+      role: ops
+      title: Calibration Scheduler
+      depends_on:
+      - P1-E03
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-O03.md
+      tool: codex-cli
+    - id: P2-A01
+      role: data
+      title: Cross-Camera Annotation
+      depends_on:
+      - P1-A01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-A01.md
+      tool: claude-code
+    - id: P2-X01
+      role: doc
+      title: API Documentation
+      depends_on:
+      - P2-V05
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-X01.md
+      tool: codex-cli
+    - id: P2-X02
+      role: doc
+      title: Operations Runbooks
+      depends_on:
+      - P2-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P2-X02.md
+      tool: codex-cli
+  phase-3:
+    name: Maturity
+    weeks: 24-36
+    tasks:
+    - id: P3-V01
+      role: dev
+      title: Model Retraining Pipeline
+      depends_on:
+      - P1-A01
+      - P1-E01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-V01.md
+      tool: claude-code
+    - id: P3-V02
+      role: dev
+      title: Shadow Deploy Tooling
+      depends_on:
+      - P0-D09
+      - P1-V04
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-V02.md
+      tool: codex-cli
+    - id: P3-V03
+      role: dev
+      title: Customer Admin UI
+      depends_on:
+      - P2-V05
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-V03.md
+      tool: claude-code
+    - id: P3-V04
+      role: dev
+      title: Adaptive Transit Time
+      depends_on:
+      - P0-D05
+      - P2-V02
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-V04.md
+      tool: claude-code
+    - id: P3-E01
+      role: eval
+      title: Retraining Validation
+      depends_on:
+      - P3-V01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-E01.md
+      tool: codex-cli
+    - id: P3-E02
+      role: eval
+      title: Shadow Comparison Dashboard
+      depends_on:
+      - P3-V02
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-E02.md
+      tool: codex-cli
+    - id: P3-E03
+      role: eval
+      title: Drift Monitoring
+      depends_on:
+      - P1-V04
+      - P1-O02
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-E03.md
+      tool: codex-cli
+    - id: P3-A01
+      role: data
+      title: Continuous Annotation Pipeline
+      depends_on:
+      - P1-A01
+      - P1-V07
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-A01.md
+      tool: codex-cli
+    - id: P3-A02
+      role: data
+      title: Re-ID Training Data Collection
+      depends_on:
+      - P2-A01
+      - P2-V02
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-A02.md
+      tool: codex-cli
+    - id: P3-O01
+      role: ops
+      title: Deployment Automation
+      depends_on:
+      - P1-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-O01.md
+      tool: codex-cli
+    - id: P3-X01
+      role: doc
+      title: Deployment Guide
+      depends_on:
+      - P3-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-X01.md
+      tool: claude-code
+    - id: P3-X02
+      role: doc
+      title: Operations Handbook
+      depends_on:
+      - P2-X02
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-X02.md
+      tool: claude-code
+    - id: P3-X03
+      role: doc
+      title: Updated Cost Model
+      depends_on:
+      - P0-X01
+      - P2-E03
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P3-X03.md
+      tool: claude-code
+  phase-4:
+    name: Scale & Productization
+    weeks: 34-44+
+    tasks:
+    - id: P4-V01
+      role: dev
+      title: Zone Sharding for Large Sites
+      depends_on:
+      - P2-V02
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-V01.md
+      tool: claude-code
+    - id: P4-V02
+      role: dev
+      title: Jetson Edge Agent
+      depends_on:
+      - P1-V01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-V02.md
+      tool: claude-code
+    - id: P4-V03
+      role: dev
+      title: LPR Module
+      depends_on:
+      - P1-V04
+      - P2-V01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-V03.md
+      tool: codex-cli
+    - id: P4-V04
+      role: dev
+      title: Embedding Search
+      depends_on:
+      - P2-V02
+      - P1-V06
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-V04.md
+      tool: claude-code
+    - id: P4-V05
+      role: dev
+      title: Multi-Site Portal
+      depends_on:
+      - P2-V05
+      - P3-V03
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-V05.md
+      tool: claude-code
+    - id: P4-E01
+      role: eval
+      title: 50-100 Camera Load Test
+      depends_on:
+      - P2-E03
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-E01.md
+      tool: codex-cli
+    - id: P4-E02
+      role: eval
+      title: Zone Benchmark
+      depends_on:
+      - P4-V01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-E02.md
+      tool: codex-cli
+    - id: P4-O01
+      role: ops
+      title: Multi-Site Infrastructure
+      depends_on:
+      - P3-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-O01.md
+      tool: codex-cli
+    - id: P4-O02
+      role: ops
+      title: Disaster Recovery
+      depends_on:
+      - P1-O01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-O02.md
+      tool: codex-cli
+    - id: P4-A01
+      role: data
+      title: Multi-Site Dataset
+      depends_on:
+      - P2-A01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-A01.md
+      tool: claude-code
+    - id: P4-X01
+      role: doc
+      title: Commercial Documentation
+      depends_on:
+      - P3-X01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-X01.md
+      tool: codex-cli
+    - id: P4-X02
+      role: doc
+      title: Architecture Reference
+      depends_on:
+      - P3-X01
+      status: pending
+      assigned_to: null
+      branch: null
+      prompt: .agents/prompts/P4-X02.md
+      tool: codex-cli
