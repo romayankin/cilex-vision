@@ -1,0 +1,30 @@
+topics:
+  - name: detections.shadow
+    partitions: 6
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 86400000
+    key_schema: string(camera_id)
+    value_schema: vidanalytics.v1.detection.Detection
+    description: >
+      Shadow detection output from candidate models under evaluation.
+
+  - name: tracklets.shadow
+    partitions: 6
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 86400000
+    key_schema: string(camera_id)
+    value_schema: vidanalytics.v1.tracklet.Tracklet
+    description: >
+      Shadow tracklet output from candidate tracker under evaluation.
+
+  - name: embeddings.shadow
+    partitions: 6
+    replication_factor: 3
+    cleanup_policy: delete
+    retention_ms: 86400000
+    key_schema: string(local_track_id)
+    value_schema: vidanalytics.v1.embedding.Embedding
+    description: >
+      Shadow embedding output from candidate Re-ID model under evaluation.

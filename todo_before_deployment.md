@@ -66,6 +66,12 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] The new Terraform modules were syntax-reviewed but could not be `terraform fmt` / `terraform validate` checked locally because the Terraform CLI is not installed in this environment. Run `terraform init`, `terraform fmt`, and `terraform validate` in CI or an operator workstation before first apply
 - [ ] The `gpu-node` role overwrites `/etc/docker/daemon.json` to set `default-runtime: nvidia`. If Triton hosts need additional Docker daemon settings, merge them into managed config before production rollout
 
+## Shadow Deploy Tooling Gaps (P3-V02)
+
+- [ ] `scripts/shadow/compare_shadow.py` can only score confidence-distribution drift if Prometheus scrapes both `shadow_detection_confidence` and a future production-side `inference_detection_confidence` histogram. The current production inference worker still lacks that histogram
+- [ ] The new shadow worker is not yet wired into any Prometheus scrape config. Add a scrape target before relying on `compare_shadow.py` against live shadow runs
+- [ ] `infra/kafka/shadow-topics.yaml` reserves `embeddings.shadow`, but `scripts/shadow/shadow_inference_worker.py` currently shadows detector + tracker output only. Add the OSNet crop / publish path before using this tooling for Re-ID shadow evaluations
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover

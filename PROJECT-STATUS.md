@@ -160,8 +160,9 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | Task | Title | Branch | What it produced |
 |------|-------|--------|-----------------|
 | P3-O01 | Deployment Automation | feat/P3-O01 | Terraform modules for multi-node compute/network/storage provisioning, multi-node Ansible deployment orchestration with GPU and edge roles, a production inventory template, and a deployment health-check script |
+| P3-V02 | Shadow Deploy Tooling | feat/P3-V02 | Shadow Triton repo docs, separate shadow Kafka topic definitions, a urllib-based EXPLICIT mode load/unload script, a detector-shadow inference worker publishing to shadow topics, and a Prometheus-backed comparison report script |
 
-### Phase 3 — Pending (12 tasks remaining)
+### Phase 3 — Pending (11 tasks remaining)
 ### Phase 4 — Pending (12 tasks remaining)
 
 ---
