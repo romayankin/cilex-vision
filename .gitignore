@@ -17,3 +17,9 @@ data/eval/*.avi
 .claude-task-context.md
 /tmp/
 cilex-vision-knowledge-base.md
+
+# Pilot runtime data
+infra/pilot-data/
+detections.db
+yolov8n.pt
+infra/triton/cpu-inference/
