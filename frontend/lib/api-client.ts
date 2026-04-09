@@ -111,6 +111,64 @@ export interface TopologyResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Topology admin types (full models from query-api)
+// ---------------------------------------------------------------------------
+
+export interface CameraNode {
+  camera_id: string;
+  site_id: string;
+  name: string;
+  zone_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  status: string;
+  location_description: string | null;
+}
+
+export interface TransitTimeDistribution {
+  object_class: string;
+  p50_ms: number;
+  p90_ms: number;
+  p99_ms: number;
+  sample_count: number;
+  last_updated: string | null;
+}
+
+export interface TransitionEdge {
+  edge_id: string | null;
+  camera_a_id: string;
+  camera_b_id: string;
+  transition_time_s: number;
+  confidence: number;
+  enabled: boolean;
+  transit_distributions: TransitTimeDistribution[];
+}
+
+export interface TopologyGraph {
+  site_id: string;
+  site_name?: string;
+  cameras: CameraNode[];
+  edges: TransitionEdge[];
+}
+
+export interface CameraCreateRequest {
+  camera_id: string;
+  name: string;
+  zone_id?: string;
+  latitude?: number;
+  longitude?: number;
+  location_description?: string;
+}
+
+export interface EdgeCreateRequest {
+  camera_a_id: string;
+  camera_b_id: string;
+  transition_time_s: number;
+  confidence?: number;
+  enabled?: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Query parameter types
 // ---------------------------------------------------------------------------
 
@@ -170,6 +228,22 @@ async function apiFetch<T>(path: string, params?: Record<string, string | number
   return res.json() as Promise<T>;
 }
 
+async function apiMutate<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const url = buildUrl(path);
+  const res = await fetch(url, {
+    method,
+    credentials: "include",
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status} ${res.statusText}`);
+  }
+  // 204 No Content has no body
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
 // ---------------------------------------------------------------------------
 // API methods
 // ---------------------------------------------------------------------------
@@ -192,4 +266,20 @@ export async function getEvents(q: EventQuery = {}): Promise<EventListResponse> 
 
 export async function getTopology(siteId: string): Promise<TopologyResponse> {
   return apiFetch<TopologyResponse>(`/topology/${siteId}`);
+}
+
+export async function getTopologyGraph(siteId: string): Promise<TopologyGraph> {
+  return apiFetch<TopologyGraph>(`/topology/${siteId}`);
+}
+
+export async function addCamera(siteId: string, body: CameraCreateRequest): Promise<CameraNode> {
+  return apiMutate<CameraNode>(`/topology/${siteId}/cameras`, "POST", body);
+}
+
+export async function removeCamera(siteId: string, cameraId: string): Promise<void> {
+  return apiMutate<void>(`/topology/${siteId}/cameras/${cameraId}`, "DELETE");
+}
+
+export async function upsertEdge(siteId: string, body: EdgeCreateRequest): Promise<TransitionEdge> {
+  return apiMutate<TransitionEdge>(`/topology/${siteId}/edges`, "PUT", body);
 }

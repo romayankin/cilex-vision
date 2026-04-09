@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 const GRAFANA_URL = process.env.NEXT_PUBLIC_GRAFANA_URL || "http://localhost:3001";
 
 const DASHBOARDS = [
@@ -10,14 +12,40 @@ const DASHBOARDS = [
   { name: "Model Quality", path: "/d/model-quality", desc: "Detection accuracy, Re-ID match rates, attribute confidence" },
 ];
 
+const ADMIN_SECTIONS = [
+  { href: "/admin/cameras", name: "Cameras", desc: "Add, edit, and manage camera feeds" },
+  { href: "/admin/topology", name: "Topology", desc: "Edit camera graph, edges, and transit times" },
+  { href: "/admin/retention", name: "Retention", desc: "Data retention policies by class" },
+  { href: "/admin/users", name: "Users", desc: "Role definitions and permissions" },
+  { href: "/admin/health", name: "Health", desc: "Embedded Grafana monitoring panels" },
+  { href: "/admin/calibration", name: "Calibration", desc: "Edge filter calibration status" },
+];
+
 export default function AdminPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Administration</h1>
 
+      {/* Admin sub-pages */}
+      <section>
+        <h2 className="text-lg font-medium mb-3">Management</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {ADMIN_SECTIONS.map((s) => (
+            <Link
+              key={s.href}
+              href={s.href}
+              className="block bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md hover:border-blue-300 transition-all"
+            >
+              <h3 className="font-medium text-sm text-blue-700">{s.name}</h3>
+              <p className="text-xs text-gray-500 mt-1">{s.desc}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       {/* Grafana dashboards */}
       <section>
-        <h2 className="text-lg font-medium mb-3">Monitoring Dashboards</h2>
+        <h2 className="text-lg font-medium mb-3">Quick Access: Monitoring Dashboards</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {DASHBOARDS.map((d) => (
             <a
@@ -31,26 +59,6 @@ export default function AdminPage() {
               <p className="text-xs text-gray-500 mt-1">{d.desc}</p>
             </a>
           ))}
-        </div>
-      </section>
-
-      {/* Camera management placeholder */}
-      <section>
-        <h2 className="text-lg font-medium mb-3">Camera Management</h2>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-          <p className="text-sm text-gray-500">
-            Camera configuration and status management will be available in P3-V03.
-          </p>
-        </div>
-      </section>
-
-      {/* System health placeholder */}
-      <section>
-        <h2 className="text-lg font-medium mb-3">System Health</h2>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-          <p className="text-sm text-gray-500">
-            Service health summary and alerts overview coming soon.
-          </p>
         </div>
       </section>
     </div>

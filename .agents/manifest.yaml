@@ -504,9 +504,9 @@ phases:
       title: Customer Admin UI
       depends_on:
       - P2-V05
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P3-V03
       prompt: .agents/prompts/P3-V03.md
       tool: claude-code
     - id: P3-V04
