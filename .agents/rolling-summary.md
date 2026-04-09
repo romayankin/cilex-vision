@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-09 19:34 (after P2-V04)*
+*Auto-generated after each task. Last updated: 2026-04-09 20:01 (after P2-O01)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 7/16 tasks done. Overall progress: 36/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 8/16 tasks done. Overall progress: 37/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -39,7 +39,7 @@ Complete Intelligence Layer (Phase 2) — 7/16 tasks done. Overall progress: 36/
 - **P2-E03** (End-to-End Stress Test) → codex-cli — unblocks 2 tasks
 - **P2-A01** (Cross-Camera Annotation) → claude-code — unblocks 2 tasks
 - **P3-O01** (Deployment Automation) → codex-cli — unblocks 2 tasks
-- **P2-O01** (MTMC Infrastructure) → codex-cli — unblocks 1 tasks
+- **P2-X02** (Operations Runbooks) → codex-cli — unblocks 1 tasks
 - **P3-V01** (Model Retraining Pipeline) → claude-code — unblocks 1 tasks
 - **P3-V02** (Shadow Deploy Tooling) → codex-cli — unblocks 1 tasks
 
