@@ -1,0 +1,10 @@
+asyncpg>=0.29.0
+confluent-kafka>=2.3.0
+grpcio-tools>=1.60.0
+minio>=7.2.0
+Pillow>=10.0.0
+prometheus-client>=0.19.0
+protobuf>=4.25.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+pyyaml>=6.0

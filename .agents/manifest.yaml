@@ -367,7 +367,7 @@ phases:
       title: Clip Pipeline
       depends_on:
       - P2-V03
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P2-V04
       prompt: .agents/prompts/P2-V04.md

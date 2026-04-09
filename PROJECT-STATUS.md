@@ -149,8 +149,10 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P2-V01 | Attribute Extraction Service | — | Attribute service consuming `tracklets.local`, quality gate + white balance + Triton color classifier, asyncpg persistence, Dockerfile, strict mypy config, and 18 tests |
 | P2-V02 | MTMC Re-ID Association Service | feat/P2-V02 | MTMC service with FAISS matching, topology-aware scoring, checkpoint/restore, asyncpg persistence, Dockerfile, strict mypy config, and 13 tests |
 | P2-V03 | Event Engine | feat/P2-V03 | Event-engine service with per-track FSMs, Kafka + PostgreSQL event publishing, ROI / loitering polygon parsing from camera config, Dockerfile, strict mypy config, and 14 tests |
+| P2-V04 | Clip Pipeline | feat/P2-V04 | Clip-service consuming closed `events.raw` records, FFmpeg H.264 baseline clip extraction, thumbnail generation, MinIO upload, PostgreSQL asset updates, Dockerfile, strict mypy config, and 6 tests |
+| P2-V05 | Search UI & Timeline | feat/P2-V05 | Next.js frontend with search, camera timeline, cross-camera journey, admin views, API proxy client, HLS/MP4 playback, and standalone Docker packaging |
 
-### Phase 2 — Pending (11 tasks remaining)
+### Phase 2 — Pending (9 tasks remaining)
 ### Phases 3-4 — All Pending (25 tasks, prompts not yet in manifest)
 
 ---

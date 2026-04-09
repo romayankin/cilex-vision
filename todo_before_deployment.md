@@ -17,6 +17,7 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 ## Query API Gaps
 
 - [ ] Track detail endpoint (`GET /tracks/{id}`) returns `thumbnail_url: null` — needs a frame-reference lookup table or stored thumbnail URI in `local_tracks` to resolve
+- [ ] Events endpoint does not expose a signed thumbnail URL — `P2-V04` stores `thumbnail_uri` in `events.metadata_jsonb`, but `services/query-api/routers/events.py` only signs `clip_uri`
 
 ## Debug Trace Pipeline Gaps (P1-V07)
 
@@ -41,6 +42,11 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [x] Topology FastAPI router (`services/topology/api.py`) not registered in any running app — wire into `services/query-api/main.py` or deploy as a standalone service
 - [ ] Run `seed.py --apply` against the pilot DB during infrastructure setup to populate the demo 4-camera topology
 - [ ] `zone_id` is stored in `cameras.config_json` JSONB — document this convention for the MTMC service (Phase 2) which needs zone-aware matching
+
+## Clip Pipeline Gaps (P2-V04)
+
+- [ ] Decoded frame keys are `camera_id/YYYY-MM-DD/frame_id.jpg`, so clip extraction currently filters source frames by MinIO `last_modified` instead of a true capture-time index. Add a decoded-frame metadata table or timestamped object naming scheme before relying on frame-accurate clips
+- [ ] `archive.transcode.completed` is contract-bound to `vidanalytics.v1.frame.FrameRef`, but `P2-V04` uses it to announce event clip completion. Consider a dedicated clip-oriented topic/schema if downstream consumers need stronger semantics
 
 ## Model Rollout SOP Gaps (P0-D09)
 
