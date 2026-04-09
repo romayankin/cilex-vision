@@ -367,9 +367,9 @@ phases:
       title: Clip Pipeline
       depends_on:
       - P2-V03
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P2-V04
       prompt: .agents/prompts/P2-V04.md
       tool: codex-cli
     - id: P2-V05
