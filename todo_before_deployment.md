@@ -53,6 +53,13 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `services/mtmc-service/config.py` only supports `kafka_security_protocol`; it has no SASL/SCRAM or TLS file settings, so the new MTMC infra playbook defaults to `PLAINTEXT` and cannot yet connect to the secured Kafka deployment from `deploy-kafka.yml`
 - [ ] `infra/ansible/playbooks/deploy-services.yml` builds from each service directory only, but repo service Dockerfiles such as `services/mtmc-service/Dockerfile` expect a repo-root build context (`proto/` plus `services/...`). Generalize the shared service playbook before relying on it for newer services
 
+## Stress-Test Observability Gaps (P2-E03)
+
+- [ ] The taxonomy NFRs reference `e2e_latency_ms` and `inference_fps{camera_id}`, but the current services do not export those exact Prometheus metrics. The new stress-test harness reports that as failed validation; add the canonical metrics before relying on NFR pass/fail output for pilot sign-off
+- [ ] The current Query API `/health` endpoint returns only `{"status": "ok"}` and does not expose active camera / stream count, so the stress-test harness cannot validate the "4 active pilot cameras" NFR from a live health contract yet
+- [ ] `infra/prometheus/prometheus.pilot.yml` still scrapes only the original pilot services plus Triton. If attribute-service, event-engine, clip-service, or mtmc-service are deployed for a full Phase 2 pilot, add scrape targets before expecting complete end-to-end stress-test coverage
+- [ ] The repo still has no committed replay media corpus for realistic event / clip / MTMC-heavy stress runs. Operators must currently provide `--replay-frame-dir` inputs out-of-band for those scenarios
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover
