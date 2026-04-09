@@ -60,6 +60,11 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `infra/prometheus/prometheus.pilot.yml` still scrapes only the original pilot services plus Triton. If attribute-service, event-engine, clip-service, or mtmc-service are deployed for a full Phase 2 pilot, add scrape targets before expecting complete end-to-end stress-test coverage
 - [ ] The repo still has no committed replay media corpus for realistic event / clip / MTMC-heavy stress runs. Operators must currently provide `--replay-frame-dir` inputs out-of-band for those scenarios
 
+## Operations Runbook Gaps (P2-X02)
+
+- [ ] `attribute-service`, `event-engine`, and `clip-service` do not have a standard host-reachable `/health` or `/ready` contract in the shared deployment path. Operators currently have to rely on container logs and Prometheus scrape presence during restart verification
+- [ ] Topology administration still depends on either an environment-specific admin JWT cookie for the Query API or direct SQL fallback. Add a first-class operator login / admin workflow before large-scale camera onboarding
+
 ## Deployment Automation Gaps (P3-O01)
 
 - [ ] `infra/ansible/inventory/production.yml` is intentionally a template: replace the placeholder IPs, PKI source paths, credentials, and empty `service_deployments` entries before running `deploy-multi-node.yml`

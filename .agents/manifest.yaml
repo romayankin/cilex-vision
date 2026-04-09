@@ -468,9 +468,9 @@ phases:
       title: Operations Runbooks
       depends_on:
       - P2-O01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P2-X02
       prompt: .agents/prompts/P2-X02.md
       tool: codex-cli
   phase-3:
