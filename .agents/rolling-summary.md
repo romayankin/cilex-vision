@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-09 20:01 (after P2-O01)*
+*Auto-generated after each task. Last updated: 2026-04-09 22:42 (after P2-E03)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 8/16 tasks done. Overall progress: 37/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 9/16 tasks done. Overall progress: 38/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -15,7 +15,7 @@ Complete Intelligence Layer (Phase 2) — 8/16 tasks done. Overall progress: 37/
 - Triton EXPLICIT mode — shadow deploy before cutover.
 - Protobuf for all inter-service messages, buf lint in CI.
 - Python str enums as TEXT with CHECK constraints, not native PG ENUMs.
-- If a camera has motion that never results in a tracklet, the event engine will not see it.
+- The current services do not expose all of those exact metrics.
 
 ## Key Decisions
 
@@ -35,11 +35,11 @@ Complete Intelligence Layer (Phase 2) — 8/16 tasks done. Overall progress: 37/
 
 ## Next Steps
 
-20 task(s) ready to launch. Priority:
-- **P2-E03** (End-to-End Stress Test) → codex-cli — unblocks 2 tasks
+21 task(s) ready to launch. Priority:
 - **P2-A01** (Cross-Camera Annotation) → claude-code — unblocks 2 tasks
 - **P3-O01** (Deployment Automation) → codex-cli — unblocks 2 tasks
 - **P2-X02** (Operations Runbooks) → codex-cli — unblocks 1 tasks
 - **P3-V01** (Model Retraining Pipeline) → claude-code — unblocks 1 tasks
 - **P3-V02** (Shadow Deploy Tooling) → codex-cli — unblocks 1 tasks
+- **P3-V03** (Customer Admin UI) → claude-code — unblocks 1 tasks
 
