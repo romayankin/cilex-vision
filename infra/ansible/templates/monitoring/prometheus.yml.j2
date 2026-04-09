@@ -37,6 +37,16 @@ scrape_configs:
 {%   endfor %}
 
 {% endif %}
+{% if mtmc_scrape_targets | default([]) | length > 0 %}
+  - job_name: mtmc-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+{%   for target in mtmc_scrape_targets | default([]) %}
+          - {{ target }}
+{%   endfor %}
+
+{% endif %}
   - job_name: loki
     static_configs:
       - targets:

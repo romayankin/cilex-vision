@@ -418,7 +418,7 @@ phases:
       title: MTMC Infrastructure
       depends_on:
       - P2-V02
-      status: in_progress
+      status: done
       assigned_to: null
       branch: feat/P2-O01
       prompt: .agents/prompts/P2-O01.md

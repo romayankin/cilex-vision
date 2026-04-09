@@ -1,0 +1,274 @@
+---
+- name: Deploy MTMC Re-ID service
+  hosts: services
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+    mtmc_enabled: "{{ hostvars[inventory_hostname].mtmc_enabled | default(true) | bool }}"
+    mtmc_container_name: mtmc-service
+    mtmc_image: cilex/mtmc-service:pilot
+    mtmc_network_name: cilex-services
+    mtmc_service_dir: "{{ cilex_root_dir }}/mtmc-service"
+    mtmc_build_context_dir: "{{ mtmc_service_dir }}/build-context"
+    mtmc_checkpoint_dir: "{{ cilex_data_dir }}/mtmc-service/checkpoint"
+    mtmc_metrics_port: 8080
+    mtmc_host_metrics_port: "{{ hostvars[inventory_hostname].mtmc_host_metrics_port | default(8080) }}"
+    mtmc_kafka_security_protocol: "{{ hostvars[inventory_hostname].mtmc_kafka_security_protocol | default('PLAINTEXT') }}"
+    mtmc_minio_secure: "{{ hostvars[inventory_hostname].mtmc_minio_secure | default(false) | bool }}"
+    mtmc_minio_bucket: "{{ hostvars[inventory_hostname].mtmc_minio_bucket | default('mtmc-checkpoints') }}"
+    mtmc_site_id: "{{ hostvars[inventory_hostname].mtmc_site_id | default('default') }}"
+    mtmc_log_level: "{{ hostvars[inventory_hostname].mtmc_log_level | default('INFO') }}"
+    mtmc_kafka_bootstrap: "{% for host in groups.get('kafka', []) %}{{ hostvars[host].ansible_host | default(host) }}:{{ kafka_client_port }}{% if not loop.last %},{% endif %}{% endfor %}"
+    mtmc_db_dsn: "postgresql://{{ timescaledb_postgres_user }}:{{ timescaledb_postgres_password }}@{{ hostvars[groups['timescaledb'][0]].ansible_host | default(groups['timescaledb'][0]) }}:{{ timescaledb_port }}/{{ timescaledb_postgres_db }}"
+    mtmc_minio_url: "{{ hostvars[groups['minio'][0]].ansible_host | default(groups['minio'][0]) }}:{{ minio_api_port }}"
+  pre_tasks:
+    - name: Validate MTMC deployment prerequisites
+      ansible.builtin.assert:
+        that:
+          - groups.get('kafka', []) | length > 0
+          - groups.get('timescaledb', []) | length > 0
+          - groups.get('minio', []) | length > 0
+          - groups.get('monitoring', []) | length > 0
+        fail_msg: "deploy-mtmc-infra.yml requires kafka, timescaledb, minio, and monitoring inventory groups."
+      when: mtmc_enabled
+
+  roles:
+    - common
+
+  tasks:
+    - name: Ensure the MTMC Docker network exists
+      community.docker.docker_network:
+        name: "{{ mtmc_network_name }}"
+        state: present
+      when: mtmc_enabled
+
+    - name: Create MTMC directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ mtmc_service_dir }}"
+        - "{{ mtmc_build_context_dir }}"
+        - "{{ mtmc_build_context_dir }}/proto"
+        - "{{ mtmc_build_context_dir }}/services"
+        - "{{ mtmc_checkpoint_dir }}"
+      when: mtmc_enabled
+
+    - name: Copy MTMC proto build context
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/proto/"
+        dest: "{{ mtmc_build_context_dir }}/proto/"
+        owner: root
+        group: root
+        mode: preserve
+        directory_mode: "0755"
+      when: mtmc_enabled
+
+    - name: Copy MTMC service build context
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/services/mtmc-service/"
+        dest: "{{ mtmc_build_context_dir }}/services/mtmc-service/"
+        owner: root
+        group: root
+        mode: preserve
+        directory_mode: "0755"
+      when: mtmc_enabled
+
+    - name: Wait for Kafka client listeners
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[item].ansible_host | default(item) }}"
+        port: "{{ kafka_client_port }}"
+        delay: 3
+        timeout: 90
+      loop: "{{ groups.get('kafka', []) }}"
+      when: mtmc_enabled
+
+    - name: Wait for TimescaleDB
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[groups['timescaledb'][0]].ansible_host | default(groups['timescaledb'][0]) }}"
+        port: "{{ timescaledb_port }}"
+        delay: 3
+        timeout: 90
+      when: mtmc_enabled
+
+    - name: Wait for MinIO API
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[groups['minio'][0]].ansible_host | default(groups['minio'][0]) }}"
+        port: "{{ minio_api_port }}"
+        delay: 3
+        timeout: 90
+      when: mtmc_enabled
+
+    - name: Build MTMC service image from the staged repo-root context
+      community.docker.docker_image:
+        name: "{{ mtmc_image }}"
+        source: build
+        force_source: false
+        build:
+          path: "{{ mtmc_build_context_dir }}"
+          dockerfile: services/mtmc-service/Dockerfile
+          pull: true
+      when: mtmc_enabled
+
+    - name: Start MTMC service container
+      community.docker.docker_container:
+        name: "{{ mtmc_container_name }}"
+        image: "{{ mtmc_image }}"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ mtmc_network_name }}"
+        env:
+          MTMC_KAFKA_BOOTSTRAP: "{{ mtmc_kafka_bootstrap }}"
+          MTMC_KAFKA_SECURITY_PROTOCOL: "{{ mtmc_kafka_security_protocol }}"
+          MTMC_DB_DSN: "{{ mtmc_db_dsn }}"
+          MTMC_MINIO_URL: "{{ mtmc_minio_url }}"
+          MTMC_MINIO_ACCESS_KEY: "{{ minio_root_user }}"
+          MTMC_MINIO_SECRET_KEY: "{{ minio_root_password }}"
+          MTMC_MINIO_SECURE: "{{ mtmc_minio_secure | ternary('true', 'false') }}"
+          MTMC_MINIO_BUCKET: "{{ mtmc_minio_bucket }}"
+          MTMC_SITE_ID: "{{ mtmc_site_id }}"
+          MTMC_CHECKPOINT_LOCAL_PATH: /data/mtmc-checkpoint
+          MTMC_METRICS_PORT: "{{ mtmc_metrics_port | string }}"
+          MTMC_LOG_LEVEL: "{{ mtmc_log_level }}"
+        volumes:
+          - "{{ mtmc_checkpoint_dir }}:/data/mtmc-checkpoint"
+        published_ports:
+          - "{{ mtmc_host_metrics_port }}:{{ mtmc_metrics_port }}"
+      when: mtmc_enabled
+      no_log: true
+
+    - name: Wait for MTMC metrics port
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ mtmc_host_metrics_port }}"
+        delay: 3
+        timeout: 90
+      when: mtmc_enabled
+
+    - name: Smoke test MTMC metrics endpoint
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ mtmc_host_metrics_port }}/metrics"
+        status_code: 200
+        return_content: true
+      register: mtmc_metrics
+      when: mtmc_enabled
+
+    - name: Assert MTMC metrics include the match counter
+      ansible.builtin.assert:
+        that:
+          - "'mtmc_matches_total' in mtmc_metrics.content"
+        fail_msg: "MTMC metrics endpoint did not expose mtmc_matches_total."
+      when: mtmc_enabled
+
+    # - name: Install FAISS GPU prerequisites for scaled deployments
+    #   ansible.builtin.apt:
+    #     name:
+    #       - python3-dev
+    #       - libopenblas-dev
+    #       - libomp-dev
+    #     state: present
+    #     update_cache: true
+    #
+    # - name: Rebuild the MTMC image against faiss-gpu requirements
+    #   community.docker.docker_image:
+    #     name: "{{ mtmc_image }}"
+    #     source: build
+    #     force_source: true
+    #     build:
+    #       path: "{{ mtmc_build_context_dir }}"
+    #       dockerfile: services/mtmc-service/Dockerfile
+    #       pull: true
+
+- name: Register MTMC monitoring assets
+  hosts: monitoring
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+    mtmc_host_metrics_port_default: 8080
+  pre_tasks:
+    - name: Initialise the MTMC scrape target list
+      ansible.builtin.set_fact:
+        mtmc_scrape_targets: []
+
+    - name: Build MTMC scrape target list
+      ansible.builtin.set_fact:
+        mtmc_scrape_targets: "{{ mtmc_scrape_targets + [(hostvars[item].ansible_host | default(item)) ~ ':' ~ (hostvars[item].mtmc_host_metrics_port | default(mtmc_host_metrics_port_default) | string)] }}"
+      loop: "{{ groups.get('services', []) }}"
+      when: hostvars[item].mtmc_enabled | default(true) | bool
+
+  roles:
+    - common
+
+  tasks:
+    - name: Ensure monitoring directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ monitoring_prometheus_dir }}"
+        - "{{ monitoring_prometheus_dir }}/rules"
+        - "{{ monitoring_grafana_dir }}"
+        - "{{ monitoring_grafana_dir }}/dashboards"
+
+    - name: Copy MTMC Prometheus alerts
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/infra/prometheus/rules/mtmc-alerts.yml"
+        dest: "{{ monitoring_prometheus_dir }}/rules/mtmc-alerts.yml"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy MTMC Grafana dashboard
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/infra/grafana/dashboards/mtmc-health.json"
+        dest: "{{ monitoring_grafana_dir }}/dashboards/mtmc-health.json"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Render Prometheus config with MTMC scrape targets
+      ansible.builtin.template:
+        src: ../templates/monitoring/prometheus.yml.j2
+        dest: "{{ monitoring_prometheus_dir }}/prometheus.yml"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Inspect Prometheus container
+      community.docker.docker_container_info:
+        name: prometheus
+      register: mtmc_prometheus_container
+
+    - name: Reload Prometheus after MTMC scrape changes
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ prometheus_port }}/-/reload"
+        method: POST
+        status_code: 200
+      when:
+        - mtmc_prometheus_container.exists
+        - mtmc_prometheus_container.container.State.Running | default(false)
+
+    - name: Check Prometheus targets API
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ prometheus_port }}/api/v1/targets"
+        status_code: 200
+      when:
+        - mtmc_prometheus_container.exists
+        - mtmc_prometheus_container.container.State.Running | default(false)

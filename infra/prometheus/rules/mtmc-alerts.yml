@@ -1,0 +1,52 @@
+groups:
+  - name: mtmc-service
+    rules:
+      - alert: MtmcMatchRateLow
+        expr: rate(mtmc_matches_total[10m]) == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: mtmc
+        annotations:
+          summary: "MTMC match rate is zero for 15 minutes on site {{ $labels.site_id }}"
+          description: "No MTMC matches have been recorded for site {{ $labels.site_id }} for 15 minutes."
+
+      - alert: MtmcCheckpointLagCritical
+        expr: mtmc_checkpoint_lag_seconds > 600
+        for: 5m
+        labels:
+          severity: critical
+          service: mtmc
+        annotations:
+          summary: "MTMC checkpoint lag exceeds 10 minutes"
+          description: "The MTMC service has not completed a successful checkpoint in more than 600 seconds."
+
+      - alert: MtmcFaissIndexAnomaly
+        expr: abs(delta(mtmc_faiss_index_size[1h])) > 10000
+        for: 10m
+        labels:
+          severity: warning
+          service: mtmc
+        annotations:
+          summary: "MTMC FAISS index size changed by >10k in 1 hour"
+          description: "The MTMC FAISS index size changed by more than 10,000 embeddings over the last hour."
+
+      - alert: MtmcRejectRateHigh
+        expr: sum by (site_id) (rate(mtmc_rejects_total[5m])) / clamp_min(sum by (site_id) (rate(mtmc_matches_total[5m])) + sum by (site_id) (rate(mtmc_rejects_total[5m])), 1e-9) > 0.95
+        for: 10m
+        labels:
+          severity: warning
+          service: mtmc
+        annotations:
+          summary: "MTMC rejecting >95% of candidates on site {{ $labels.site_id }}"
+          description: "The MTMC rejection ratio for site {{ $labels.site_id }} has remained above 95% for 10 minutes."
+
+      - alert: MtmcEmbeddingConsumptionStopped
+        expr: sum(rate(mtmc_embeddings_consumed_total[5m])) == 0
+        for: 10m
+        labels:
+          severity: critical
+          service: mtmc
+        annotations:
+          summary: "MTMC is not consuming embeddings"
+          description: "No MTMC embeddings have been consumed for 10 minutes."

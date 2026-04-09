@@ -48,6 +48,11 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] Decoded frame keys are `camera_id/YYYY-MM-DD/frame_id.jpg`, so clip extraction currently filters source frames by MinIO `last_modified` instead of a true capture-time index. Add a decoded-frame metadata table or timestamped object naming scheme before relying on frame-accurate clips
 - [ ] `archive.transcode.completed` is contract-bound to `vidanalytics.v1.frame.FrameRef`, but `P2-V04` uses it to announce event clip completion. Consider a dedicated clip-oriented topic/schema if downstream consumers need stronger semantics
 
+## MTMC Infrastructure Gaps (P2-O01)
+
+- [ ] `services/mtmc-service/config.py` only supports `kafka_security_protocol`; it has no SASL/SCRAM or TLS file settings, so the new MTMC infra playbook defaults to `PLAINTEXT` and cannot yet connect to the secured Kafka deployment from `deploy-kafka.yml`
+- [ ] `infra/ansible/playbooks/deploy-services.yml` builds from each service directory only, but repo service Dockerfiles such as `services/mtmc-service/Dockerfile` expect a repo-root build context (`proto/` plus `services/...`). Generalize the shared service playbook before relying on it for newer services
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover

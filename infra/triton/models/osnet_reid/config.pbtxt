@@ -1,0 +1,43 @@
+# OSNet-x1.0 dedicated MTMC Re-ID embedding extractor
+# Output: L2-normalized 512-dimensional embedding vector
+# Tuned for MTMC crop bursts with tighter queue latency than the general osnet config
+# See docs/triton-placement.md for Class B GPU placement guidance
+
+name: "osnet_reid"
+platform: "tensorrt_plan"
+max_batch_size: 32
+
+input [
+  {
+    name: "images"
+    data_type: TYPE_FP32
+    dims: [3, 256, 128]
+  }
+]
+
+output [
+  {
+    name: "embeddings"
+    data_type: TYPE_FP32
+    dims: [512]
+  }
+]
+
+dynamic_batching {
+  preferred_batch_size: [4, 8, 16]
+  max_queue_delay_microseconds: 50000
+}
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    gpus: [0]
+  }
+]
+
+version_policy {
+  latest {
+    num_versions: 2
+  }
+}
