@@ -446,3 +446,9 @@ else
     echo "  If it's close, paste each ❌ FAIL item as specific feedback."
 fi
 echo "═══════════════════════════════════════════════════════"
+
+# Auto-update rolling summary on pass
+if [ $FAIL -eq 0 ]; then
+    "${REPO_ROOT}/.agents/update-summary.sh" "${TASK_ID}" 2>/dev/null && \
+        echo "" && echo "  📝 Rolling summary updated: .agents/rolling-summary.md" || true
+fi
