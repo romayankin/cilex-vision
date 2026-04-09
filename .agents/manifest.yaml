@@ -336,7 +336,7 @@ phases:
       title: Attribute Extraction Service
       depends_on:
       - P1-V04
-      status: pending
+      status: done
       assigned_to: null
       branch: null
       prompt: .agents/prompts/P2-V01.md
