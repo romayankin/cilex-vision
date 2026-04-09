@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-10 00:59 (after P2-A01)*
+*Auto-generated after each task. Last updated: 2026-04-10 01:28 (after P3-O01)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 39/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 40/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -36,8 +36,8 @@ Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 39
 
 ## Next Steps
 
-22 task(s) ready to launch. Priority:
-- **P3-O01** (Deployment Automation) → codex-cli — unblocks 2 tasks
+23 task(s) ready to launch. Priority:
+- **P3-X01** (Deployment Guide) → claude-code — unblocks 2 tasks
 - **P2-X02** (Operations Runbooks) → codex-cli — unblocks 1 tasks
 - **P3-V01** (Model Retraining Pipeline) → claude-code — unblocks 1 tasks
 - **P3-V02** (Shadow Deploy Tooling) → codex-cli — unblocks 1 tasks
