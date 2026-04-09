@@ -418,9 +418,9 @@ phases:
       title: MTMC Infrastructure
       depends_on:
       - P2-V02
-      status: pending
+      status: in_progress
       assigned_to: null
-      branch: null
+      branch: feat/P2-O01
       prompt: .agents/prompts/P2-O01.md
       tool: codex-cli
     - id: P2-O02
