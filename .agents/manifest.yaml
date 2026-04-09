@@ -448,9 +448,9 @@ phases:
       title: Cross-Camera Annotation
       depends_on:
       - P1-A01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P2-A01
       prompt: .agents/prompts/P2-A01.md
       tool: claude-code
     - id: P2-X01
