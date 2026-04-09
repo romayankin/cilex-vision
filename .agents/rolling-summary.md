@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-10 02:10 (after P3-V02)*
+*Auto-generated after each task. Last updated: 2026-04-10 02:26 (after P3-V03)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 42/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 43/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -22,6 +22,7 @@ Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 42
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- Loading/error/content rendering pattern from P2-V05
 - `if __name__ == "__main__"` with `try/except SystemExit` pattern
 - `asyncpg` for DB queries in the sampler (matching repo convention)
 
@@ -38,8 +39,8 @@ Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 42
 23 task(s) ready to launch. Priority:
 - **P3-X01** (Deployment Guide) → claude-code — unblocks 2 tasks
 - **P2-X02** (Operations Runbooks) → codex-cli — unblocks 1 tasks
-- **P3-V03** (Customer Admin UI) → claude-code — unblocks 1 tasks
 - **P4-V01** (Zone Sharding for Large Sites) → claude-code — unblocks 1 tasks
 - **P2-E01** (Attribute Classifier Bake-Off) → codex-cli
 - **P2-E02** (MTMC Evaluation) → codex-cli
+- **P2-O02** (Storage Tiering) → codex-cli
 
