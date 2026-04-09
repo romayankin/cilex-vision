@@ -377,9 +377,9 @@ phases:
       title: Search UI & Timeline
       depends_on:
       - P1-V06
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P2-V05
       prompt: .agents/prompts/P2-V05.md
       tool: claude-code
     - id: P2-E01
