@@ -154,8 +154,15 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P2-V04 | Clip Pipeline | feat/P2-V04 | Clip-service consuming closed `events.raw` records, FFmpeg H.264 baseline clip extraction, thumbnail generation, MinIO upload, PostgreSQL asset updates, Dockerfile, strict mypy config, and 6 tests |
 | P2-V05 | Search UI & Timeline | feat/P2-V05 | Next.js frontend with search, camera timeline, cross-camera journey, admin views, API proxy client, HLS/MP4 playback, and standalone Docker packaging |
 
-### Phase 2 — Pending (7 tasks remaining)
-### Phases 3-4 — All Pending (25 tasks, prompts not yet in manifest)
+### Phase 2 — Pending (6 tasks remaining)
+
+### Phase 3 — Completed
+| Task | Title | Branch | What it produced |
+|------|-------|--------|-----------------|
+| P3-O01 | Deployment Automation | feat/P3-O01 | Terraform modules for multi-node compute/network/storage provisioning, multi-node Ansible deployment orchestration with GPU and edge roles, a production inventory template, and a deployment health-check script |
+
+### Phase 3 — Pending (12 tasks remaining)
+### Phase 4 — Pending (12 tasks remaining)
 
 ---
 

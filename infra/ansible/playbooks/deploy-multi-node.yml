@@ -1,0 +1,44 @@
+---
+- name: Prepare GPU inference nodes for Triton
+  hosts: triton
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+
+  roles:
+    - common
+    - gpu-node
+
+- import_playbook: deploy-timescaledb.yml
+- import_playbook: deploy-minio.yml
+- import_playbook: deploy-nats.yml
+- import_playbook: deploy-kafka.yml
+- import_playbook: create-kafka-topics.yml
+
+- import_playbook: deploy-triton.yml
+
+- name: Deploy edge gateway nodes
+  hosts: edge_gateways
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+
+  roles:
+    - common
+    - edge-gateway
+
+- import_playbook: deploy-services.yml
+- import_playbook: deploy-mtmc-infra.yml
+- import_playbook: deploy-monitoring.yml
+- import_playbook: deploy-mlflow.yml
+- import_playbook: smoke-test.yml

@@ -1,0 +1,90 @@
+---
+- name: Install GPU node prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - ubuntu-drivers-common
+    state: present
+    update_cache: true
+
+- name: Check whether NVIDIA userspace is already present
+  ansible.builtin.command:
+    cmd: which nvidia-smi
+  register: gpu_nvidia_smi
+  changed_when: false
+  failed_when: false
+
+- name: Install NVIDIA driver package when nvidia-smi is absent
+  ansible.builtin.apt:
+    name: "{{ gpu_nvidia_driver_package }}"
+    state: present
+    update_cache: true
+  when: gpu_nvidia_smi.rc != 0
+
+- name: Add NVIDIA container toolkit apt signing key
+  ansible.builtin.apt_key:
+    url: https://nvidia.github.io/libnvidia-container/gpgkey
+    state: present
+
+- name: Add NVIDIA container toolkit apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64] https://nvidia.github.io/libnvidia-container/stable/deb/amd64 /"
+    filename: nvidia-container-toolkit
+    state: present
+
+- name: Install NVIDIA container toolkit
+  ansible.builtin.apt:
+    name: "{{ gpu_nvidia_container_toolkit_package }}"
+    state: present
+    update_cache: true
+
+- name: Configure Docker to use the NVIDIA runtime by default
+  ansible.builtin.copy:
+    dest: "{{ gpu_docker_daemon_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {
+        "default-runtime": "nvidia",
+        "runtimes": {
+          "nvidia": {
+            "path": "nvidia-container-runtime",
+            "runtimeArgs": []
+          }
+        }
+      }
+  notify: Restart Docker
+
+- name: Flush Docker restart handler before GPU validation
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify GPU visibility
+  ansible.builtin.command:
+    cmd: nvidia-smi -L
+  register: gpu_inventory
+  changed_when: false
+
+- name: Pull Triton runtime image
+  community.docker.docker_image:
+    name: "{{ triton_image }}"
+    source: pull
+
+- name: Create Triton model repository directory
+  ansible.builtin.file:
+    path: "{{ triton_model_repository_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Sync Triton model repository from the repo
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/infra/triton/models/"
+    dest: "{{ triton_model_repository_dir }}/"
+    owner: root
+    group: root
+    mode: preserve
+    directory_mode: "0755"

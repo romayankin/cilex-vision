@@ -1,6 +1,6 @@
 ---
 - name: Deploy host-side log and metric agents
-  hosts: kafka:nats:timescaledb:minio:triton:monitoring:mlflow:cvat:services
+  hosts: kafka:nats:timescaledb:minio:triton:monitoring:mlflow:cvat:services:edge_gateways
   become: true
   gather_facts: false
   collections:

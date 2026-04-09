@@ -1,0 +1,143 @@
+---
+all:
+  vars:
+    ansible_user: ubuntu
+    ansible_become: true
+    ansible_python_interpreter: /usr/bin/python3
+
+    kafka_inter_broker_password: replace-me
+    kafka_admin_password: replace-me
+    kafka_ssl_keystore_password: replace-me
+    kafka_ssl_key_password: replace-me
+    kafka_ssl_truststore_password: replace-me
+    minio_root_password: replace-me
+    grafana_admin_password: replace-me
+    cvat_postgres_password: replace-me
+    cvat_admin_password: replace-me
+
+    monitoring_clock_targets:
+      - camera_id: cam-site-a-001
+        chrony_host: edge-site-a.edge.cilex.internal
+        site_id: site-a
+      - camera_id: cam-site-b-001
+        chrony_host: edge-site-b.edge.cilex.internal
+        site_id: site-b
+
+  children:
+    kafka:
+      hosts:
+        kafka-1.core.cilex.internal:
+          ansible_host: 10.43.10.11
+          kafka_node_id: 1
+          kafka_ssl_keystore_src: /secure/kafka/kafka-1/broker.keystore.p12
+          kafka_ssl_truststore_src: /secure/kafka/kafka-1/broker.truststore.p12
+        kafka-2.core.cilex.internal:
+          ansible_host: 10.43.10.12
+          kafka_node_id: 2
+          kafka_ssl_keystore_src: /secure/kafka/kafka-2/broker.keystore.p12
+          kafka_ssl_truststore_src: /secure/kafka/kafka-2/broker.truststore.p12
+        kafka-3.core.cilex.internal:
+          ansible_host: 10.43.10.13
+          kafka_node_id: 3
+          kafka_ssl_keystore_src: /secure/kafka/kafka-3/broker.keystore.p12
+          kafka_ssl_truststore_src: /secure/kafka/kafka-3/broker.truststore.p12
+
+    timescaledb:
+      hosts:
+        timescaledb-1.core.cilex.internal:
+          ansible_host: 10.43.20.11
+
+    minio:
+      hosts:
+        minio-1.core.cilex.internal:
+          ansible_host: 10.43.20.12
+
+    triton:
+      hosts:
+        triton-1.core.cilex.internal:
+          ansible_host: 10.43.30.11
+          triton_gpu_devices:
+            - "0"
+        triton-2.core.cilex.internal:
+          ansible_host: 10.43.30.12
+          triton_gpu_devices:
+            - "0"
+
+    monitoring:
+      hosts:
+        monitoring-1.core.cilex.internal:
+          ansible_host: 10.43.40.11
+
+    mlflow:
+      hosts:
+        mlflow-1.core.cilex.internal:
+          ansible_host: 10.43.50.11
+
+    services:
+      hosts:
+        app-1.core.cilex.internal:
+          ansible_host: 10.43.70.11
+          mtmc_enabled: true
+          # Example service_deployments:
+          # service_deployments:
+          #   - name: query-api
+          #     source_dir: services/query-api
+          #     image: cilex/query-api:production
+          #     build_context_mode: service_dir
+          #     ports:
+          #       - "8000:8000"
+          #     smoke_test_url: http://127.0.0.1:8000/health
+          #   - name: event-engine
+          #     source_dir: services/event-engine
+          #     image: cilex/event-engine:production
+          #     build_context_mode: repo_root
+          #     dockerfile: services/event-engine/Dockerfile
+          #     smoke_test_url: http://127.0.0.1:8080/metrics
+          service_deployments: []
+        app-2.core.cilex.internal:
+          ansible_host: 10.43.70.12
+          mtmc_enabled: false
+          service_deployments: []
+
+    edge_gateways:
+      hosts:
+        edge-site-a.edge.cilex.internal:
+          ansible_host: 10.42.10.11
+          edge_site_id: site-a
+          edge_nats_url: tls://10.42.20.11:4222
+          edge_nats_client_cert_src: /secure/sites/site-a/edge/client.crt
+          edge_nats_client_key_src: /secure/sites/site-a/edge/client.key
+          edge_nats_root_ca_src: /secure/sites/site-a/nats-server/root_ca.crt
+          edge_cameras:
+            - camera_id: cam-site-a-001
+              rtsp_url: rtsp://replace-me/site-a/cam-001
+              enabled: true
+        edge-site-b.edge.cilex.internal:
+          ansible_host: 10.42.10.12
+          edge_site_id: site-b
+          edge_nats_url: tls://10.42.20.12:4222
+          edge_nats_client_cert_src: /secure/sites/site-b/edge/client.crt
+          edge_nats_client_key_src: /secure/sites/site-b/edge/client.key
+          edge_nats_root_ca_src: /secure/sites/site-b/nats-server/root_ca.crt
+          edge_cameras:
+            - camera_id: cam-site-b-001
+              rtsp_url: rtsp://replace-me/site-b/cam-001
+              enabled: true
+
+    nats:
+      hosts:
+        nats-site-a.edge.cilex.internal:
+          ansible_host: 10.42.20.11
+          nats_site_id: site-a
+          nats_server_cert_src: /secure/sites/site-a/nats-server/server.crt
+          nats_server_key_src: /secure/sites/site-a/nats-server/server.key
+          nats_root_ca_src: /secure/sites/site-a/nats-server/root_ca.crt
+        nats-site-b.edge.cilex.internal:
+          ansible_host: 10.42.20.12
+          nats_site_id: site-b
+          nats_server_cert_src: /secure/sites/site-b/nats-server/server.crt
+          nats_server_key_src: /secure/sites/site-b/nats-server/server.key
+          nats_root_ca_src: /secure/sites/site-b/nats-server/root_ca.crt
+
+    cvat:
+      hosts: {}

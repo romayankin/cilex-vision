@@ -60,6 +60,12 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `infra/prometheus/prometheus.pilot.yml` still scrapes only the original pilot services plus Triton. If attribute-service, event-engine, clip-service, or mtmc-service are deployed for a full Phase 2 pilot, add scrape targets before expecting complete end-to-end stress-test coverage
 - [ ] The repo still has no committed replay media corpus for realistic event / clip / MTMC-heavy stress runs. Operators must currently provide `--replay-frame-dir` inputs out-of-band for those scenarios
 
+## Deployment Automation Gaps (P3-O01)
+
+- [ ] `infra/ansible/inventory/production.yml` is intentionally a template: replace the placeholder IPs, PKI source paths, credentials, and empty `service_deployments` entries before running `deploy-multi-node.yml`
+- [ ] The new Terraform modules were syntax-reviewed but could not be `terraform fmt` / `terraform validate` checked locally because the Terraform CLI is not installed in this environment. Run `terraform init`, `terraform fmt`, and `terraform validate` in CI or an operator workstation before first apply
+- [ ] The `gpu-node` role overwrites `/etc/docker/daemon.json` to set `default-runtime: nvidia`. If Triton hosts need additional Docker daemon settings, merge them into managed config before production rollout
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover

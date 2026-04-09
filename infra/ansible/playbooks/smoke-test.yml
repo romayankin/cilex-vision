@@ -195,3 +195,15 @@
         status_code: 200
       loop: "{{ service_deployments }}"
       when: item.smoke_test_url is defined
+
+- name: Smoke test edge gateways
+  hosts: edge_gateways
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Check edge-agent metrics
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ edge_gateway_metrics_port }}/metrics"
+        status_code: 200

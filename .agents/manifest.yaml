@@ -578,9 +578,9 @@ phases:
       title: Deployment Automation
       depends_on:
       - P1-O01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P3-O01
       prompt: .agents/prompts/P3-O01.md
       tool: codex-cli
     - id: P3-X01

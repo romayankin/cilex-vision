@@ -58,7 +58,49 @@
       loop: "{{ service_deployments }}"
       when: service_deployments | length > 0
 
-    - name: Copy service build contexts to the target host
+    - name: Validate requested build-context modes
+      ansible.builtin.assert:
+        that:
+          - item.build_context_mode | default('service_dir') in ['service_dir', 'repo_root']
+        fail_msg: "Service {{ item.name }} uses unsupported build_context_mode={{ item.build_context_mode | default('service_dir') }}."
+      loop: "{{ service_deployments }}"
+      when: service_deployments | length > 0
+
+    - name: Create per-service build staging directories
+      ansible.builtin.file:
+        path: "{{ service_build_root }}/{{ item.name }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop: "{{ service_deployments }}"
+      when: service_deployments | length > 0
+
+    - name: Create repo-root build staging directories for proto-aware services
+      ansible.builtin.file:
+        path: "{{ service_build_root }}/{{ item.name }}/proto"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop: "{{ service_deployments }}"
+      when:
+        - service_deployments | length > 0
+        - item.build_context_mode | default('service_dir') == 'repo_root'
+
+    - name: Create repo-root service parent directories
+      ansible.builtin.file:
+        path: "{{ service_build_root }}/{{ item.name }}/{{ item.source_dir | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop: "{{ service_deployments }}"
+      when:
+        - service_deployments | length > 0
+        - item.build_context_mode | default('service_dir') == 'repo_root'
+
+    - name: Copy direct service build contexts to the target host
       ansible.builtin.copy:
         src: "{{ repo_root }}/{{ item.source_dir }}/"
         dest: "{{ service_build_root }}/{{ item.name }}/"
@@ -67,7 +109,35 @@
         mode: preserve
         directory_mode: "0755"
       loop: "{{ service_deployments }}"
-      when: service_deployments | length > 0
+      when:
+        - service_deployments | length > 0
+        - item.build_context_mode | default('service_dir') == 'service_dir'
+
+    - name: Copy shared proto build context for repo-root Dockerfiles
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/proto/"
+        dest: "{{ service_build_root }}/{{ item.name }}/proto/"
+        owner: root
+        group: root
+        mode: preserve
+        directory_mode: "0755"
+      loop: "{{ service_deployments }}"
+      when:
+        - service_deployments | length > 0
+        - item.build_context_mode | default('service_dir') == 'repo_root'
+
+    - name: Copy repo-root service build contexts to the target host
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/{{ item.source_dir }}/"
+        dest: "{{ service_build_root }}/{{ item.name }}/{{ item.source_dir }}/"
+        owner: root
+        group: root
+        mode: preserve
+        directory_mode: "0755"
+      loop: "{{ service_deployments }}"
+      when:
+        - service_deployments | length > 0
+        - item.build_context_mode | default('service_dir') == 'repo_root'
 
     - name: Build service images from local Dockerfiles
       community.docker.docker_image:
@@ -76,6 +146,7 @@
         force_source: false
         build:
           path: "{{ service_build_root }}/{{ item.name }}"
+          dockerfile: "{{ item.dockerfile | default((((item.build_context_mode | default('service_dir')) == 'repo_root') | ternary(item.source_dir ~ '/Dockerfile', 'Dockerfile'))) }}"
           pull: true
       loop: "{{ service_deployments }}"
       when: service_deployments | length > 0
@@ -107,4 +178,3 @@
       retries: 12
       delay: 5
       until: service_smoke_results.status == 200
-

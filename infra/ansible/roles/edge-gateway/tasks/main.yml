@@ -1,0 +1,173 @@
+---
+- name: Validate edge gateway deployment inputs
+  ansible.builtin.assert:
+    that:
+      - edge_site_id is defined
+      - edge_cameras is defined
+      - edge_nats_client_cert_src is defined
+      - edge_nats_client_key_src is defined
+      - edge_nats_root_ca_src is defined
+    fail_msg: "edge-gateway requires edge_site_id, edge_cameras, and the NATS client certificate source paths."
+
+- name: Install edge gateway RTSP and media prerequisites
+  ansible.builtin.apt:
+    name:
+      - gstreamer1.0-tools
+      - gstreamer1.0-plugins-base
+      - gstreamer1.0-plugins-good
+      - gstreamer1.0-plugins-bad
+      - gstreamer1.0-plugins-ugly
+      - gstreamer1.0-libav
+    state: present
+    update_cache: true
+
+- name: Create edge gateway directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ edge_gateway_base_dir }}"
+    - "{{ edge_gateway_config_dir }}"
+    - "{{ edge_gateway_pki_dir }}"
+    - "{{ edge_gateway_build_context_dir }}"
+    - "{{ edge_gateway_build_context_dir }}/proto"
+    - "{{ edge_gateway_build_context_dir }}/services"
+    - "{{ edge_gateway_data_dir }}"
+    - "{{ edge_gateway_buffer_dir }}"
+
+- name: Copy edge NATS client certificate
+  ansible.builtin.copy:
+    src: "{{ edge_nats_client_cert_src }}"
+    dest: "{{ edge_gateway_pki_dir }}/client.crt"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Copy edge NATS client key
+  ansible.builtin.copy:
+    src: "{{ edge_nats_client_key_src }}"
+    dest: "{{ edge_gateway_pki_dir }}/client.key"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Copy edge NATS root CA
+  ansible.builtin.copy:
+    src: "{{ edge_nats_root_ca_src }}"
+    dest: "{{ edge_gateway_pki_dir }}/root_ca.crt"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Build the rendered edge-agent config model
+  ansible.builtin.set_fact:
+    edge_agent_rendered_config:
+      site_id: "{{ edge_site_id }}"
+      cameras: "{{ edge_cameras }}"
+      nats:
+        url: "{{ edge_nats_url | default('tls://' ~ (hostvars[groups['nats'][0]].ansible_host | default(groups['nats'][0])) ~ ':' ~ nats_client_port) }}"
+        tls:
+          cert_file: /etc/cilex/pki/client.crt
+          key_file: /etc/cilex/pki/client.key
+          ca_file: /etc/cilex/pki/root_ca.crt
+      minio:
+        endpoint: "{{ edge_minio_endpoint | default((hostvars[groups['minio'][0]].ansible_host | default(groups['minio'][0])) ~ ':' ~ minio_api_port) }}"
+        access_key: "{{ edge_minio_access_key | default(minio_root_user) }}"
+        secret_key: "{{ edge_minio_secret_key | default(minio_root_password) }}"
+        bucket: "{{ edge_minio_bucket | default('frame-blobs') }}"
+        secure: "{{ (edge_minio_secure | default(false) | bool) | ternary('true', 'false') }}"
+      buffer:
+        path: /var/lib/edge-agent/buffer
+        max_bytes: "{{ edge_buffer_max_bytes | default(edge_gateway_buffer_budget_bytes) | int }}"
+        replay_rate_limit: "{{ edge_replay_rate_limit | default(100) | int }}"
+      metrics_port: "{{ edge_metrics_port | default(edge_gateway_metrics_port) | int }}"
+      log_level: "{{ edge_log_level | default('INFO') }}"
+
+- name: Render edge-agent config.yaml
+  ansible.builtin.copy:
+    dest: "{{ edge_gateway_config_dir }}/config.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ edge_agent_rendered_config | to_nice_yaml(indent=2, sort_keys=false) }}"
+
+- name: Write the local buffer budget marker
+  ansible.builtin.copy:
+    dest: "{{ edge_gateway_buffer_dir }}/BUFFER_BUDGET_BYTES"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ edge_buffer_max_bytes | default(edge_gateway_buffer_budget_bytes) | int }}\n"
+
+- name: Copy edge-agent proto build context
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/proto/"
+    dest: "{{ edge_gateway_build_context_dir }}/proto/"
+    owner: root
+    group: root
+    mode: preserve
+    directory_mode: "0755"
+
+- name: Copy edge-agent service build context
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/services/edge-agent/"
+    dest: "{{ edge_gateway_build_context_dir }}/services/edge-agent/"
+    owner: root
+    group: root
+    mode: preserve
+    directory_mode: "0755"
+
+- name: Build edge-agent image from repo-root-compatible context
+  community.docker.docker_image:
+    name: "{{ edge_agent_image }}"
+    source: build
+    force_source: false
+    build:
+      path: "{{ edge_gateway_build_context_dir }}"
+      dockerfile: services/edge-agent/Dockerfile
+      pull: true
+
+- name: Start node-exporter on the edge gateway
+  community.docker.docker_container:
+    name: node-exporter
+    image: "{{ node_exporter_image }}"
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    command:
+      - --path.rootfs=/host
+      - --collector.textfile.directory=/textfile_collector
+    volumes:
+      - "/:/host:ro,rslave"
+      - "/proc:/host/proc:ro"
+      - "/sys:/host/sys:ro"
+      - "{{ monitoring_textfile_dir }}:/textfile_collector"
+
+- name: Start edge-agent container
+  community.docker.docker_container:
+    name: edge-agent
+    image: "{{ edge_agent_image }}"
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    env:
+      EDGE_CONFIG: /app/config.yaml
+    volumes:
+      - "{{ edge_gateway_config_dir }}/config.yaml:/app/config.yaml:ro"
+      - "{{ edge_gateway_pki_dir }}:/etc/cilex/pki:ro"
+      - "{{ edge_gateway_buffer_dir }}:/var/lib/edge-agent/buffer"
+
+- name: Wait for edge-agent metrics
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ edge_metrics_port | default(edge_gateway_metrics_port) }}"
+    delay: 3
+    timeout: 90
+
+- name: Smoke test edge-agent metrics endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ edge_metrics_port | default(edge_gateway_metrics_port) }}/metrics"
+    status_code: 200
