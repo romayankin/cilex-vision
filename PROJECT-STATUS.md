@@ -140,7 +140,18 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 
 
 ### Phase 1 — Pending (12 tasks remaining)
-### Phases 2-4 — All Pending (39 tasks, prompts not yet in manifest)
+
+### Phase 2 — Completed
+| Task | Title | Branch | What it produced |
+|------|-------|--------|-----------------|
+| P2-FIX01 | Pilot Readiness Fixes | feat/P2-FIX01 | Canonical Kafka topic fixes, inference-worker trace wiring, query-api topology router wiring, and regression tests for those gaps |
+| P2-PILOT01 | 4-Camera CPU-Only Pilot Deployment | feat/P2-PILOT01 | Pilot compose stack, YOLOv8n CPU Triton model wiring, setup scripts, camera helpers, pilot Prometheus config, and deployment guide |
+| P2-V01 | Attribute Extraction Service | — | Attribute service consuming `tracklets.local`, quality gate + white balance + Triton color classifier, asyncpg persistence, Dockerfile, strict mypy config, and 18 tests |
+| P2-V02 | MTMC Re-ID Association Service | feat/P2-V02 | MTMC service with FAISS matching, topology-aware scoring, checkpoint/restore, asyncpg persistence, Dockerfile, strict mypy config, and 13 tests |
+| P2-V03 | Event Engine | feat/P2-V03 | Event-engine service with per-track FSMs, Kafka + PostgreSQL event publishing, ROI / loitering polygon parsing from camera config, Dockerfile, strict mypy config, and 14 tests |
+
+### Phase 2 — Pending (11 tasks remaining)
+### Phases 3-4 — All Pending (25 tasks, prompts not yet in manifest)
 
 ---
 
