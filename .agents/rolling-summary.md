@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-09 19:12 (after P2-V05)*
+*Auto-generated after each task. Last updated: 2026-04-09 19:34 (after P2-V04)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 6/16 tasks done. Overall progress: 35/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 7/16 tasks done. Overall progress: 36/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -22,20 +22,20 @@ Complete Intelligence Layer (Phase 2) — 6/16 tasks done. Overall progress: 35/
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- This matches the repo’s existing MinIO usage pattern from attribute-service, decode-service, and MTMC checkpointing.
 - **`cameras.config_json` polygon shape is still a convention, not a formal contract**
-- `gen_proto.sh`, `requirements.txt`, `Dockerfile` — standard patterns.
 
 ## Open Issues
 
 - Track detail endpoint (`GET /tracks/{id}`) returns `thumbnail_url: null` — needs a frame-reference lookup table or stored thumbnail URI in `local_tracks` to resolve
+- Events endpoint does not expose a signed thumbnail URL — `P2-V04` stores `thumbnail_uri` in `events.metadata_jsonb`, but `services/query-api/routers/events.py` only signs `clip_uri`
 - Debug trace query endpoint lists MinIO objects directly (no DB index) — acceptable for pilot but will need a metadata table at scale
 - BoT-SORT is not implemented in the repo — only ByteTrack exists in `services/inference-worker/tracker.py`. Need to implement or integrate BoT-SORT before promoting it to production
 - Live tracker bake-off still needed — proxy uses MOT17 private detections, not YOLOv8-L on pilot clips. Re-validate recommendation once `data/eval/mot/` is populated
-- BoT-SORT published throughput (6.8 FPS) is ~4x slower than ByteTrack (29.6 FPS) — measure real latency on target GPU stack before committing to BoT-SORT in production
 
 ## Next Steps
 
-21 task(s) ready to launch. Priority:
+20 task(s) ready to launch. Priority:
 - **P2-E03** (End-to-End Stress Test) → codex-cli — unblocks 2 tasks
 - **P2-A01** (Cross-Camera Annotation) → claude-code — unblocks 2 tasks
 - **P3-O01** (Deployment Automation) → codex-cli — unblocks 2 tasks
