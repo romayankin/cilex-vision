@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-09 18:46 (after P2-V03)*
+*Auto-generated after each task. Last updated: 2026-04-09 19:12 (after P2-V05)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 5/16 tasks done. Overall progress: 34/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 6/16 tasks done. Overall progress: 35/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -24,7 +24,6 @@ Complete Intelligence Layer (Phase 2) — 5/16 tasks done. Overall progress: 34/
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
 - **`cameras.config_json` polygon shape is still a convention, not a formal contract**
 - `gen_proto.sh`, `requirements.txt`, `Dockerfile` — standard patterns.
-- White balance as a thin cv2.xphoto wrapper (skip-on-IR pattern)
 
 ## Open Issues
 
@@ -36,11 +35,11 @@ Complete Intelligence Layer (Phase 2) — 5/16 tasks done. Overall progress: 34/
 
 ## Next Steps
 
-20 task(s) ready to launch. Priority:
-- **P2-V05** (Search UI & Timeline) → claude-code — unblocks 3 tasks
+21 task(s) ready to launch. Priority:
 - **P2-E03** (End-to-End Stress Test) → codex-cli — unblocks 2 tasks
 - **P2-A01** (Cross-Camera Annotation) → claude-code — unblocks 2 tasks
 - **P3-O01** (Deployment Automation) → codex-cli — unblocks 2 tasks
 - **P2-O01** (MTMC Infrastructure) → codex-cli — unblocks 1 tasks
 - **P3-V01** (Model Retraining Pipeline) → claude-code — unblocks 1 tasks
+- **P3-V02** (Shadow Deploy Tooling) → codex-cli — unblocks 1 tasks
 
