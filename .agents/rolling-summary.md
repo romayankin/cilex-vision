@@ -1,6 +1,6 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-09 14:26 (after P2-FIX01)*
+*Auto-generated after each task. Last updated: 2026-04-09 17:56 (after P2-V02)*
 
 ## Current Goal
 
@@ -15,14 +15,16 @@ Complete Intelligence Layer (Phase 2) — 2/16 tasks done. Overall progress: 31/
 - Triton EXPLICIT mode — shadow deploy before cutover.
 - Protobuf for all inter-service messages, buf lint in CI.
 - Python str enums as TEXT with CHECK constraints, not native PG ENUMs.
-- Check constraint names follow: ck_{table}_{column}
-- Don't add native PostgreSQL ENUM types — use CHECK constraints instead
 
 ## Key Decisions
 
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- `gen_proto.sh` — Proto generation following inference-worker pattern.
+- FAISS IndexIDMap + metadata dict pattern for filtered vector search
+- This matches the bake-off harness pattern used elsewhere in the repo.
+- This is the same practical pattern used in the bake-off tasks.
 
 ## Open Issues
 
@@ -34,11 +36,14 @@ Complete Intelligence Layer (Phase 2) — 2/16 tasks done. Overall progress: 31/
 
 ## Next Steps
 
-14 task(s) ready to launch. Priority:
-- **P2-V02** (MTMC Re-ID Association Service) → claude-code — unblocks 7 tasks
+1 task(s) in progress:
+- **P2-V02** (MTMC Re-ID Association Service) — branch: feat/P2-V02
+
+13 task(s) ready to launch. Priority:
 - **P2-V05** (Search UI & Timeline) → claude-code — unblocks 3 tasks
 - **P2-V01** (Attribute Extraction Service) → claude-code — unblocks 2 tasks
 - **P2-V03** (Event Engine) → codex-cli — unblocks 2 tasks
 - **P2-A01** (Cross-Camera Annotation) → claude-code — unblocks 2 tasks
 - **P3-O01** (Deployment Automation) → codex-cli — unblocks 2 tasks
+- **P3-V01** (Model Retraining Pipeline) → claude-code — unblocks 1 tasks
 
