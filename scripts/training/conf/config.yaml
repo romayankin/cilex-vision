@@ -1,0 +1,48 @@
+defaults:
+  - _self_
+
+data:
+  train_manifest: data/training/current/train.json
+  val_manifest: data/training/current/val.json
+  test_manifest: data/training/current/test.json
+  num_workers: 4
+  batch_size: 16
+
+model:
+  name: yolov8l
+  pretrained: true
+  num_classes: 7
+  input_size: 640
+  confidence_threshold: 0.40
+
+training:
+  epochs: 100
+  learning_rate: 0.001
+  weight_decay: 0.0005
+  warmup_epochs: 3
+  scheduler: cosine
+  early_stopping_patience: 10
+
+mlflow:
+  tracking_uri: http://localhost:5000
+  experiment_name: detector-retraining
+  run_name: null  # auto-generated if null
+
+evaluation:
+  regression_threshold: 0.02
+  baseline_run_id: null  # MLflow run ID of production baseline
+  operational_threshold: 0.40
+  classes:
+    - person
+    - car
+    - truck
+    - bus
+    - bicycle
+    - motorcycle
+    - animal
+
+export:
+  onnx_opset: 17
+  tensorrt_precision: fp16
+  tensorrt_workspace_mb: 4096
+  output_dir: models/exported
