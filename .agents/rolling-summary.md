@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-09 22:42 (after P2-E03)*
+*Auto-generated after each task. Last updated: 2026-04-10 00:59 (after P2-A01)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 9/16 tasks done. Overall progress: 38/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 39/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -22,8 +22,9 @@ Complete Intelligence Layer (Phase 2) — 9/16 tasks done. Overall progress: 38/
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- `if __name__ == "__main__"` with `try/except SystemExit` pattern
+- `asyncpg` for DB queries in the sampler (matching repo convention)
 - This matches the repo’s existing MinIO usage pattern from attribute-service, decode-service, and MTMC checkpointing.
-- **`cameras.config_json` polygon shape is still a convention, not a formal contract**
 
 ## Open Issues
 
@@ -35,11 +36,11 @@ Complete Intelligence Layer (Phase 2) — 9/16 tasks done. Overall progress: 38/
 
 ## Next Steps
 
-21 task(s) ready to launch. Priority:
-- **P2-A01** (Cross-Camera Annotation) → claude-code — unblocks 2 tasks
+22 task(s) ready to launch. Priority:
 - **P3-O01** (Deployment Automation) → codex-cli — unblocks 2 tasks
 - **P2-X02** (Operations Runbooks) → codex-cli — unblocks 1 tasks
 - **P3-V01** (Model Retraining Pipeline) → claude-code — unblocks 1 tasks
 - **P3-V02** (Shadow Deploy Tooling) → codex-cli — unblocks 1 tasks
 - **P3-V03** (Customer Admin UI) → claude-code — unblocks 1 tasks
+- **P4-V01** (Zone Sharding for Large Sites) → claude-code — unblocks 1 tasks
 
