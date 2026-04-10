@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-10 04:24 (after P4-V01)*
+*Auto-generated after each task. Last updated: 2026-04-10 18:30 (after P2-E01)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 11/16 tasks done. Overall progress: 46/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 12/16 tasks done. Overall progress: 47/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -21,9 +21,9 @@ Complete Intelligence Layer (Phase 2) — 11/16 tasks done. Overall progress: 46
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- MLflow tags follow the existing bake-off pattern:
 - YAML frontmatter on every document (version, status, created_by, date) matching runbook pattern
 - Loading/error/content rendering pattern from P2-V05
-- `if __name__ == "__main__"` with `try/except SystemExit` pattern
 
 ## Open Issues
 
@@ -35,11 +35,11 @@ Complete Intelligence Layer (Phase 2) — 11/16 tasks done. Overall progress: 46
 
 ## Next Steps
 
-24 task(s) ready to launch. Priority:
-- **P2-E01** (Attribute Classifier Bake-Off) → codex-cli
+23 task(s) ready to launch. Priority:
 - **P2-E02** (MTMC Evaluation) → codex-cli
 - **P2-O02** (Storage Tiering) → codex-cli
 - **P2-O03** (Calibration Scheduler) → codex-cli
 - **P2-X01** (API Documentation) → codex-cli
 - **P3-V04** (Adaptive Transit Time) → claude-code
+- **P3-E01** (Retraining Validation) → codex-cli
 
