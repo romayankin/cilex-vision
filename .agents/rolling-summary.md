@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-11 01:14 (after P3-E01)*
+*Auto-generated after each task. Last updated: 2026-04-11 01:32 (after P3-E02)*
 
 ## Current Goal
 
-Complete Maturity (Phase 3) — 7/13 tasks done. Overall progress: 53/70 tasks complete across all phases.
+Complete Maturity (Phase 3) — 8/13 tasks done. Overall progress: 54/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -21,9 +21,9 @@ Complete Maturity (Phase 3) — 7/13 tasks done. Overall progress: 53/70 tasks c
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- Grafana dashboard metadata matches existing repo conventions:
+- PromQL follows existing dashboard/alert conventions:
 - FakePool / FakeConn test pattern from topology conftest.py
-- The new scheduler only changed *how the next camera is chosen* and where
-- MLflow tags follow the existing bake-off pattern:
 
 ## Open Issues
 
@@ -35,11 +35,11 @@ Complete Maturity (Phase 3) — 7/13 tasks done. Overall progress: 53/70 tasks c
 
 ## Next Steps
 
-17 task(s) ready to launch. Priority:
-- **P3-E02** (Shadow Comparison Dashboard) → codex-cli
+16 task(s) ready to launch. Priority:
 - **P3-E03** (Drift Monitoring) → codex-cli
 - **P3-A01** (Continuous Annotation Pipeline) → codex-cli
 - **P3-A02** (Re-ID Training Data Collection) → codex-cli
 - **P3-X02** (Operations Handbook) → claude-code
 - **P3-X03** (Updated Cost Model) → claude-code
+- **P4-V02** (Jetson Edge Agent) → claude-code
 
