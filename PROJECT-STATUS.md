@@ -145,6 +145,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | Task | Title | Branch | What it produced |
 |------|-------|--------|-----------------|
 | P2-FIX01 | Pilot Readiness Fixes | feat/P2-FIX01 | Canonical Kafka topic fixes, inference-worker trace wiring, query-api topology router wiring, and regression tests for those gaps |
+| P2-E01 | Attribute Classifier Bake-Off | feat/P2-E01 | CVAT-to-crop data prep script, attribute bake-off harness with Triton/ONNXRuntime inference and MLflow logging, and a proxy comparison report recommending the safe-default ResNet-18 until real eval data exists |
 | P2-E03 | End-to-End Stress Test | feat/P2-E03 | End-to-end load-test harness with synthetic/replay frame generation, Prometheus snapshot collection, reversible chaos scenarios, and a Markdown NFR report template |
 | P2-O01 | MTMC Infrastructure | feat/P2-O01 | Dedicated `osnet_reid` Triton model config, MTMC Ansible deployment playbook, MTMC Grafana health dashboard, Prometheus alerts, and monitoring scrape wiring |
 | P2-PILOT01 | 4-Camera CPU-Only Pilot Deployment | feat/P2-PILOT01 | Pilot compose stack, YOLOv8n CPU Triton model wiring, setup scripts, camera helpers, pilot Prometheus config, and deployment guide |
@@ -155,7 +156,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P2-V04 | Clip Pipeline | feat/P2-V04 | Clip-service consuming closed `events.raw` records, FFmpeg H.264 baseline clip extraction, thumbnail generation, MinIO upload, PostgreSQL asset updates, Dockerfile, strict mypy config, and 6 tests |
 | P2-V05 | Search UI & Timeline | feat/P2-V05 | Next.js frontend with search, camera timeline, cross-camera journey, admin views, API proxy client, HLS/MP4 playback, and standalone Docker packaging |
 
-### Phase 2 — Pending (5 tasks remaining)
+### Phase 2 — Pending (4 tasks remaining)
 
 ### Phase 3 — Completed
 | Task | Title | Branch | What it produced |
@@ -212,6 +213,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 ## Documents Generated
 | File | Pages | Contents |
 |------|-------|---------|
+| docs/bakeoff-results/attribute-comparison.md | — | Proxy attribute bake-off report documenting the safe-default recommendation until real CVAT evaluation data and candidate artifacts exist |
 | cilex-vision-pipeline-reference.pdf | 35 | Core pipeline: 20 components with clickable diagram |
 | cilex-vision-pipeline-reference-ru.pdf | 25 | Russian translation of pipeline reference |
 | cilex-vision-supporting-systems.pdf | 19 | Supporting systems: 13 components (CONDENSED — needs full rebuild) |

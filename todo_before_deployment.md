@@ -60,6 +60,11 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `infra/prometheus/prometheus.pilot.yml` still scrapes only the original pilot services plus Triton. If attribute-service, event-engine, clip-service, or mtmc-service are deployed for a full Phase 2 pilot, add scrape targets before expecting complete end-to-end stress-test coverage
 - [ ] The repo still has no committed replay media corpus for realistic event / clip / MTMC-heavy stress runs. Operators must currently provide `--replay-frame-dir` inputs out-of-band for those scenarios
 
+## Attribute Bake-Off Gaps (P2-E01)
+
+- [ ] `data/eval/attribute/manifest.json` is still absent in the repo, so `scripts/bakeoff/run_attribute_bakeoff.py` cannot produce a real comparison yet. Annotated `attribute-eval` CVAT tasks still need to be exported with `scripts/bakeoff/prepare_color_eval_data.py`
+- [ ] The repository still has no committed `artifacts/models/attribute/efficientnet_b0.onnx` export, so the EfficientNet-B0 challenger path remains evaluation-ready in code only
+
 ## Operations Runbook Gaps (P2-X02)
 
 - [ ] `attribute-service`, `event-engine`, and `clip-service` do not have a standard host-reachable `/health` or `/ready` contract in the shared deployment path. Operators currently have to rely on container logs and Prometheus scrape presence during restart verification
