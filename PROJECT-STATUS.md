@@ -158,8 +158,9 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P2-V03 | Event Engine | feat/P2-V03 | Event-engine service with per-track FSMs, Kafka + PostgreSQL event publishing, ROI / loitering polygon parsing from camera config, Dockerfile, strict mypy config, and 14 tests |
 | P2-V04 | Clip Pipeline | feat/P2-V04 | Clip-service consuming closed `events.raw` records, FFmpeg H.264 baseline clip extraction, thumbnail generation, MinIO upload, PostgreSQL asset updates, Dockerfile, strict mypy config, and 6 tests |
 | P2-V05 | Search UI & Timeline | feat/P2-V05 | Next.js frontend with search, camera timeline, cross-camera journey, admin views, API proxy client, HLS/MP4 playback, and standalone Docker packaging |
+| P2-X01 | API Documentation | feat/P2-X01 | Auto-generated Query API OpenAPI YAML, API README, runnable curl/Python examples, Postman collection generator, and committed Postman collection for the current FastAPI route surface |
 
-### Phase 2 — Pending (1 task remaining)
+### Phase 2 — Pending (0 tasks remaining)
 
 ### Phase 3 — Completed
 | Task | Title | Branch | What it produced |
@@ -230,6 +231,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | cilex-vision-tech-stack.pdf | 16 | Tech stack (38 technologies) |
 | camera-comparison.pdf | — | Camera comparison EN + RU |
 | docs/runbooks/{incident-response,scaling,backup-restore,camera-onboarding,service-restart}.md | — | Phase 2 operator runbooks for alert response, capacity changes, backup and restore, camera onboarding, and controlled restarts |
+| docs/api/{openapi.yaml,README.md,postman-collection.json} | — | Auto-generated Query API contract plus operator-facing authentication, pagination, signed-URL, and Postman usage guide |
 
 ---
 

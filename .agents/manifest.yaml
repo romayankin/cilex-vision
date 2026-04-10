@@ -458,9 +458,9 @@ phases:
       title: API Documentation
       depends_on:
       - P2-V05
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P2-X01
       prompt: .agents/prompts/P2-X01.md
       tool: codex-cli
     - id: P2-X02

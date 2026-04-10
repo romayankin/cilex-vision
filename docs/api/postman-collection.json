@@ -1,0 +1,1713 @@
+{
+  "info": {
+    "name": "Cilex Vision Query API",
+    "description": "Read-oriented API for detections, tracks, events, site topology, and engineering debug traces. This document is generated from the real FastAPI app and patched with auth and public-endpoint metadata.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "access_token",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{access_token}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "cookie",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "access_token",
+      "value": "PASTE_JWT_HERE"
+    }
+  ],
+  "item": [
+    {
+      "name": "debug",
+      "item": [
+        {
+          "name": "List Debug Traces",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "List debug traces from MinIO with signed URLs.\n\nRequired roles: `engineering`, `admin`. Admin bypasses camera scope; detections, tracks, and events apply non-admin `camera_scope` filtering.",
+            "url": {
+              "raw": "{{base_url}}/debug/traces?camera_id=cam-01&start=2026-04-10&end=2026-04-10&track_id=00000000-0000-0000-0000-000000000001&limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "debug",
+                "traces"
+              ],
+              "query": [
+                {
+                  "key": "camera_id",
+                  "value": "cam-01",
+                  "description": "Camera ID (required)"
+                },
+                {
+                  "key": "start",
+                  "value": "2026-04-10",
+                  "description": "Start date inclusive (YYYY-MM-DD)"
+                },
+                {
+                  "key": "end",
+                  "value": "2026-04-10",
+                  "description": "End date inclusive (YYYY-MM-DD)"
+                },
+                {
+                  "key": "track_id",
+                  "value": "00000000-0000-0000-0000-000000000001",
+                  "description": "Filter by track ID"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/debug/traces"
+                }
+              },
+              "status": "Successful Response",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"traces\": [\n    {\n      \"trace_id\": \"string\",\n      \"camera_id\": \"string\",\n      \"date\": \"string\",\n      \"url\": \"string\",\n      \"size_bytes\": 0\n    }\n  ],\n  \"total\": 0\n}"
+            },
+            {
+              "name": "Validation Error",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/debug/traces"
+                }
+              },
+              "status": "Validation Error",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\",\n      \"input\": {},\n      \"ctx\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing, expired, or invalid access token.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/debug/traces"
+                }
+              },
+              "status": "Missing, expired, or invalid access token.",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Authentication required\"\n}"
+            },
+            {
+              "name": "Authenticated user does not have the required role or scope.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/debug/traces"
+                }
+              },
+              "status": "Authenticated user does not have the required role or scope.",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Role 'viewer' not authorized for this resource\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Debug Trace",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Fetch full debug trace JSON from MinIO.\n\nRequired roles: `engineering`, `admin`. Admin bypasses camera scope; detections, tracks, and events apply non-admin `camera_scope` filtering.",
+            "url": {
+              "raw": "{{base_url}}/debug/traces/:trace_id?camera_id=cam-01&date=2026-04-10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "debug",
+                "traces",
+                ":trace_id"
+              ],
+              "query": [
+                {
+                  "key": "camera_id",
+                  "value": "cam-01",
+                  "description": "Camera ID"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-04-10",
+                  "description": "Trace date (YYYY-MM-DD)"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "trace_id",
+                  "value": "trace-20260410-0001"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/debug/traces/{trace_id}"
+                }
+              },
+              "status": "Successful Response",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{}"
+            },
+            {
+              "name": "Validation Error",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/debug/traces/{trace_id}"
+                }
+              },
+              "status": "Validation Error",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\",\n      \"input\": {},\n      \"ctx\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing, expired, or invalid access token.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/debug/traces/{trace_id}"
+                }
+              },
+              "status": "Missing, expired, or invalid access token.",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Authentication required\"\n}"
+            },
+            {
+              "name": "Authenticated user does not have the required role or scope.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/debug/traces/{trace_id}"
+                }
+              },
+              "status": "Authenticated user does not have the required role or scope.",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Role 'viewer' not authorized for this resource\"\n}"
+            },
+            {
+              "name": "Requested resource was not found.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/debug/traces/{trace_id}"
+                }
+              },
+              "status": "Requested resource was not found.",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Track 00000000-0000-0000-0000-000000000001 not found\"\n}"
+            },
+            {
+              "name": "A required backing dependency is unavailable.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/debug/traces/{trace_id}"
+                }
+              },
+              "status": "A required backing dependency is unavailable.",
+              "code": 503,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Database not available\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "detections",
+      "item": [
+        {
+          "name": "List Detections",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Query detections with filtering and pagination.\n\nRequired roles: `admin`, `operator`, `viewer`, `engineering`. Admin bypasses camera scope; detections, tracks, and events apply non-admin `camera_scope` filtering.",
+            "url": {
+              "raw": "{{base_url}}/detections?camera_id=cam-01&start=2026-04-10T00:00:00Z&end=2026-04-10T23:59:59Z&class=person&min_confidence=0.6&offset=0&limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "detections"
+              ],
+              "query": [
+                {
+                  "key": "camera_id",
+                  "value": "cam-01",
+                  "description": "Filter by camera ID"
+                },
+                {
+                  "key": "start",
+                  "value": "2026-04-10T00:00:00Z",
+                  "description": "Start time (inclusive)"
+                },
+                {
+                  "key": "end",
+                  "value": "2026-04-10T23:59:59Z",
+                  "description": "End time (exclusive)"
+                },
+                {
+                  "key": "class",
+                  "value": "person",
+                  "description": "Filter by object class"
+                },
+                {
+                  "key": "min_confidence",
+                  "value": "0.6",
+                  "description": "Minimum confidence"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/detections"
+                }
+              },
+              "status": "Successful Response",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detections\": [\n    {\n      \"time\": \"2026-04-10T00:00:00Z\",\n      \"camera_id\": \"string\",\n      \"frame_seq\": 0,\n      \"object_class\": \"string\",\n      \"confidence\": 0.0,\n      \"bbox\": {\n        \"x\": 0.0,\n        \"y\": 0.0,\n        \"w\": 0.0,\n        \"h\": 0.0\n      },\n      \"local_track_id\": \"string\",\n      \"model_version\": \"string\"\n    }\n  ],\n  \"total\": 0,\n  \"offset\": 0,\n  \"limit\": 0\n}"
+            },
+            {
+              "name": "Validation Error",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/detections"
+                }
+              },
+              "status": "Validation Error",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\",\n      \"input\": {},\n      \"ctx\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing, expired, or invalid access token.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/detections"
+                }
+              },
+              "status": "Missing, expired, or invalid access token.",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Authentication required\"\n}"
+            },
+            {
+              "name": "Authenticated user does not have the required role or scope.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/detections"
+                }
+              },
+              "status": "Authenticated user does not have the required role or scope.",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Role 'viewer' not authorized for this resource\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "events",
+      "item": [
+        {
+          "name": "List Events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Query events with filtering and pagination.\n\nRequired roles: `admin`, `operator`, `viewer`. Admin bypasses camera scope; detections, tracks, and events apply non-admin `camera_scope` filtering.",
+            "url": {
+              "raw": "{{base_url}}/events?site_id=11111111-1111-1111-1111-111111111111&camera_id=cam-01&start=2026-04-10T00:00:00Z&end=2026-04-10T23:59:59Z&event_type=entered_scene&state=closed&offset=0&limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "site_id",
+                  "value": "11111111-1111-1111-1111-111111111111",
+                  "description": "Filter by site ID"
+                },
+                {
+                  "key": "camera_id",
+                  "value": "cam-01",
+                  "description": "Filter by camera ID"
+                },
+                {
+                  "key": "start",
+                  "value": "2026-04-10T00:00:00Z",
+                  "description": "Events starting after this time"
+                },
+                {
+                  "key": "end",
+                  "value": "2026-04-10T23:59:59Z",
+                  "description": "Events starting before this time"
+                },
+                {
+                  "key": "event_type",
+                  "value": "entered_scene",
+                  "description": "Filter by event type"
+                },
+                {
+                  "key": "state",
+                  "value": "closed",
+                  "description": "Filter by event state"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/events"
+                }
+              },
+              "status": "Successful Response",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"events\": [\n    {\n      \"event_id\": \"string\",\n      \"event_type\": \"string\",\n      \"track_id\": \"string\",\n      \"camera_id\": \"string\",\n      \"start_time\": \"2026-04-10T00:00:00Z\",\n      \"end_time\": \"2026-04-10T00:00:00Z\",\n      \"duration_ms\": 0,\n      \"clip_url\": \"string\",\n      \"state\": \"string\",\n      \"metadata\": {},\n      \"source_capture_ts\": \"2026-04-10T00:00:00Z\",\n      \"edge_receive_ts\": \"2026-04-10T00:00:00Z\",\n      \"core_ingest_ts\": \"2026-04-10T00:00:00Z\"\n    }\n  ],\n  \"total\": 0,\n  \"offset\": 0,\n  \"limit\": 0\n}"
+            },
+            {
+              "name": "Validation Error",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/events"
+                }
+              },
+              "status": "Validation Error",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\",\n      \"input\": {},\n      \"ctx\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing, expired, or invalid access token.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/events"
+                }
+              },
+              "status": "Missing, expired, or invalid access token.",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Authentication required\"\n}"
+            },
+            {
+              "name": "Authenticated user does not have the required role or scope.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/events"
+                }
+              },
+              "status": "Authenticated user does not have the required role or scope.",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Role 'viewer' not authorized for this resource\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Liveness probe for the Query API.",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/health"
+                }
+              },
+              "status": "Successful Response",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{}"
+            }
+          ]
+        },
+        {
+          "name": "Ready",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Readiness probe that verifies database connectivity.",
+            "url": {
+              "raw": "{{base_url}}/ready",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ready"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/ready"
+                }
+              },
+              "status": "Successful Response",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{}"
+            }
+          ]
+        },
+        {
+          "name": "Metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Prometheus text exposition for Query API metrics.",
+            "url": {
+              "raw": "{{base_url}}/metrics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "metrics"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [
+            {
+              "name": "Prometheus metrics payload.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/metrics"
+                }
+              },
+              "status": "Prometheus metrics payload.",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain"
+                }
+              ],
+              "body": "# HELP query_requests_total Total API requests by endpoint and method\n# TYPE query_requests_total counter\nquery_requests_total{endpoint=\"/detections\",method=\"GET\",status=\"200\"} 42\n"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "topology",
+      "item": [
+        {
+          "name": "Get Topology",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Return the full topology graph for a site.\n\nRequired roles: `admin`, `operator`. Admin bypasses camera scope; detections, tracks, and events apply non-admin `camera_scope` filtering.",
+            "url": {
+              "raw": "{{base_url}}/topology/:site_id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "topology",
+                ":site_id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "site_id",
+                  "value": "11111111-1111-1111-1111-111111111111"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}"
+                }
+              },
+              "status": "Successful Response",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"site_id\": \"string\",\n  \"cameras\": [\n    {\n      \"camera_id\": \"string\",\n      \"site_id\": \"string\",\n      \"name\": \"string\",\n      \"zone_id\": \"string\",\n      \"latitude\": 0.0,\n      \"longitude\": 0.0,\n      \"status\": \"offline\",\n      \"location_description\": \"string\"\n    }\n  ],\n  \"edges\": [\n    {\n      \"edge_id\": \"string\",\n      \"camera_a_id\": \"string\",\n      \"camera_b_id\": \"string\",\n      \"transition_time_s\": 0.0,\n      \"confidence\": 1.0,\n      \"enabled\": true,\n      \"transit_distributions\": [\n        {\n          \"object_class\": \"string\",\n          \"p50_ms\": 0.0,\n          \"p90_ms\": 0.0,\n          \"p99_ms\": 0.0,\n          \"sample_count\": 0,\n          \"last_updated\": \"2026-04-10T00:00:00Z\"\n        }\n      ]\n    }\n  ]\n}"
+            },
+            {
+              "name": "Validation Error",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}"
+                }
+              },
+              "status": "Validation Error",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\",\n      \"input\": {},\n      \"ctx\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing, expired, or invalid access token.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}"
+                }
+              },
+              "status": "Missing, expired, or invalid access token.",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Authentication required\"\n}"
+            },
+            {
+              "name": "Authenticated user does not have the required role or scope.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}"
+                }
+              },
+              "status": "Authenticated user does not have the required role or scope.",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Role 'viewer' not authorized for this resource\"\n}"
+            },
+            {
+              "name": "A required backing dependency is unavailable.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}"
+                }
+              },
+              "status": "A required backing dependency is unavailable.",
+              "code": 503,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Database not available\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Upsert Edge",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Create or update a topology edge between two cameras.\n\nIf an edge already exists between the same camera pair, its values\nare updated.  Otherwise a new edge is inserted.\n\nRequired roles: `admin`. Admin bypasses camera scope; detections, tracks, and events apply non-admin `camera_scope` filtering.",
+            "url": {
+              "raw": "{{base_url}}/topology/:site_id/edges",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "topology",
+                ":site_id",
+                "edges"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "site_id",
+                  "value": "11111111-1111-1111-1111-111111111111"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"camera_a_id\": \"cam-entrance\",\n  \"camera_b_id\": \"cam-lobby\",\n  \"transition_time_s\": 12.0,\n  \"confidence\": 0.95,\n  \"enabled\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/edges"
+                }
+              },
+              "status": "Successful Response",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"edge_id\": \"string\",\n  \"camera_a_id\": \"string\",\n  \"camera_b_id\": \"string\",\n  \"transition_time_s\": 0.0,\n  \"confidence\": 1.0,\n  \"enabled\": true,\n  \"transit_distributions\": [\n    {\n      \"object_class\": \"string\",\n      \"p50_ms\": 0.0,\n      \"p90_ms\": 0.0,\n      \"p99_ms\": 0.0,\n      \"sample_count\": 0,\n      \"last_updated\": \"2026-04-10T00:00:00Z\"\n    }\n  ]\n}"
+            },
+            {
+              "name": "Validation Error",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/edges"
+                }
+              },
+              "status": "Validation Error",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\",\n      \"input\": {},\n      \"ctx\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing, expired, or invalid access token.",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/edges"
+                }
+              },
+              "status": "Missing, expired, or invalid access token.",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Authentication required\"\n}"
+            },
+            {
+              "name": "Authenticated user does not have the required role or scope.",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/edges"
+                }
+              },
+              "status": "Authenticated user does not have the required role or scope.",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Role 'viewer' not authorized for this resource\"\n}"
+            },
+            {
+              "name": "Requested resource was not found.",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/edges"
+                }
+              },
+              "status": "Requested resource was not found.",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Track 00000000-0000-0000-0000-000000000001 not found\"\n}"
+            },
+            {
+              "name": "A required backing dependency is unavailable.",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/edges"
+                }
+              },
+              "status": "A required backing dependency is unavailable.",
+              "code": 503,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Database not available\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Add Camera",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Add a camera to a site.\n\nRequired roles: `admin`. Admin bypasses camera scope; detections, tracks, and events apply non-admin `camera_scope` filtering.",
+            "url": {
+              "raw": "{{base_url}}/topology/:site_id/cameras",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "topology",
+                ":site_id",
+                "cameras"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "site_id",
+                  "value": "11111111-1111-1111-1111-111111111111"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"camera_id\": \"cam-lobby\",\n  \"name\": \"Lobby Camera\",\n  \"zone_id\": \"lobby\",\n  \"latitude\": 55.7522,\n  \"longitude\": 37.6156,\n  \"location_description\": \"Main lobby entrance\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras"
+                }
+              },
+              "status": "Successful Response",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"camera_id\": \"string\",\n  \"site_id\": \"string\",\n  \"name\": \"string\",\n  \"zone_id\": \"string\",\n  \"latitude\": 0.0,\n  \"longitude\": 0.0,\n  \"status\": \"offline\",\n  \"location_description\": \"string\"\n}"
+            },
+            {
+              "name": "Validation Error",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras"
+                }
+              },
+              "status": "Validation Error",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\",\n      \"input\": {},\n      \"ctx\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing, expired, or invalid access token.",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras"
+                }
+              },
+              "status": "Missing, expired, or invalid access token.",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Authentication required\"\n}"
+            },
+            {
+              "name": "Authenticated user does not have the required role or scope.",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras"
+                }
+              },
+              "status": "Authenticated user does not have the required role or scope.",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Role 'viewer' not authorized for this resource\"\n}"
+            },
+            {
+              "name": "Requested resource was not found.",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras"
+                }
+              },
+              "status": "Requested resource was not found.",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Track 00000000-0000-0000-0000-000000000001 not found\"\n}"
+            },
+            {
+              "name": "Request conflicts with an existing resource.",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras"
+                }
+              },
+              "status": "Request conflicts with an existing resource.",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Camera cam-lobby already exists\"\n}"
+            },
+            {
+              "name": "A required backing dependency is unavailable.",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras"
+                }
+              },
+              "status": "A required backing dependency is unavailable.",
+              "code": 503,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Database not available\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Remove Camera",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Remove a camera from a site.\n\nAlso deletes all topology edges that reference the camera.\n\nRequired roles: `admin`. Admin bypasses camera scope; detections, tracks, and events apply non-admin `camera_scope` filtering.",
+            "url": {
+              "raw": "{{base_url}}/topology/:site_id/cameras/:camera_id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "topology",
+                ":site_id",
+                "cameras",
+                ":camera_id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "site_id",
+                  "value": "11111111-1111-1111-1111-111111111111"
+                },
+                {
+                  "key": "camera_id",
+                  "value": "cam-lobby"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras/{camera_id}"
+                }
+              },
+              "status": "Successful Response",
+              "code": 204,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "body": ""
+            },
+            {
+              "name": "Validation Error",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras/{camera_id}"
+                }
+              },
+              "status": "Validation Error",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\",\n      \"input\": {},\n      \"ctx\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing, expired, or invalid access token.",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras/{camera_id}"
+                }
+              },
+              "status": "Missing, expired, or invalid access token.",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Authentication required\"\n}"
+            },
+            {
+              "name": "Authenticated user does not have the required role or scope.",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras/{camera_id}"
+                }
+              },
+              "status": "Authenticated user does not have the required role or scope.",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Role 'viewer' not authorized for this resource\"\n}"
+            },
+            {
+              "name": "Requested resource was not found.",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras/{camera_id}"
+                }
+              },
+              "status": "Requested resource was not found.",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Track 00000000-0000-0000-0000-000000000001 not found\"\n}"
+            },
+            {
+              "name": "A required backing dependency is unavailable.",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/topology/{site_id}/cameras/{camera_id}"
+                }
+              },
+              "status": "A required backing dependency is unavailable.",
+              "code": 503,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Database not available\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tracks",
+      "item": [
+        {
+          "name": "List Tracks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Query local tracks with filtering and pagination.\n\nRequired roles: `admin`, `operator`, `viewer`, `engineering`. Admin bypasses camera scope; detections, tracks, and events apply non-admin `camera_scope` filtering.",
+            "url": {
+              "raw": "{{base_url}}/tracks?camera_id=cam-01&start=2026-04-10T00:00:00Z&end=2026-04-10T23:59:59Z&class=person&state=active&offset=0&limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tracks"
+              ],
+              "query": [
+                {
+                  "key": "camera_id",
+                  "value": "cam-01",
+                  "description": "Filter by camera ID"
+                },
+                {
+                  "key": "start",
+                  "value": "2026-04-10T00:00:00Z",
+                  "description": "Tracks starting after this time"
+                },
+                {
+                  "key": "end",
+                  "value": "2026-04-10T23:59:59Z",
+                  "description": "Tracks starting before this time"
+                },
+                {
+                  "key": "class",
+                  "value": "person",
+                  "description": "Filter by object class"
+                },
+                {
+                  "key": "state",
+                  "value": "active",
+                  "description": "Filter by track state"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": ""
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tracks"
+                }
+              },
+              "status": "Successful Response",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"tracks\": [\n    {\n      \"local_track_id\": \"string\",\n      \"camera_id\": \"string\",\n      \"object_class\": \"string\",\n      \"state\": \"string\",\n      \"mean_confidence\": 0.0,\n      \"start_time\": \"2026-04-10T00:00:00Z\",\n      \"end_time\": \"2026-04-10T00:00:00Z\",\n      \"tracker_version\": \"string\",\n      \"created_at\": \"2026-04-10T00:00:00Z\"\n    }\n  ],\n  \"total\": 0,\n  \"offset\": 0,\n  \"limit\": 0\n}"
+            },
+            {
+              "name": "Validation Error",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tracks"
+                }
+              },
+              "status": "Validation Error",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\",\n      \"input\": {},\n      \"ctx\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing, expired, or invalid access token.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tracks"
+                }
+              },
+              "status": "Missing, expired, or invalid access token.",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Authentication required\"\n}"
+            },
+            {
+              "name": "Authenticated user does not have the required role or scope.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tracks"
+                }
+              },
+              "status": "Authenticated user does not have the required role or scope.",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Role 'viewer' not authorized for this resource\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Track Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Get track detail with attributes and thumbnail URL.\n\nRequired roles: `admin`, `operator`, `viewer`, `engineering`. Admin bypasses camera scope; detections, tracks, and events apply non-admin `camera_scope` filtering.",
+            "url": {
+              "raw": "{{base_url}}/tracks/:local_track_id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tracks",
+                ":local_track_id"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "local_track_id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Successful Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tracks/{local_track_id}"
+                }
+              },
+              "status": "Successful Response",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"local_track_id\": \"string\",\n  \"camera_id\": \"string\",\n  \"object_class\": \"string\",\n  \"state\": \"string\",\n  \"mean_confidence\": 0.0,\n  \"start_time\": \"2026-04-10T00:00:00Z\",\n  \"end_time\": \"2026-04-10T00:00:00Z\",\n  \"tracker_version\": \"string\",\n  \"created_at\": \"2026-04-10T00:00:00Z\",\n  \"attributes\": [\n    {\n      \"attribute_id\": \"string\",\n      \"attribute_type\": \"string\",\n      \"color_value\": \"string\",\n      \"confidence\": 0.0,\n      \"model_version\": \"string\",\n      \"observed_at\": \"2026-04-10T00:00:00Z\"\n    }\n  ],\n  \"thumbnail_url\": \"string\"\n}"
+            },
+            {
+              "name": "Validation Error",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tracks/{local_track_id}"
+                }
+              },
+              "status": "Validation Error",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\"\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\",\n      \"input\": {},\n      \"ctx\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing, expired, or invalid access token.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tracks/{local_track_id}"
+                }
+              },
+              "status": "Missing, expired, or invalid access token.",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Authentication required\"\n}"
+            },
+            {
+              "name": "Authenticated user does not have the required role or scope.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tracks/{local_track_id}"
+                }
+              },
+              "status": "Authenticated user does not have the required role or scope.",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Role 'viewer' not authorized for this resource\"\n}"
+            },
+            {
+              "name": "Requested resource was not found.",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tracks/{local_track_id}"
+                }
+              },
+              "status": "Requested resource was not found.",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Track 00000000-0000-0000-0000-000000000001 not found\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1676 @@
+openapi: 3.1.0
+info:
+  title: Cilex Vision Query API
+  description: Read-oriented API for detections, tracks, events, site topology, and
+    engineering debug traces. This document is generated from the real FastAPI app
+    and patched with auth and public-endpoint metadata.
+  version: 1.0.0
+paths:
+  /detections:
+    get:
+      tags:
+      - detections
+      summary: List Detections
+      description: 'Query detections with filtering and pagination.
+
+
+        Required roles: `admin`, `operator`, `viewer`, `engineering`. Admin bypasses
+        camera scope; detections, tracks, and events apply non-admin `camera_scope`
+        filtering.'
+      operationId: list_detections_detections_get
+      parameters:
+      - name: camera_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by camera ID
+          title: Camera Id
+        description: Filter by camera ID
+        example: cam-01
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Start time (inclusive)
+          title: Start
+        description: Start time (inclusive)
+        example: '2026-04-10T00:00:00Z'
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: End time (exclusive)
+          title: End
+        description: End time (exclusive)
+        example: '2026-04-10T23:59:59Z'
+      - name: class
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by object class
+          title: Class
+        description: Filter by object class
+        example: person
+      - name: min_confidence
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: number
+            maximum: 1.0
+            minimum: 0.0
+          - type: 'null'
+          description: Minimum confidence
+          title: Min Confidence
+        description: Minimum confidence
+        example: 0.6
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+        example: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 50
+          title: Limit
+        example: 10
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetectionListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing, expired, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Authentication required
+        '403':
+          description: Authenticated user does not have the required role or scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Role 'viewer' not authorized for this resource
+      security:
+      - cookieAuth: []
+      x-cilex-allowed-roles:
+      - admin
+      - operator
+      - viewer
+      - engineering
+  /tracks:
+    get:
+      tags:
+      - tracks
+      summary: List Tracks
+      description: 'Query local tracks with filtering and pagination.
+
+
+        Required roles: `admin`, `operator`, `viewer`, `engineering`. Admin bypasses
+        camera scope; detections, tracks, and events apply non-admin `camera_scope`
+        filtering.'
+      operationId: list_tracks_tracks_get
+      parameters:
+      - name: camera_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by camera ID
+          title: Camera Id
+        description: Filter by camera ID
+        example: cam-01
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Tracks starting after this time
+          title: Start
+        description: Tracks starting after this time
+        example: '2026-04-10T00:00:00Z'
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Tracks starting before this time
+          title: End
+        description: Tracks starting before this time
+        example: '2026-04-10T23:59:59Z'
+      - name: class
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by object class
+          title: Class
+        description: Filter by object class
+        example: person
+      - name: state
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by track state
+          title: State
+        description: Filter by track state
+        example: active
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+        example: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 50
+          title: Limit
+        example: 10
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing, expired, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Authentication required
+        '403':
+          description: Authenticated user does not have the required role or scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Role 'viewer' not authorized for this resource
+      security:
+      - cookieAuth: []
+      x-cilex-allowed-roles:
+      - admin
+      - operator
+      - viewer
+      - engineering
+  /tracks/{local_track_id}:
+    get:
+      tags:
+      - tracks
+      summary: Get Track Detail
+      description: 'Get track detail with attributes and thumbnail URL.
+
+
+        Required roles: `admin`, `operator`, `viewer`, `engineering`. Admin bypasses
+        camera scope; detections, tracks, and events apply non-admin `camera_scope`
+        filtering.'
+      operationId: get_track_detail_tracks__local_track_id__get
+      parameters:
+      - name: local_track_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Local Track Id
+        example: 00000000-0000-0000-0000-000000000001
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackDetailResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing, expired, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Authentication required
+        '403':
+          description: Authenticated user does not have the required role or scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Role 'viewer' not authorized for this resource
+        '404':
+          description: Requested resource was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Track 00000000-0000-0000-0000-000000000001 not found
+      security:
+      - cookieAuth: []
+      x-cilex-allowed-roles:
+      - admin
+      - operator
+      - viewer
+      - engineering
+  /events:
+    get:
+      tags:
+      - events
+      summary: List Events
+      description: 'Query events with filtering and pagination.
+
+
+        Required roles: `admin`, `operator`, `viewer`. Admin bypasses camera scope;
+        detections, tracks, and events apply non-admin `camera_scope` filtering.'
+      operationId: list_events_events_get
+      parameters:
+      - name: site_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by site ID
+          title: Site Id
+        description: Filter by site ID
+        example: 11111111-1111-1111-1111-111111111111
+      - name: camera_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by camera ID
+          title: Camera Id
+        description: Filter by camera ID
+        example: cam-01
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Events starting after this time
+          title: Start
+        description: Events starting after this time
+        example: '2026-04-10T00:00:00Z'
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Events starting before this time
+          title: End
+        description: Events starting before this time
+        example: '2026-04-10T23:59:59Z'
+      - name: event_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by event type
+          title: Event Type
+        description: Filter by event type
+        example: entered_scene
+      - name: state
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by event state
+          title: State
+        description: Filter by event state
+        example: closed
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+        example: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 50
+          title: Limit
+        example: 10
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing, expired, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Authentication required
+        '403':
+          description: Authenticated user does not have the required role or scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Role 'viewer' not authorized for this resource
+      security:
+      - cookieAuth: []
+      x-cilex-allowed-roles:
+      - admin
+      - operator
+      - viewer
+  /debug/traces:
+    get:
+      tags:
+      - debug
+      summary: List Debug Traces
+      description: 'List debug traces from MinIO with signed URLs.
+
+
+        Required roles: `engineering`, `admin`. Admin bypasses camera scope; detections,
+        tracks, and events apply non-admin `camera_scope` filtering.'
+      operationId: list_debug_traces_debug_traces_get
+      parameters:
+      - name: camera_id
+        in: query
+        required: true
+        schema:
+          type: string
+          description: Camera ID (required)
+          title: Camera Id
+        description: Camera ID (required)
+        example: cam-01
+      - name: start
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Start date inclusive (YYYY-MM-DD)
+          title: Start
+        description: Start date inclusive (YYYY-MM-DD)
+        example: '2026-04-10'
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: End date inclusive (YYYY-MM-DD)
+          title: End
+        description: End date inclusive (YYYY-MM-DD)
+        example: '2026-04-10'
+      - name: track_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filter by track ID
+          title: Track Id
+        description: Filter by track ID
+        example: 00000000-0000-0000-0000-000000000001
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 50
+          title: Limit
+        example: 10
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebugTraceListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing, expired, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Authentication required
+        '403':
+          description: Authenticated user does not have the required role or scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Role 'viewer' not authorized for this resource
+      security:
+      - cookieAuth: []
+      x-cilex-allowed-roles:
+      - engineering
+      - admin
+  /debug/traces/{trace_id}:
+    get:
+      tags:
+      - debug
+      summary: Get Debug Trace
+      description: 'Fetch full debug trace JSON from MinIO.
+
+
+        Required roles: `engineering`, `admin`. Admin bypasses camera scope; detections,
+        tracks, and events apply non-admin `camera_scope` filtering.'
+      operationId: get_debug_trace_debug_traces__trace_id__get
+      parameters:
+      - name: trace_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Trace Id
+        example: trace-20260410-0001
+      - name: camera_id
+        in: query
+        required: true
+        schema:
+          type: string
+          description: Camera ID
+          title: Camera Id
+        description: Camera ID
+        example: cam-01
+      - name: date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Trace date (YYYY-MM-DD)
+          title: Date
+        description: Trace date (YYYY-MM-DD)
+        example: '2026-04-10'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Get Debug Trace Debug Traces  Trace Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing, expired, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Authentication required
+        '403':
+          description: Authenticated user does not have the required role or scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Role 'viewer' not authorized for this resource
+        '404':
+          description: Requested resource was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Track 00000000-0000-0000-0000-000000000001 not found
+        '503':
+          description: A required backing dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Database not available
+      security:
+      - cookieAuth: []
+      x-cilex-allowed-roles:
+      - engineering
+      - admin
+  /topology/{site_id}:
+    get:
+      tags:
+      - topology
+      summary: Get Topology
+      description: 'Return the full topology graph for a site.
+
+
+        Required roles: `admin`, `operator`. Admin bypasses camera scope; detections,
+        tracks, and events apply non-admin `camera_scope` filtering.'
+      operationId: get_topology_topology__site_id__get
+      parameters:
+      - name: site_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Site Id
+        example: 11111111-1111-1111-1111-111111111111
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyGraph'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing, expired, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Authentication required
+        '403':
+          description: Authenticated user does not have the required role or scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Role 'viewer' not authorized for this resource
+        '503':
+          description: A required backing dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Database not available
+      security:
+      - cookieAuth: []
+      x-cilex-allowed-roles:
+      - admin
+      - operator
+  /topology/{site_id}/edges:
+    put:
+      tags:
+      - topology
+      summary: Upsert Edge
+      description: 'Create or update a topology edge between two cameras.
+
+
+        If an edge already exists between the same camera pair, its values
+
+        are updated.  Otherwise a new edge is inserted.
+
+
+        Required roles: `admin`. Admin bypasses camera scope; detections, tracks,
+        and events apply non-admin `camera_scope` filtering.'
+      operationId: upsert_edge_topology__site_id__edges_put
+      parameters:
+      - name: site_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Site Id
+        example: 11111111-1111-1111-1111-111111111111
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EdgeCreateRequest'
+            example:
+              camera_a_id: cam-entrance
+              camera_b_id: cam-lobby
+              transition_time_s: 12.0
+              confidence: 0.95
+              enabled: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransitionEdge'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing, expired, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Authentication required
+        '403':
+          description: Authenticated user does not have the required role or scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Role 'viewer' not authorized for this resource
+        '404':
+          description: Requested resource was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Track 00000000-0000-0000-0000-000000000001 not found
+        '503':
+          description: A required backing dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Database not available
+      security:
+      - cookieAuth: []
+      x-cilex-allowed-roles:
+      - admin
+  /topology/{site_id}/cameras:
+    post:
+      tags:
+      - topology
+      summary: Add Camera
+      description: 'Add a camera to a site.
+
+
+        Required roles: `admin`. Admin bypasses camera scope; detections, tracks,
+        and events apply non-admin `camera_scope` filtering.'
+      operationId: add_camera_topology__site_id__cameras_post
+      parameters:
+      - name: site_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Site Id
+        example: 11111111-1111-1111-1111-111111111111
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CameraCreateRequest'
+            example:
+              camera_id: cam-lobby
+              name: Lobby Camera
+              zone_id: lobby
+              latitude: 55.7522
+              longitude: 37.6156
+              location_description: Main lobby entrance
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CameraNode'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing, expired, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Authentication required
+        '403':
+          description: Authenticated user does not have the required role or scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Role 'viewer' not authorized for this resource
+        '404':
+          description: Requested resource was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Track 00000000-0000-0000-0000-000000000001 not found
+        '409':
+          description: Request conflicts with an existing resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Camera cam-lobby already exists
+        '503':
+          description: A required backing dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Database not available
+      security:
+      - cookieAuth: []
+      x-cilex-allowed-roles:
+      - admin
+  /topology/{site_id}/cameras/{camera_id}:
+    delete:
+      tags:
+      - topology
+      summary: Remove Camera
+      description: 'Remove a camera from a site.
+
+
+        Also deletes all topology edges that reference the camera.
+
+
+        Required roles: `admin`. Admin bypasses camera scope; detections, tracks,
+        and events apply non-admin `camera_scope` filtering.'
+      operationId: remove_camera_topology__site_id__cameras__camera_id__delete
+      parameters:
+      - name: site_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Site Id
+        example: 11111111-1111-1111-1111-111111111111
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Camera Id
+        example: cam-lobby
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing, expired, or invalid access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Authentication required
+        '403':
+          description: Authenticated user does not have the required role or scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Role 'viewer' not authorized for this resource
+        '404':
+          description: Requested resource was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Track 00000000-0000-0000-0000-000000000001 not found
+        '503':
+          description: A required backing dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Database not available
+      security:
+      - cookieAuth: []
+      x-cilex-allowed-roles:
+      - admin
+  /health:
+    get:
+      summary: Health
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Health Health Get
+      tags:
+      - public
+      description: Liveness probe for the Query API.
+  /ready:
+    get:
+      summary: Ready
+      operationId: ready_ready_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Ready Ready Get
+      tags:
+      - public
+      description: Readiness probe that verifies database connectivity.
+  /metrics:
+    get:
+      tags:
+      - public
+      summary: Metrics
+      description: Prometheus text exposition for Query API metrics.
+      operationId: metrics_metrics_get
+      responses:
+        '200':
+          description: Prometheus metrics payload.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: '# HELP query_requests_total Total API requests by endpoint
+                  and method
+
+                  # TYPE query_requests_total counter
+
+                  query_requests_total{endpoint="/detections",method="GET",status="200"}
+                  42
+
+                  '
+components:
+  schemas:
+    BoundingBox:
+      properties:
+        x:
+          type: number
+          title: X
+        y:
+          type: number
+          title: Y
+        w:
+          type: number
+          title: W
+        h:
+          type: number
+          title: H
+      type: object
+      required:
+      - x
+      - y
+      - w
+      - h
+      title: BoundingBox
+    CameraCreateRequest:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        name:
+          type: string
+          title: Name
+        zone_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Zone Id
+        latitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Latitude
+        longitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Longitude
+        location_description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Location Description
+      type: object
+      required:
+      - camera_id
+      - name
+      title: CameraCreateRequest
+      description: Request body for adding a camera to a site.
+    CameraNode:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        site_id:
+          type: string
+          title: Site Id
+        name:
+          type: string
+          title: Name
+        zone_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Zone Id
+        latitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Latitude
+        longitude:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Longitude
+        status:
+          type: string
+          title: Status
+          default: offline
+        location_description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Location Description
+      type: object
+      required:
+      - camera_id
+      - site_id
+      - name
+      title: CameraNode
+      description: 'A camera in the topology graph.
+
+
+        Wraps the ``cameras`` DB table.  ``zone_id`` is stored in the
+
+        ``config_json`` JSONB column and surfaced here for zone-based
+
+        event logic (entered_scene / exited_scene).'
+    DebugTraceListResponse:
+      properties:
+        traces:
+          items:
+            $ref: '#/components/schemas/DebugTraceSummary'
+          type: array
+          title: Traces
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - traces
+      - total
+      title: DebugTraceListResponse
+    DebugTraceSummary:
+      properties:
+        trace_id:
+          type: string
+          title: Trace Id
+        camera_id:
+          type: string
+          title: Camera Id
+        date:
+          type: string
+          title: Date
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        size_bytes:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Size Bytes
+      type: object
+      required:
+      - trace_id
+      - camera_id
+      - date
+      title: DebugTraceSummary
+      description: Lightweight trace entry returned by the listing endpoint.
+    DetectionListResponse:
+      properties:
+        detections:
+          items:
+            $ref: '#/components/schemas/DetectionResponse'
+          type: array
+          title: Detections
+        total:
+          type: integer
+          title: Total
+        offset:
+          type: integer
+          title: Offset
+        limit:
+          type: integer
+          title: Limit
+      type: object
+      required:
+      - detections
+      - total
+      - offset
+      - limit
+      title: DetectionListResponse
+    DetectionResponse:
+      properties:
+        time:
+          type: string
+          format: date-time
+          title: Time
+        camera_id:
+          type: string
+          title: Camera Id
+        frame_seq:
+          type: integer
+          title: Frame Seq
+        object_class:
+          type: string
+          title: Object Class
+        confidence:
+          type: number
+          title: Confidence
+        bbox:
+          $ref: '#/components/schemas/BoundingBox'
+        local_track_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Local Track Id
+        model_version:
+          type: string
+          title: Model Version
+      type: object
+      required:
+      - time
+      - camera_id
+      - frame_seq
+      - object_class
+      - confidence
+      - bbox
+      - model_version
+      title: DetectionResponse
+    EdgeCreateRequest:
+      properties:
+        camera_a_id:
+          type: string
+          title: Camera A Id
+        camera_b_id:
+          type: string
+          title: Camera B Id
+        transition_time_s:
+          type: number
+          title: Transition Time S
+        confidence:
+          type: number
+          title: Confidence
+          default: 1.0
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+      type: object
+      required:
+      - camera_a_id
+      - camera_b_id
+      - transition_time_s
+      title: EdgeCreateRequest
+      description: Request body for creating/updating an edge.
+    EventListResponse:
+      properties:
+        events:
+          items:
+            $ref: '#/components/schemas/EventResponse'
+          type: array
+          title: Events
+        total:
+          type: integer
+          title: Total
+        offset:
+          type: integer
+          title: Offset
+        limit:
+          type: integer
+          title: Limit
+      type: object
+      required:
+      - events
+      - total
+      - offset
+      - limit
+      title: EventListResponse
+    EventResponse:
+      properties:
+        event_id:
+          type: string
+          title: Event Id
+        event_type:
+          type: string
+          title: Event Type
+        track_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Track Id
+        camera_id:
+          type: string
+          title: Camera Id
+        start_time:
+          type: string
+          format: date-time
+          title: Start Time
+        end_time:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: End Time
+        duration_ms:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Duration Ms
+        clip_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Clip Url
+        state:
+          type: string
+          title: State
+        metadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Metadata
+        source_capture_ts:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Source Capture Ts
+        edge_receive_ts:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Edge Receive Ts
+        core_ingest_ts:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Core Ingest Ts
+      type: object
+      required:
+      - event_id
+      - event_type
+      - camera_id
+      - start_time
+      - state
+      title: EventResponse
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    TopologyGraph:
+      properties:
+        site_id:
+          type: string
+          title: Site Id
+        cameras:
+          items:
+            $ref: '#/components/schemas/CameraNode'
+          type: array
+          title: Cameras
+        edges:
+          items:
+            $ref: '#/components/schemas/TransitionEdge'
+          type: array
+          title: Edges
+      type: object
+      required:
+      - site_id
+      title: TopologyGraph
+      description: 'Full topology graph for one site.
+
+
+        Provides helper methods for MTMC candidate filtering:
+
+        ``adjacent_cameras`` and ``downstream_cameras``.'
+    TrackAttributeResponse:
+      properties:
+        attribute_id:
+          type: string
+          title: Attribute Id
+        attribute_type:
+          type: string
+          title: Attribute Type
+        color_value:
+          type: string
+          title: Color Value
+        confidence:
+          type: number
+          title: Confidence
+        model_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model Version
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+      type: object
+      required:
+      - attribute_id
+      - attribute_type
+      - color_value
+      - confidence
+      - observed_at
+      title: TrackAttributeResponse
+    TrackDetailResponse:
+      properties:
+        local_track_id:
+          type: string
+          title: Local Track Id
+        camera_id:
+          type: string
+          title: Camera Id
+        object_class:
+          type: string
+          title: Object Class
+        state:
+          type: string
+          title: State
+        mean_confidence:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Mean Confidence
+        start_time:
+          type: string
+          format: date-time
+          title: Start Time
+        end_time:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: End Time
+        tracker_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tracker Version
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        attributes:
+          items:
+            $ref: '#/components/schemas/TrackAttributeResponse'
+          type: array
+          title: Attributes
+        thumbnail_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Thumbnail Url
+      type: object
+      required:
+      - local_track_id
+      - camera_id
+      - object_class
+      - state
+      - start_time
+      - created_at
+      title: TrackDetailResponse
+    TrackListResponse:
+      properties:
+        tracks:
+          items:
+            $ref: '#/components/schemas/TrackSummaryResponse'
+          type: array
+          title: Tracks
+        total:
+          type: integer
+          title: Total
+        offset:
+          type: integer
+          title: Offset
+        limit:
+          type: integer
+          title: Limit
+      type: object
+      required:
+      - tracks
+      - total
+      - offset
+      - limit
+      title: TrackListResponse
+    TrackSummaryResponse:
+      properties:
+        local_track_id:
+          type: string
+          title: Local Track Id
+        camera_id:
+          type: string
+          title: Camera Id
+        object_class:
+          type: string
+          title: Object Class
+        state:
+          type: string
+          title: State
+        mean_confidence:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Mean Confidence
+        start_time:
+          type: string
+          format: date-time
+          title: Start Time
+        end_time:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: End Time
+        tracker_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tracker Version
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - local_track_id
+      - camera_id
+      - object_class
+      - state
+      - start_time
+      - created_at
+      title: TrackSummaryResponse
+    TransitTimeDistribution:
+      properties:
+        object_class:
+          type: string
+          title: Object Class
+        p50_ms:
+          type: number
+          title: P50 Ms
+        p90_ms:
+          type: number
+          title: P90 Ms
+        p99_ms:
+          type: number
+          title: P99 Ms
+        sample_count:
+          type: integer
+          title: Sample Count
+          default: 0
+        last_updated:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Updated
+      type: object
+      required:
+      - object_class
+      - p50_ms
+      - p90_ms
+      - p99_ms
+      title: TransitTimeDistribution
+      description: 'Transit-time distribution for one object class on one edge.
+
+
+        ``p50_ms`` / ``p90_ms`` / ``p99_ms`` represent the 50th, 90th and 99th
+
+        percentile transit times in milliseconds.  ``sample_count`` tracks
+
+        how many Re-ID matches have contributed; zero means the distribution
+
+        is still seeded (not yet learned from data).'
+    TransitionEdge:
+      properties:
+        edge_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Edge Id
+        camera_a_id:
+          type: string
+          title: Camera A Id
+        camera_b_id:
+          type: string
+          title: Camera B Id
+        transition_time_s:
+          type: number
+          title: Transition Time S
+        confidence:
+          type: number
+          title: Confidence
+          default: 1.0
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+        transit_distributions:
+          items:
+            $ref: '#/components/schemas/TransitTimeDistribution'
+          type: array
+          title: Transit Distributions
+      type: object
+      required:
+      - camera_a_id
+      - camera_b_id
+      - transition_time_s
+      title: TransitionEdge
+      description: 'A directed edge between two cameras with transit-time distributions.
+
+
+        ``transition_time_s`` is the overall median person transit time (the
+
+        value stored in the ``topology_edges`` DB table).  ``transit_distributions``
+
+        holds per-class percentile breakdowns.'
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    ErrorResponse:
+      title: ErrorResponse
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Human-readable error description.
+      required:
+      - detail
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: JWT access token carried in the httpOnly `access_token` cookie.
+        The Query API does not mint tokens itself.
+servers:
+- url: http://localhost:8000
+  description: Local development default
+tags:
+- name: detections
+  description: Time-windowed detection search from the TimescaleDB hypertable.
+- name: tracks
+  description: Track summaries and per-track detail, including joined attributes.
+- name: events
+  description: Event search with signed clip URLs when clip assets are available.
+- name: topology
+  description: Site topology graph read/write operations for cameras and transition
+    edges.
+- name: debug
+  description: Engineering-only debug trace listing and retrieval from MinIO.
+- name: public
+  description: Unauthenticated health, readiness, and Prometheus endpoints.

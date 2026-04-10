@@ -18,6 +18,9 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 
 - [ ] Track detail endpoint (`GET /tracks/{id}`) returns `thumbnail_url: null` — needs a frame-reference lookup table or stored thumbnail URI in `local_tracks` to resolve
 - [ ] Events endpoint does not expose a signed thumbnail URL — `P2-V04` stores `thumbnail_uri` in `events.metadata_jsonb`, but `services/query-api/routers/events.py` only signs `clip_uri`
+- [ ] Query API still has no token issuance / login endpoint, so the new API docs rely on an external auth plane or locally minted JWTs for manual curl/Postman usage
+- [ ] Query API still has no dedicated MTMC journey or `global_track_links` endpoint, so `docs/api/examples/get-journey.py` can only combine track detail, related events, and optional topology context instead of returning a true cross-camera journey
+- [ ] `/topology/*` and `/debug/*` are role-gated but not filtered by `camera_scope`; confirm whether that is the intended security model before production exposure
 
 ## Debug Trace Pipeline Gaps (P1-V07)
 
