@@ -1,0 +1,31 @@
+# Systemd timer for automated calibration rotation
+# Install: sudo cp infra/cron/calibration-cron.yml /etc/systemd/system/cilex-calibration.yml
+# Enable: sudo systemctl enable --now cilex-calibration.timer
+
+timer:
+  description: "Cilex Vision edge filter calibration rotation"
+  on_calendar: "*-*-* 02:00:00"
+  persistent: true
+
+service:
+  description: "Cilex Vision calibration scheduler"
+  type: oneshot
+  working_directory: /opt/cilex/cilex-vision
+  exec_start: >-
+    /usr/bin/python3 scripts/calibration/calibration_scheduler.py
+    --db-dsn postgresql://localhost:5432/vidanalytics
+    --edge-config infra/pilot/cameras.yaml
+    --interval-days 7
+    --min-gap-hours 1
+  user: cilex
+  environment:
+    - DATABASE_URL=postgresql://localhost:5432/vidanalytics
+
+cron_alternative: >-
+  0 2 * * * cd /opt/cilex/cilex-vision &&
+  python3 scripts/calibration/calibration_scheduler.py
+  --db-dsn postgresql://localhost:5432/vidanalytics
+  --edge-config infra/pilot/cameras.yaml
+  --interval-days 7
+  --min-gap-hours 1
+  >> /var/log/cilex/calibration.log 2>&1

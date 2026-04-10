@@ -438,9 +438,9 @@ phases:
       title: Calibration Scheduler
       depends_on:
       - P1-E03
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P2-O03
       prompt: .agents/prompts/P2-O03.md
       tool: codex-cli
     - id: P2-A01

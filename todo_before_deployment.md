@@ -37,6 +37,12 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] NATS ACL template (`infra/nats/nats-server.conf`) missing control subject authorization — add `site.<site_id>.control.>` to the appropriate user blocks
 - [ ] Prometheus node-exporter textfile collector not configured to scrape `artifacts/calibration/prometheus/` — calibration metrics won't appear in Grafana until this path is added to the monitoring stack
 
+## Calibration Scheduler Gaps (P2-O03)
+
+- [ ] `scripts/calibration/calibration_scheduler.py` chooses cameras from PostgreSQL, but execution still depends on `--edge-config` for site/NATS/MinIO/motion defaults because the current `cameras` table does not carry enough runtime calibration config for a DB-only workflow
+- [ ] `calibration_results` is created lazily by the scheduler/report scripts at runtime; add an Alembic migration or deployment-time DDL step before relying on this in environments where the app DB user lacks `CREATE TABLE` / `CREATE INDEX` privileges
+- [ ] `infra/cron/calibration-cron.yml` is committed as an operator artifact only; it is not yet installed by Ansible or any deployment playbook
+
 ## Topology Service Gaps (P0-D05)
 
 - [x] Topology FastAPI router (`services/topology/api.py`) not registered in any running app — wire into `services/query-api/main.py` or deploy as a standalone service
