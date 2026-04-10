@@ -17,6 +17,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
 
 from models import (
     CameraCreateRequest,
@@ -370,3 +371,73 @@ def _extract_zone_id(config_json: Any) -> str | None:
     if isinstance(config_json, dict):
         return config_json.get("zone_id")
     return None
+
+
+# ---------------------------------------------------------------------------
+# Transit-stats response model
+# ---------------------------------------------------------------------------
+
+
+class TransitStatEntry(BaseModel):
+    """One row of learned transit statistics for an edge + object class."""
+
+    from_camera: str
+    to_camera: str
+    object_class: str
+    p50_ms: float
+    p90_ms: float
+    p99_ms: float
+    sample_count: int
+    blend_weight: float
+
+
+# ---------------------------------------------------------------------------
+# GET /topology/{site_id}/transit-stats
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{site_id}/transit-stats",
+    response_model=list[TransitStatEntry],
+)
+async def get_transit_stats(
+    request: Request,
+    site_id: str,
+    min_samples: int = 100,
+    user: dict = Depends(_require_read),
+) -> list[TransitStatEntry]:
+    """Return learned transit distributions for all edges in a site.
+
+    Each entry includes the blend weight (0..1) indicating how much the
+    learned data contributes vs the static prior. ``min_samples`` controls
+    the sample count at which the learned distribution fully replaces the
+    prior (default 100).
+    """
+    pool = _pool(request)
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT ts.from_camera, ts.to_camera, ts.object_class, "
+            "       ts.p50_ms, ts.p90_ms, ts.p99_ms, ts.sample_count "
+            "FROM transit_time_stats ts "
+            "JOIN cameras ca ON ts.from_camera = ca.camera_id "
+            "WHERE ca.site_id = $1 "
+            "ORDER BY ts.from_camera, ts.to_camera, ts.object_class",
+            site_id,
+        )
+
+    return [
+        TransitStatEntry(
+            from_camera=r["from_camera"],
+            to_camera=r["to_camera"],
+            object_class=r["object_class"],
+            p50_ms=float(r["p50_ms"]),
+            p90_ms=float(r["p90_ms"]),
+            p99_ms=float(r["p99_ms"]),
+            sample_count=int(r["sample_count"]),
+            blend_weight=min(int(r["sample_count"]) / min_samples, 1.0)
+            if min_samples > 0
+            else 1.0,
+        )
+        for r in rows
+    ]
