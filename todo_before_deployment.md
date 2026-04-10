@@ -95,7 +95,12 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 
 ## Privacy & Compliance Gaps (P0-X02)
 
-- [ ] No committed MinIO lifecycle policies — retention intent exists in Ansible vars but `infra/minio/lifecycle/` directory does not exist. Add lifecycle JSON for `raw-video`, `event-clips`, `thumbnails`
+- [x] Commit MinIO lifecycle policies — `P2-O02` added `infra/minio/lifecycle-policies.json` plus apply/report tooling for the retention buckets
 - [ ] DSAR export endpoint missing — no API for data subject access request packaging (admin-only, job-based, spans PostgreSQL + TimescaleDB + MinIO)
 - [ ] Data subject deletion workflow missing — no admin-only deletion job with dry-run, approval metadata, and coordinated cross-store deletes
 - [ ] Relational metadata retention is indefinite — `events`, `local_tracks`, `global_tracks`, `track_attributes` have no expiry. Add explicit retention jobs if customer contracts require hard ceilings
+
+## Storage Tiering Gaps (P2-O02)
+
+- [ ] `infra/ansible/playbooks/deploy-minio.yml` still bootstraps buckets only; it does not yet run `infra/minio/apply-lifecycle.py`. Add an idempotent playbook task or operator SOP step before relying on MinIO retention enforcement in fresh deployments
+- [ ] `scripts/cost-model/params.yaml` still lacks a dedicated `cold_object` monthly rate, so `infra/minio/storage-report.py` and the `storage-tiering` dashboard price cold buckets with the warm-tier proxy until the cost model is extended

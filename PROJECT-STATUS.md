@@ -149,6 +149,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P2-E02 | MTMC Evaluation | feat/P2-E02 | Re-ID ground-truth export validation script, pure cross-camera metric computation helpers, an asyncpg + MLflow MTMC evaluation harness, and a proxy report documenting the go/no-go gate plus current GT export gaps |
 | P2-E03 | End-to-End Stress Test | feat/P2-E03 | End-to-end load-test harness with synthetic/replay frame generation, Prometheus snapshot collection, reversible chaos scenarios, and a Markdown NFR report template |
 | P2-O01 | MTMC Infrastructure | feat/P2-O01 | Dedicated `osnet_reid` Triton model config, MTMC Ansible deployment playbook, MTMC Grafana health dashboard, Prometheus alerts, and monitoring scrape wiring |
+| P2-O02 | Storage Tiering | feat/P2-O02 | Canonical MinIO lifecycle policy JSON, idempotent `mc`-based lifecycle apply/report scripts, a storage-tiering Grafana dashboard, MinIO capacity/ILM alerts, and MinIO metrics scrape wiring for pilot + Ansible monitoring |
 | P2-PILOT01 | 4-Camera CPU-Only Pilot Deployment | feat/P2-PILOT01 | Pilot compose stack, YOLOv8n CPU Triton model wiring, setup scripts, camera helpers, pilot Prometheus config, and deployment guide |
 | P2-X02 | Operations Runbooks | feat/P2-X02 | Five operator-facing runbooks covering incident response, scaling, backup and restore, camera onboarding, and service restart procedures aligned to the deployed pilot and multi-node stacks |
 | P2-V01 | Attribute Extraction Service | — | Attribute service consuming `tracklets.local`, quality gate + white balance + Triton color classifier, asyncpg persistence, Dockerfile, strict mypy config, and 18 tests |
@@ -157,7 +158,7 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P2-V04 | Clip Pipeline | feat/P2-V04 | Clip-service consuming closed `events.raw` records, FFmpeg H.264 baseline clip extraction, thumbnail generation, MinIO upload, PostgreSQL asset updates, Dockerfile, strict mypy config, and 6 tests |
 | P2-V05 | Search UI & Timeline | feat/P2-V05 | Next.js frontend with search, camera timeline, cross-camera journey, admin views, API proxy client, HLS/MP4 playback, and standalone Docker packaging |
 
-### Phase 2 — Pending (3 tasks remaining)
+### Phase 2 — Pending (2 tasks remaining)
 
 ### Phase 3 — Completed
 | Task | Title | Branch | What it produced |

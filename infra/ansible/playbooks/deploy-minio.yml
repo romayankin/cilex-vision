@@ -45,6 +45,7 @@
         env:
           MINIO_ROOT_USER: "{{ minio_root_user }}"
           MINIO_ROOT_PASSWORD: "{{ minio_root_password }}"
+          MINIO_PROMETHEUS_AUTH_TYPE: public
         command:
           - server
           - /data
@@ -101,4 +102,3 @@
         that:
           - item in minio_bucket_list.stdout
       loop: "{{ minio_buckets }}"
-

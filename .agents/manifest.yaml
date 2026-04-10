@@ -428,9 +428,9 @@ phases:
       title: Storage Tiering
       depends_on:
       - P1-O01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P2-O02
       prompt: .agents/prompts/P2-O02.md
       tool: codex-cli
     - id: P2-O03

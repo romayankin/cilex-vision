@@ -1,0 +1,52 @@
+groups:
+  - name: storage-tiering
+    rules:
+      - alert: MinIOBucketCapacityWarn
+        expr: max by (bucket) (minio_bucket_usage_total_bytes) > 50e9
+        for: 10m
+        labels:
+          severity: warning
+          service: minio
+        annotations:
+          summary: "MinIO bucket {{ $labels.bucket }} exceeds 50 GB"
+          description: "Bucket {{ $labels.bucket }} is using {{ $value | printf \"%.0f\" }} bytes. Review tier placement, retention, and downstream consumers before the bucket reaches its hard limit."
+
+      - alert: MinIOBucketCapacityCritical
+        expr: max by (bucket) (minio_bucket_usage_total_bytes) > 100e9
+        for: 10m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "MinIO bucket {{ $labels.bucket }} exceeds 100 GB"
+          description: "Bucket {{ $labels.bucket }} has crossed the critical storage threshold. Add capacity or expire/archive data immediately."
+
+      - alert: MinIODiskUsageHigh
+        expr: sum(minio_node_drive_used_bytes) / sum(minio_node_drive_total_bytes) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: minio
+        annotations:
+          summary: "MinIO drive usage above 85%"
+          description: "Aggregate MinIO drive usage is above 85% for 10 minutes. Check hot-tier growth and pending lifecycle work before writes start to slow down."
+
+      - alert: MinIODiskUsageCritical
+        expr: sum(minio_node_drive_used_bytes) / sum(minio_node_drive_total_bytes) > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "MinIO drive usage above 95%"
+          description: "Aggregate MinIO drive usage is above 95%. Expect object writes and lifecycle housekeeping to degrade until capacity is reclaimed."
+
+      - alert: MinIOLifecycleExpirationStalled
+        expr: sum(increase(minio_node_ilm_action_count_delete_action[1h]) + increase(minio_node_ilm_action_count_delete_version_action[1h])) == 0 and sum(max by (bucket) (minio_bucket_usage_total_bytes)) > 10e9 and sum(minio_node_ilm_expiry_pending_tasks) > 0
+        for: 2h
+        labels:
+          severity: warning
+          service: minio
+        annotations:
+          summary: "MinIO lifecycle expiration activity appears stalled"
+          description: "No ILM delete actions were observed for two hours while expiry tasks remain queued and more than 10 GB is stored. Check MinIO scanner health and lifecycle configuration."

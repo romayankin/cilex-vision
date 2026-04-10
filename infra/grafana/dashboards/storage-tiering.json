@@ -1,0 +1,209 @@
+{
+  "uid": "storage-tiering",
+  "title": "Storage Tiering",
+  "tags": ["storage", "minio", "tiering"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "prometheus" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "MinIO Total Storage",
+      "description": "Total bytes across all provisioned buckets. Uses max-by-bucket before summing to avoid duplicate samples from replicated scrapes.",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum(max by (bucket) (minio_bucket_usage_total_bytes))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50000000000 },
+              { "color": "red", "value": 100000000000 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Per-Bucket Size",
+      "gridPos": { "h": 7, "w": 16, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "max by (bucket) (minio_bucket_usage_total_bytes)",
+          "legendFormat": "{{ bucket }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 1
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull", "max"]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "piechart",
+      "title": "Tier Distribution",
+      "description": "Hot = frame-blobs, decoded-frames, mtmc-checkpoints. Warm = event-clips, thumbnails, archive-warm. Cold = raw-video, debug-traces.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum(max by (bucket) (minio_bucket_usage_total_bytes{bucket=~\"frame-blobs|decoded-frames|mtmc-checkpoints\"}))",
+          "legendFormat": "hot",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(max by (bucket) (minio_bucket_usage_total_bytes{bucket=~\"event-clips|thumbnails|archive-warm\"}))",
+          "legendFormat": "warm",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(max by (bucket) (minio_bucket_usage_total_bytes{bucket=~\"raw-video|debug-traces\"}))",
+          "legendFormat": "cold",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": ["value", "percent"]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "Object Count by Bucket",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "max by (bucket) (minio_bucket_usage_object_total)",
+          "legendFormat": "{{ bucket }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Lifecycle Expiration Activity",
+      "description": "Proxy for ILM expiry activity using MinIO node-side delete counters and pending task gauges. If the deployment only scrapes legacy metrics, this panel will stay empty until MinIO resource and node endpoints are added.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum(increase(minio_node_ilm_action_count_delete_action[5m]))",
+          "legendFormat": "delete_action / 5m",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(minio_node_ilm_action_count_delete_version_action[5m]))",
+          "legendFormat": "delete_version_action / 5m",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(minio_node_ilm_expiry_pending_tasks)",
+          "legendFormat": "pending expiry tasks",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Projected Monthly Cost",
+      "description": "Cold-tier buckets reuse the warm-tier rate proxy ($0.0125/GB-month) because the repo cost model does not define a separate cold-object rate yet.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "((sum(max by (bucket) (minio_bucket_usage_total_bytes{bucket=~\"frame-blobs|decoded-frames|mtmc-checkpoints\"})) / 1073741824) * 0.023) + ((sum(max by (bucket) (minio_bucket_usage_total_bytes{bucket=~\"event-clips|thumbnails|archive-warm|raw-video|debug-traces\"})) / 1073741824) * 0.0125)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    }
+  ]
+}

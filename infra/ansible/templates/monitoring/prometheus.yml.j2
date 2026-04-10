@@ -27,6 +27,40 @@ scrape_configs:
           - {{ target }}
 {% endfor %}
 
+{% if groups.get('minio', []) %}
+  - job_name: minio-cluster
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets:
+{%   for host in groups.get('minio', []) %}
+          - {{ hostvars[host].ansible_host | default(host) }}:{{ minio_api_port }}
+{%   endfor %}
+
+  - job_name: minio-bucket
+    metrics_path: /minio/v2/metrics/bucket
+    static_configs:
+      - targets:
+{%   for host in groups.get('minio', []) %}
+          - {{ hostvars[host].ansible_host | default(host) }}:{{ minio_api_port }}
+{%   endfor %}
+
+  - job_name: minio-resource
+    metrics_path: /minio/v2/metrics/resource
+    static_configs:
+      - targets:
+{%   for host in groups.get('minio', []) %}
+          - {{ hostvars[host].ansible_host | default(host) }}:{{ minio_api_port }}
+{%   endfor %}
+
+  - job_name: minio-node
+    metrics_path: /minio/v2/metrics/node
+    static_configs:
+      - targets:
+{%   for host in groups.get('minio', []) %}
+          - {{ hostvars[host].ansible_host | default(host) }}:{{ minio_api_port }}
+{%   endfor %}
+
+{% endif %}
 {% if groups.get('triton', []) %}
   - job_name: triton
     metrics_path: /metrics

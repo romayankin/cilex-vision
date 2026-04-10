@@ -94,6 +94,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
     volumes:
       - ./pilot-data/minio:/data
     mem_limit: 1024m
@@ -117,18 +118,21 @@ services:
       - -ec
       - |
         mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}";
+        mc mb -p local/raw-video || true;
         mc mb -p local/frame-blobs || true;
         mc mb -p local/decoded-frames || true;
         mc mb -p local/event-clips || true;
         mc mb -p local/debug-traces || true;
         mc mb -p local/thumbnails || true;
+        mc mb -p local/archive-warm || true;
+        mc mb -p local/mtmc-checkpoints || true;
         echo "MinIO buckets ready";
         exec tail -f /dev/null
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
     healthcheck:
-      test: ["CMD-SHELL", "mc ls local/frame-blobs >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "mc ls local/raw-video >/dev/null 2>&1 && mc ls local/frame-blobs >/dev/null 2>&1 && mc ls local/decoded-frames >/dev/null 2>&1 && mc ls local/event-clips >/dev/null 2>&1 && mc ls local/debug-traces >/dev/null 2>&1 && mc ls local/thumbnails >/dev/null 2>&1 && mc ls local/archive-warm >/dev/null 2>&1 && mc ls local/mtmc-checkpoints >/dev/null 2>&1"]
       interval: 15s
       timeout: 10s
       retries: 10

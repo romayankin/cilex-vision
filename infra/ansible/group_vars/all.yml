@@ -121,15 +121,29 @@ minio_root_password: minioadmin123
 minio_buckets:
   - raw-video
   - frame-blobs
+  - decoded-frames
   - event-clips
   - debug-traces
   - thumbnails
   - archive-warm
+  - mtmc-checkpoints
 minio_lifecycle_rules:
+  - bucket: frame-blobs
+    expiration_days: 7
+  - bucket: decoded-frames
+    expiration_days: 7
   - bucket: raw-video
     expiration_days: 30
   - bucket: event-clips
     expiration_days: 90
+  - bucket: thumbnails
+    expiration_days: 30
+  - bucket: archive-warm
+    expiration_days: 90
+  - bucket: debug-traces
+    expiration_days: 30
+  - bucket: mtmc-checkpoints
+    expiration_days: 7
 
 triton_http_port: 8000
 triton_grpc_port: 8001

@@ -1,0 +1,100 @@
+{
+  "policies": [
+    {
+      "bucket": "frame-blobs",
+      "tier": "hot",
+      "rules": [
+        {
+          "id": "expire-frame-blobs-7d",
+          "status": "Enabled",
+          "expiration": { "days": 7 },
+          "filter": { "prefix": "" }
+        }
+      ]
+    },
+    {
+      "bucket": "decoded-frames",
+      "tier": "hot",
+      "rules": [
+        {
+          "id": "expire-decoded-frames-7d",
+          "status": "Enabled",
+          "expiration": { "days": 7 },
+          "filter": { "prefix": "" }
+        }
+      ]
+    },
+    {
+      "bucket": "event-clips",
+      "tier": "warm",
+      "rules": [
+        {
+          "id": "expire-event-clips-90d",
+          "status": "Enabled",
+          "expiration": { "days": 90 },
+          "filter": { "prefix": "" }
+        }
+      ]
+    },
+    {
+      "bucket": "thumbnails",
+      "tier": "warm",
+      "rules": [
+        {
+          "id": "expire-thumbnails-30d",
+          "status": "Enabled",
+          "expiration": { "days": 30 },
+          "filter": { "prefix": "" }
+        }
+      ]
+    },
+    {
+      "bucket": "raw-video",
+      "tier": "cold",
+      "rules": [
+        {
+          "id": "expire-raw-video-30d",
+          "status": "Enabled",
+          "expiration": { "days": 30 },
+          "filter": { "prefix": "" }
+        }
+      ]
+    },
+    {
+      "bucket": "archive-warm",
+      "tier": "warm",
+      "rules": [
+        {
+          "id": "expire-archive-warm-90d",
+          "status": "Enabled",
+          "expiration": { "days": 90 },
+          "filter": { "prefix": "" }
+        }
+      ]
+    },
+    {
+      "bucket": "debug-traces",
+      "tier": "cold",
+      "rules": [
+        {
+          "id": "expire-debug-traces-30d",
+          "status": "Enabled",
+          "expiration": { "days": 30 },
+          "filter": { "prefix": "" }
+        }
+      ]
+    },
+    {
+      "bucket": "mtmc-checkpoints",
+      "tier": "hot",
+      "rules": [
+        {
+          "id": "expire-mtmc-checkpoints-7d",
+          "status": "Enabled",
+          "expiration": { "days": 7 },
+          "filter": { "prefix": "" }
+        }
+      ]
+    }
+  ]
+}
