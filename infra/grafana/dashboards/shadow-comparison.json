@@ -1,0 +1,302 @@
+{
+  "uid": "shadow-comparison",
+  "title": "Shadow vs Production Comparison",
+  "tags": ["shadow", "model-rollout", "phase-3"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "prometheus" }
+      },
+      {
+        "name": "camera_id",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(inference_tracks_active, camera_id)",
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Detection Count: Production vs Shadow",
+      "description": "Overall detections per minute. The current production and shadow detection counters are global, so this is a pipeline-level comparison rather than a per-camera split.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum(rate(inference_detections_total[5m])) * 60",
+          "legendFormat": "production",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(shadow_detections_total[5m])) * 60",
+          "legendFormat": "shadow",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Confidence Distribution",
+      "description": "Shadow-only confidence percentiles. Production does not export a confidence histogram yet, so drift must be investigated with debug traces rather than a direct histogram overlay.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(shadow_detection_confidence_bucket[5m])))",
+          "legendFormat": "shadow p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(shadow_detection_confidence_bucket[5m])))",
+          "legendFormat": "shadow p90",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(shadow_detection_confidence_bucket[5m])))",
+          "legendFormat": "shadow p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "bargauge",
+      "title": "Class Distribution",
+      "description": "Five-minute detection rates by object class for production and shadow. Use this panel to spot class-specific skew even when overall detection volume matches.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum by (object_class) (rate(inference_detections_total[5m]))",
+          "legendFormat": "prod {{ object_class }}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (object_class) (rate(shadow_detections_total[5m]))",
+          "legendFormat": "shadow {{ object_class }}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Disagreement Rate",
+      "description": "Count-level divergence proxy aligned to the shadow comparison gate. The Stage 2 alert threshold fires at 20%; the Stage 2 rollout gate stays at 15%.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "100 * abs(sum(rate(inference_detections_total[5m])) - sum(rate(shadow_detections_total[5m]))) / clamp_min(sum(rate(inference_detections_total[5m])), 1e-9)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 15 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Latency Comparison",
+      "description": "Detector latency percentiles for production and shadow over the last hour.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(inference_latency_ms_bucket[5m])))",
+          "legendFormat": "prod p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(inference_latency_ms_bucket[5m])))",
+          "legendFormat": "prod p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(inference_latency_ms_bucket[5m])))",
+          "legendFormat": "prod p99",
+          "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(shadow_inference_latency_ms_bucket[5m])))",
+          "legendFormat": "shadow p50",
+          "refId": "D"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(shadow_inference_latency_ms_bucket[5m])))",
+          "legendFormat": "shadow p95",
+          "refId": "E"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(shadow_inference_latency_ms_bucket[5m])))",
+          "legendFormat": "shadow p99",
+          "refId": "F"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Shadow Frames Consumed / sec",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "rate(shadow_frames_consumed_total[5m])",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Shadow Publish Errors / sec",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum(rate(shadow_publish_errors_total[5m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Shadow Worker Up",
+      "description": "Assumes Prometheus scrapes the shadow worker under job name `shadow-inference-worker`.",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "max(up{job=\"shadow-inference-worker\"})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 9,
+      "type": "text",
+      "title": "Debug Trace Link",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 24 },
+      "options": {
+        "mode": "markdown",
+        "content": "**Investigate disagreements**\n\n- Open [Query API debug traces](/debug/traces)\n- Use camera selection `${camera_id}` when pivoting into traces or logs\n- This dashboard compares pipeline-level rates because the current detection counters are not camera-scoped"
+      }
+    }
+  ]
+}

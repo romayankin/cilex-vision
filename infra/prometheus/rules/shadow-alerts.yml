@@ -1,0 +1,42 @@
+groups:
+  - name: shadow-deployment
+    rules:
+      - alert: ShadowDetectionCountDivergence
+        expr: abs(sum(rate(inference_detections_total[5m])) - sum(rate(shadow_detections_total[5m]))) / clamp_min(sum(rate(inference_detections_total[5m])), 1e-9) > 0.20
+        for: 10m
+        labels:
+          severity: warning
+          service: shadow-inference-worker
+        annotations:
+          summary: "Shadow detection count diverges from production by more than 20%"
+          description: "The Stage 2 shadow detector is producing a sustained count-level divergence above 20% relative to production over the last 10 minutes."
+
+      - alert: ShadowLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(shadow_inference_latency_ms_bucket[5m]))) > 2 * histogram_quantile(0.95, sum by (le) (rate(inference_latency_ms_bucket[5m])))
+        for: 10m
+        labels:
+          severity: warning
+          service: shadow-inference-worker
+        annotations:
+          summary: "Shadow inference p95 latency is more than 2x production"
+          description: "The shadow detector p95 latency has remained above double the production detector p95 for 10 minutes. Check Triton queue depth, model version, and GPU contention."
+
+      - alert: ShadowPublishErrors
+        expr: sum(rate(shadow_publish_errors_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: shadow-inference-worker
+        annotations:
+          summary: "Shadow inference worker is publishing errors"
+          description: "The shadow worker has sustained Kafka publish failures for 5 minutes. Check shadow topic availability and broker connectivity."
+
+      - alert: ShadowWorkerDown
+        expr: max(up{job="shadow-inference-worker"}) == 0 or absent(up{job="shadow-inference-worker"}) == 1
+        for: 5m
+        labels:
+          severity: critical
+          service: shadow-inference-worker
+        annotations:
+          summary: "Shadow inference worker is down or not being scraped"
+          description: "Prometheus has not seen a healthy `shadow-inference-worker` scrape target for 5 minutes. Validate the worker process, metrics port, and scrape configuration."

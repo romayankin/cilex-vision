@@ -535,9 +535,9 @@ phases:
       title: Shadow Comparison Dashboard
       depends_on:
       - P3-V02
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P3-E02
       prompt: .agents/prompts/P3-E02.md
       tool: codex-cli
     - id: P3-E03

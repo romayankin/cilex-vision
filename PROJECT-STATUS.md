@@ -168,8 +168,9 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P3-O01 | Deployment Automation | feat/P3-O01 | Terraform modules for multi-node compute/network/storage provisioning, multi-node Ansible deployment orchestration with GPU and edge roles, a production inventory template, and a deployment health-check script |
 | P3-V02 | Shadow Deploy Tooling | feat/P3-V02 | Shadow Triton repo docs, separate shadow Kafka topic definitions, a urllib-based EXPLICIT mode load/unload script, a detector-shadow inference worker publishing to shadow topics, and a Prometheus-backed comparison report script |
 | P3-E01 | Retraining Validation | feat/P3-E01 | Pure regression-comparison helpers, an MLflow/JSON retrained-vs-production validation harness with Markdown + JSON artifacts, and a `make validate` target for the training pipeline |
+| P3-E02 | Shadow Comparison Dashboard | feat/P3-E02 | Grafana shadow-vs-production rollout dashboard with divergence, latency, class mix, and worker-health panels plus Prometheus alert rules for shadow deployment anomalies |
 
-### Phase 3 — Pending (10 tasks remaining)
+### Phase 3 — Pending (9 tasks remaining)
 ### Phase 4 — Pending (12 tasks remaining)
 
 ---
