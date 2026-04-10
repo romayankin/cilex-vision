@@ -96,6 +96,10 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] The new shadow worker is not yet wired into any Prometheus scrape config. Add a scrape target before relying on `compare_shadow.py` against live shadow runs
 - [ ] `infra/kafka/shadow-topics.yaml` reserves `embeddings.shadow`, but `scripts/shadow/shadow_inference_worker.py` currently shadows detector + tracker output only. Add the OSNet crop / publish path before using this tooling for Re-ID shadow evaluations
 
+## Retraining Validation Gaps (P3-E01)
+
+- [ ] The new validation harness can infer the candidate run from `models/latest_run_id.txt`, but there is still no canonical MLflow alias or config entry for the current production baseline run. Operators must supply `--baseline-run-id` / `BASELINE_RUN_ID` or a baseline JSON artifact until the registry has a stable "production detector" pointer
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover

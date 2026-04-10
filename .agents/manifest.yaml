@@ -525,9 +525,9 @@ phases:
       title: Retraining Validation
       depends_on:
       - P3-V01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P3-E01
       prompt: .agents/prompts/P3-E01.md
       tool: codex-cli
     - id: P3-E02
