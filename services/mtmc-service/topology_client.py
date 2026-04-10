@@ -26,7 +26,7 @@ except ImportError:
     # Fallback: inline minimal models matching the topology service
     from pydantic import BaseModel, Field
 
-    class TransitTimeDistribution(BaseModel):  # type: ignore[no-redef]
+    class TransitTimeDistribution(BaseModel):
         object_class: str
         p50_ms: float
         p90_ms: float
@@ -47,10 +47,10 @@ except ImportError:
         transition_time_s: float
         confidence: float = 1.0
         enabled: bool = True
-        transit_distributions: list[TransitTimeDistribution] = Field(default_factory=list)  # type: ignore[assignment]
+        transit_distributions: list[TransitTimeDistribution] = Field(default_factory=list)
 
         @staticmethod
-        def default_distributions(transition_time_s: float) -> list[TransitTimeDistribution]:  # type: ignore[override]
+        def default_distributions(transition_time_s: float) -> list[TransitTimeDistribution]:
             OBJECT_CLASSES = ["person", "car", "truck", "bus", "bicycle", "motorcycle", "animal"]
             SPEED = {"person": 1.0, "car": 0.3, "truck": 0.5, "bus": 0.4, "bicycle": 0.6, "motorcycle": 0.35, "animal": 0.8}
             dists = []
@@ -64,8 +64,8 @@ except ImportError:
 
     class TopologyGraph(BaseModel):  # type: ignore[no-redef]
         site_id: str
-        cameras: list[CameraNode] = Field(default_factory=list)  # type: ignore[assignment]
-        edges: list[TransitionEdge] = Field(default_factory=list)  # type: ignore[assignment]
+        cameras: list[CameraNode] = Field(default_factory=list)
+        edges: list[TransitionEdge] = Field(default_factory=list)
 
         def downstream_cameras(self, camera_id: str, time_window_ms: float, object_class: str = "person") -> list[str]:
             SPEED = {"person": 1.0, "car": 0.3, "truck": 0.5, "bus": 0.4, "bicycle": 0.6, "motorcycle": 0.35, "animal": 0.8}

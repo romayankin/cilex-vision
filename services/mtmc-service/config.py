@@ -41,6 +41,12 @@ class MTMCSettings(BaseSettings):
     score_weight_transit: float = 0.3
     score_weight_attribute: float = 0.1
 
+    # Zone sharding (optional)
+    zone_id: str | None = None  # None = no sharding
+    cross_zone_topic: str = "mtmc.cross_zone"
+    cross_zone_match_threshold: float = 0.55
+    cross_zone_batch_interval_s: float = 5.0
+
     metrics_port: int = 8080
     log_level: str = "INFO"
 
