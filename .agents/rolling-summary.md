@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-10 02:26 (after P3-V03)*
+*Auto-generated after each task. Last updated: 2026-04-10 04:24 (after P4-V01)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 43/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 11/16 tasks done. Overall progress: 46/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -15,16 +15,15 @@ Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 43
 - Triton EXPLICIT mode — shadow deploy before cutover.
 - Protobuf for all inter-service messages, buf lint in CI.
 - Python str enums as TEXT with CHECK constraints, not native PG ENUMs.
-- The current services do not expose all of those exact metrics.
 
 ## Key Decisions
 
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- YAML frontmatter on every document (version, status, created_by, date) matching runbook pattern
 - Loading/error/content rendering pattern from P2-V05
 - `if __name__ == "__main__"` with `try/except SystemExit` pattern
-- `asyncpg` for DB queries in the sampler (matching repo convention)
 
 ## Open Issues
 
@@ -36,11 +35,11 @@ Complete Intelligence Layer (Phase 2) — 10/16 tasks done. Overall progress: 43
 
 ## Next Steps
 
-23 task(s) ready to launch. Priority:
-- **P3-X01** (Deployment Guide) → claude-code — unblocks 2 tasks
-- **P2-X02** (Operations Runbooks) → codex-cli — unblocks 1 tasks
-- **P4-V01** (Zone Sharding for Large Sites) → claude-code — unblocks 1 tasks
+24 task(s) ready to launch. Priority:
 - **P2-E01** (Attribute Classifier Bake-Off) → codex-cli
 - **P2-E02** (MTMC Evaluation) → codex-cli
 - **P2-O02** (Storage Tiering) → codex-cli
+- **P2-O03** (Calibration Scheduler) → codex-cli
+- **P2-X01** (API Documentation) → codex-cli
+- **P3-V04** (Adaptive Transit Time) → claude-code
 
