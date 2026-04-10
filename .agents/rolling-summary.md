@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-10 19:36 (after P2-O02)*
+*Auto-generated after each task. Last updated: 2026-04-10 20:04 (after P2-O03)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 14/16 tasks done. Overall progress: 49/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 15/16 tasks done. Overall progress: 50/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -21,6 +21,7 @@ Complete Intelligence Layer (Phase 2) — 14/16 tasks done. Overall progress: 49
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- The new scheduler only changed *how the next camera is chosen* and where
 - MLflow tags follow the existing bake-off pattern:
 - YAML frontmatter on every document (version, status, created_by, date) matching runbook pattern
 - Loading/error/content rendering pattern from P2-V05
@@ -35,11 +36,11 @@ Complete Intelligence Layer (Phase 2) — 14/16 tasks done. Overall progress: 49
 
 ## Next Steps
 
-21 task(s) ready to launch. Priority:
-- **P2-O03** (Calibration Scheduler) → codex-cli
+20 task(s) ready to launch. Priority:
 - **P2-X01** (API Documentation) → codex-cli
 - **P3-V04** (Adaptive Transit Time) → claude-code
 - **P3-E01** (Retraining Validation) → codex-cli
 - **P3-E02** (Shadow Comparison Dashboard) → codex-cli
 - **P3-E03** (Drift Monitoring) → codex-cli
+- **P3-A01** (Continuous Annotation Pipeline) → codex-cli
 
