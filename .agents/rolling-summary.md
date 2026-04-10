@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-11 00:53 (after P3-V04)*
+*Auto-generated after each task. Last updated: 2026-04-11 01:12 (after P3-E01)*
 
 ## Current Goal
 
-Complete Maturity (Phase 3) — 6/13 tasks done. Overall progress: 52/70 tasks complete across all phases.
+Complete Maturity (Phase 3) — 7/13 tasks done. Overall progress: 53/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -35,11 +35,11 @@ Complete Maturity (Phase 3) — 6/13 tasks done. Overall progress: 52/70 tasks c
 
 ## Next Steps
 
-18 task(s) ready to launch. Priority:
-- **P3-E01** (Retraining Validation) → codex-cli
+17 task(s) ready to launch. Priority:
 - **P3-E02** (Shadow Comparison Dashboard) → codex-cli
 - **P3-E03** (Drift Monitoring) → codex-cli
 - **P3-A01** (Continuous Annotation Pipeline) → codex-cli
 - **P3-A02** (Re-ID Training Data Collection) → codex-cli
 - **P3-X02** (Operations Handbook) → claude-code
+- **P3-X03** (Updated Cost Model) → claude-code
 
