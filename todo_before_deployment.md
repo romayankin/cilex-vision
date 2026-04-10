@@ -65,6 +65,11 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `data/eval/attribute/manifest.json` is still absent in the repo, so `scripts/bakeoff/run_attribute_bakeoff.py` cannot produce a real comparison yet. Annotated `attribute-eval` CVAT tasks still need to be exported with `scripts/bakeoff/prepare_color_eval_data.py`
 - [ ] The repository still has no committed `artifacts/models/attribute/efficientnet_b0.onnx` export, so the EfficientNet-B0 challenger path remains evaluation-ready in code only
 
+## MTMC Evaluation Gaps (P2-E02)
+
+- [ ] `scripts/annotation/export_reid_pairs.py` still emits synthetic `local_track_id` values derived from CVAT shape IDs. Real MTMC evaluation requires DB-backed `local_tracks.local_track_id` UUIDs in the exported ground truth
+- [ ] The MTMC service persists only final `global_track_id` assignments, not the ranked candidate lists considered during matching. `P2-E02` therefore reports Rank-1 / Rank-5 / mAP as assignment-derived proxies until candidate-level retrieval outputs are persisted
+
 ## Operations Runbook Gaps (P2-X02)
 
 - [ ] `attribute-service`, `event-engine`, and `clip-service` do not have a standard host-reachable `/health` or `/ready` contract in the shared deployment path. Operators currently have to rely on container logs and Prometheus scrape presence during restart verification

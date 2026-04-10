@@ -397,9 +397,9 @@ phases:
       title: MTMC Evaluation
       depends_on:
       - P2-V02
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P2-E02
       prompt: .agents/prompts/P2-E02.md
       tool: codex-cli
     - id: P2-E03
