@@ -169,8 +169,9 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P3-V02 | Shadow Deploy Tooling | feat/P3-V02 | Shadow Triton repo docs, separate shadow Kafka topic definitions, a urllib-based EXPLICIT mode load/unload script, a detector-shadow inference worker publishing to shadow topics, and a Prometheus-backed comparison report script |
 | P3-E01 | Retraining Validation | feat/P3-E01 | Pure regression-comparison helpers, an MLflow/JSON retrained-vs-production validation harness with Markdown + JSON artifacts, and a `make validate` target for the training pipeline |
 | P3-E02 | Shadow Comparison Dashboard | feat/P3-E02 | Grafana shadow-vs-production rollout dashboard with divergence, latency, class mix, and worker-health panels plus Prometheus alert rules for shadow deployment anomalies |
+| P3-E03 | Drift Monitoring | feat/P3-E03 | TimescaleDB-backed confidence baseline snapshotting, KS/KL drift detection with Prometheus textfile output, and an hourly cron/systemd artifact for production drift scans |
 
-### Phase 3 — Pending (9 tasks remaining)
+### Phase 3 — Pending (8 tasks remaining)
 ### Phase 4 — Pending (12 tasks remaining)
 
 ---

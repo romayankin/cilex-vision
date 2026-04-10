@@ -1,0 +1,31 @@
+# Systemd timer for hourly confidence drift monitoring.
+# Install: sudo cp infra/cron/drift-monitoring-cron.yml /etc/systemd/system/cilex-drift-monitoring.yml
+# Enable: sudo systemctl enable --now cilex-drift-monitoring.timer
+
+timer:
+  description: "Cilex Vision confidence drift monitoring"
+  on_calendar: "*-*-* *:00:00"
+  persistent: true
+
+service:
+  description: "Confidence drift detector"
+  type: oneshot
+  working_directory: /opt/cilex/cilex-vision
+  exec_start: >-
+    /usr/bin/python3 scripts/monitoring/drift_detector.py
+    --db-dsn postgresql://localhost:5432/vidanalytics
+    --baseline s3://debug-traces/baselines/confidence-baseline.json
+    --metrics-output /var/lib/node_exporter/textfile_collector/confidence_drift.prom
+    --output /var/log/cilex/confidence-drift-report.md
+  user: cilex
+  environment:
+    - DATABASE_URL=postgresql://localhost:5432/vidanalytics
+
+cron_alternative: >-
+  0 * * * * cd /opt/cilex/cilex-vision &&
+  python3 scripts/monitoring/drift_detector.py
+  --db-dsn postgresql://localhost:5432/vidanalytics
+  --baseline s3://debug-traces/baselines/confidence-baseline.json
+  --metrics-output /var/lib/node_exporter/textfile_collector/confidence_drift.prom
+  --output /var/log/cilex/confidence-drift-report.md
+  >> /var/log/cilex/drift-monitoring.log 2>&1
