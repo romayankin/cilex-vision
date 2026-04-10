@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-10 19:03 (after P2-E02)*
+*Auto-generated after each task. Last updated: 2026-04-10 19:36 (after P2-O02)*
 
 ## Current Goal
 
-Complete Intelligence Layer (Phase 2) — 13/16 tasks done. Overall progress: 48/70 tasks complete across all phases.
+Complete Intelligence Layer (Phase 2) — 14/16 tasks done. Overall progress: 49/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -35,11 +35,11 @@ Complete Intelligence Layer (Phase 2) — 13/16 tasks done. Overall progress: 48
 
 ## Next Steps
 
-22 task(s) ready to launch. Priority:
-- **P2-O02** (Storage Tiering) → codex-cli
+21 task(s) ready to launch. Priority:
 - **P2-O03** (Calibration Scheduler) → codex-cli
 - **P2-X01** (API Documentation) → codex-cli
 - **P3-V04** (Adaptive Transit Time) → claude-code
 - **P3-E01** (Retraining Validation) → codex-cli
 - **P3-E02** (Shadow Comparison Dashboard) → codex-cli
+- **P3-E03** (Drift Monitoring) → codex-cli
 
