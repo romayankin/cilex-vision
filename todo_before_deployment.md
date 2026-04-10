@@ -117,6 +117,12 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `infra/cron/hard-example-mining-cron.yml` is committed as an operator artifact only; it is not yet installed by Ansible or any deployment playbook
 - [ ] The new feedback loop writes a local retraining manifest at `data/training/raw/feedback-additions.json`, but no DVC/versioning or training playbook step consumes it automatically yet
 
+## Re-ID Training Data Collection Gaps (P3-A02)
+
+- [ ] `scripts/annotation/collect_reid_training_data.py` can only materialize representative crops for MTMC links that can be tied back to a debug trace carrying `frame_uri`. High-confidence `global_track_links` without trace-backed frame context are currently skipped from the triplet manifest
+- [ ] `scripts/annotation/validate_reid_pairs.py` seeds CVAT review tasks and exports validation results, but the upload/export path was only linted and smoke-tested locally; run it once against the real CVAT deployment before relying on it for a sustained annotation queue
+- [ ] `scripts/annotation/reid_dataset_builder.py` can build and optionally `dvc add` a local versioned Re-ID dataset, but nothing in the training pipeline consumes that manifest yet. A later Re-ID training task still needs to define the actual dataloader / triplet-loss input contract
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover
