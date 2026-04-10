@@ -588,9 +588,9 @@ phases:
       title: Deployment Guide
       depends_on:
       - P3-O01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P3-X01
       prompt: .agents/prompts/P3-X01.md
       tool: claude-code
     - id: P3-X02
