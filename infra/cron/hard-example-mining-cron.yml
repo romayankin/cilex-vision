@@ -1,0 +1,34 @@
+# Systemd timer for daily hard-example mining and continuous annotation intake.
+# Install: sudo cp infra/cron/hard-example-mining-cron.yml /etc/systemd/system/cilex-hard-example-mining.yml
+# Enable: sudo systemctl enable --now cilex-hard-example-mining.timer
+
+timer:
+  description: "Cilex Vision hard example mining for continuous annotation"
+  on_calendar: "*-*-* 03:00:00"
+  persistent: true
+
+service:
+  description: "Hard example miner"
+  type: oneshot
+  working_directory: /opt/cilex/cilex-vision
+  exec_start: >-
+    /usr/bin/python3 scripts/annotation/hard_example_miner.py
+    --db-dsn postgresql://localhost:5432/vidanalytics
+    --samples-per-class 50
+    --daily-limit 500
+    --output-dir data/hard-examples
+  user: cilex
+  environment:
+    - DATABASE_URL=postgresql://localhost:5432/vidanalytics
+    - MINIO_URL=http://localhost:9000
+    - MINIO_ACCESS_KEY=minioadmin
+    - MINIO_SECRET_KEY=minioadmin123
+
+cron_alternative: >-
+  0 3 * * * cd /opt/cilex/cilex-vision &&
+  python3 scripts/annotation/hard_example_miner.py
+  --db-dsn postgresql://localhost:5432/vidanalytics
+  --samples-per-class 50
+  --daily-limit 500
+  --output-dir data/hard-examples
+  >> /var/log/cilex/hard-example-mining.log 2>&1

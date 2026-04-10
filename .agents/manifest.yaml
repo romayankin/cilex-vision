@@ -557,9 +557,9 @@ phases:
       depends_on:
       - P1-A01
       - P1-V07
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P3-A01
       prompt: .agents/prompts/P3-A01.md
       tool: codex-cli
     - id: P3-A02

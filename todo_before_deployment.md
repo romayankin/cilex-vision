@@ -111,6 +111,12 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] The hourly detector assumes `s3://debug-traces/baselines/confidence-baseline.json` already exists. Baseline capture / refresh is still a manual operator workflow and should be rerun after approved model cutovers or major seasonal scene changes
 - [ ] Drift monitoring currently queries the `detections` table, which already reflects the production confidence thresholding path. Confidence drift below the ingest threshold is invisible until raw detector confidences or a production confidence histogram are persisted
 
+## Continuous Annotation Pipeline Gaps (P3-A01)
+
+- [ ] `scripts/annotation/hard_example_miner.py` can only export examples that have both a low-confidence detection and a recoverable debug trace with `frame_uri`. Low-confidence detections that were not sampled into `debug-traces` are currently counted but cannot be sent to CVAT automatically
+- [ ] `infra/cron/hard-example-mining-cron.yml` is committed as an operator artifact only; it is not yet installed by Ansible or any deployment playbook
+- [ ] The new feedback loop writes a local retraining manifest at `data/training/raw/feedback-additions.json`, but no DVC/versioning or training playbook step consumes it automatically yet
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover
