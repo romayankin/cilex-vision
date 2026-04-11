@@ -676,9 +676,9 @@ phases:
       title: 50-100 Camera Load Test
       depends_on:
       - P2-E03
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P4-E01
       prompt: .agents/prompts/P4-E01.md
       tool: codex-cli
     - id: P4-E02

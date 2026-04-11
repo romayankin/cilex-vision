@@ -129,6 +129,12 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] The repo still has no committed Triton model configs or engine-management wiring for `plate_detector` and `plate_ocr`. Add the actual model repository entries before enabling `LPR_ENABLED=true` in deployment
 - [ ] Query API docs generated in `P2-X01` were not regenerated for the new `/lpr/results` endpoint, so `docs/api/openapi.yaml` and the committed Postman collection are now stale until the API documentation task is rerun or refreshed
 
+## 100-Camera Load Test Gaps (P4-E01)
+
+- [ ] `scripts/load-test/replay_streams.py` replays recorded video into the existing FrameRef + MinIO ingest contract; it does not emulate a true RTSP/NATS edge path. Add a dedicated RTSP/edge simulator if final Phase 4 sign-off must exercise the full edge transport chain instead of the central ingest contract only
+- [ ] `scripts/load-test/chaos_scenarios.py` skips the GPU overload experiment unless operators provide `--overload-command` and optional cleanup wiring. Add a standard overload runner or deployment-aware helper before treating that scenario as automatic coverage
+- [ ] `scripts/load-test/measure_e2e.py` and `generate_report.py` can report disk, network, GPU, and canonical end-to-end latency only when Prometheus scrapes metrics such as `container_fs_usage_bytes`, `container_network_*`, `nv_gpu_*`, and `e2e_latency_ms`. Add cAdvisor / DCGM exporters and the missing canonical latency metrics before using the 100-camera report as a final go/no-go artifact
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover

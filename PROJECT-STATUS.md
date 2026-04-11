@@ -180,8 +180,9 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P4-V01 | Zone Sharding for Large Sites | feat/P4-V01 | Zone-aware MTMC sharding helpers, a boundary-event publisher, a cross-zone associator, and MTMC config/test updates for large-site partitioning |
 | P4-V02 | Jetson Edge Agent | feat/P4-V02 | Jetson-specific edge pipeline and TensorRT detector, export tooling, Jetson container/runtime setup, and post-flash configuration scripts |
 | P4-V03 | LPR Module | feat/P4-V03 | LPR service with Triton plate detection + OCR, plate quality gating, buffered COPY writes into `lpr_results`, raw SQL migration, and Query API plate-text search with exact/prefix/wildcard modes |
+| P4-E01 | 50-100 Camera Load Test | feat/P4-E01 | FFmpeg-backed 50-100 camera replay tooling, Prometheus + direct-probe E2E measurement, extended chaos scenario automation, and a 100-camera NFR/cost comparison report generator plus template |
 
-### Phase 4 — Pending (11 tasks remaining)
+### Phase 4 — Pending (10 tasks remaining)
 
 ---
 
