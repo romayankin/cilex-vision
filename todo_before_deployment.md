@@ -135,6 +135,11 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `scripts/load-test/chaos_scenarios.py` skips the GPU overload experiment unless operators provide `--overload-command` and optional cleanup wiring. Add a standard overload runner or deployment-aware helper before treating that scenario as automatic coverage
 - [ ] `scripts/load-test/measure_e2e.py` and `generate_report.py` can report disk, network, GPU, and canonical end-to-end latency only when Prometheus scrapes metrics such as `container_fs_usage_bytes`, `container_network_*`, `nv_gpu_*`, and `e2e_latency_ms`. Add cAdvisor / DCGM exporters and the missing canonical latency metrics before using the 100-camera report as a final go/no-go artifact
 
+## Zone Benchmark Gaps (P4-E02)
+
+- [ ] `scripts/evaluation/zone_benchmark.py` is an offline synthetic benchmark that applies the zone-threshold and boundary-search rules with NumPy search pools; it does not yet drive the live `services/mtmc-service` zone-sharding modules or a real FAISS-backed MTMC deployment. Add a service-backed benchmark path if final large-site sign-off must validate runtime behavior instead of a deterministic proxy
+- [ ] The benchmark hard-requires Python `mlflow` at execution time and no dedicated evaluation environment or requirements file is committed for `scripts/evaluation/`. Install MLflow in the operator/CI environment before relying on `P4-E02` automation for repeatable reports
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover

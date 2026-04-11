@@ -686,9 +686,9 @@ phases:
       title: Zone Benchmark
       depends_on:
       - P4-V01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P4-E02
       prompt: .agents/prompts/P4-E02.md
       tool: codex-cli
     - id: P4-O01
