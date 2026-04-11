@@ -655,9 +655,9 @@ phases:
       depends_on:
       - P2-V02
       - P1-V06
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P4-V04
       prompt: .agents/prompts/P4-V04.md
       tool: claude-code
     - id: P4-V05
