@@ -598,9 +598,9 @@ phases:
       title: Operations Handbook
       depends_on:
       - P2-X02
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P3-X02
       prompt: .agents/prompts/P3-X02.md
       tool: claude-code
     - id: P3-X03
