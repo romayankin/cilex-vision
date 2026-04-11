@@ -123,6 +123,12 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `scripts/annotation/validate_reid_pairs.py` seeds CVAT review tasks and exports validation results, but the upload/export path was only linted and smoke-tested locally; run it once against the real CVAT deployment before relying on it for a sustained annotation queue
 - [ ] `scripts/annotation/reid_dataset_builder.py` can build and optionally `dvc add` a local versioned Re-ID dataset, but nothing in the training pipeline consumes that manifest yet. A later Re-ID training task still needs to define the actual dataloader / triplet-loss input contract
 
+## LPR Module Gaps (P4-V03)
+
+- [ ] `tracklets.local` still lacks a canonical decoded-frame URI or frame-object lookup key, so `services/lpr-service/main.py` resolves representative frames heuristically from `decoded-frames` via MinIO `last_modified` plus fallback key templates. Add a frame-reference lookup table or persist `frame_uri` alongside track/detection metadata before relying on frame-accurate plate reads
+- [ ] The repo still has no committed Triton model configs or engine-management wiring for `plate_detector` and `plate_ocr`. Add the actual model repository entries before enabling `LPR_ENABLED=true` in deployment
+- [ ] Query API docs generated in `P2-X01` were not regenerated for the new `/lpr/results` endpoint, so `docs/api/openapi.yaml` and the committed Postman collection are now stale until the API documentation task is rerun or refreshed
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover

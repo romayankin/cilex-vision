@@ -10,6 +10,7 @@ Read-only REST API for querying detections, tracks, and events from the Cilex Vi
 | GET | /tracks | Paginated track listing |
 | GET | /tracks/{id} | Track detail with attributes |
 | GET | /events | Paginated event listing with clip URLs |
+| GET | /lpr/results | Search recognized license plates |
 | GET | /health | Health check |
 | GET | /ready | Readiness check (DB connectivity) |
 | GET | /metrics | Prometheus metrics |
@@ -22,7 +23,7 @@ JWT via httpOnly cookie (`access_token`). Four RBAC roles:
 | Role | Endpoints | Camera Scope |
 |---|---|---|
 | admin | all | all cameras |
-| operator | detections, tracks, events | scoped |
+| operator | detections, tracks, events, lpr | scoped |
 | viewer | detections, tracks, events | scoped |
 | engineering | detections, tracks | scoped |
 

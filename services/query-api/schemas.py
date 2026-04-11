@@ -81,6 +81,37 @@ class TrackListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# LPR
+# ---------------------------------------------------------------------------
+
+
+class PlateBoundingBox(BaseModel):
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+class LprResultResponse(BaseModel):
+    result_id: str
+    local_track_id: str
+    camera_id: str
+    plate_text: str
+    plate_confidence: float
+    country_format: Optional[str] = None
+    plate_bbox: PlateBoundingBox
+    detected_at: datetime
+    model_version: Optional[str] = None
+
+
+class LprResultListResponse(BaseModel):
+    results: list[LprResultResponse]
+    total: int
+    offset: int
+    limit: int
+
+
+# ---------------------------------------------------------------------------
 # Events
 # ---------------------------------------------------------------------------
 

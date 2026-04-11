@@ -174,7 +174,14 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P3-A02 | Re-ID Training Data Collection | feat/P3-A02 | High-confidence MTMC triplet collection with debug-trace-backed crop export, CVAT pair-validation tooling for positive and hard-negative review, and a versioned Re-ID dataset builder with chronological splits plus optional DVC tracking |
 
 ### Phase 3 — Pending (6 tasks remaining)
-### Phase 4 — Pending (12 tasks remaining)
+### Phase 4 — Completed
+| Task | Title | Branch | What it produced |
+|------|-------|--------|-----------------|
+| P4-V01 | Zone Sharding for Large Sites | feat/P4-V01 | Zone-aware MTMC sharding helpers, a boundary-event publisher, a cross-zone associator, and MTMC config/test updates for large-site partitioning |
+| P4-V02 | Jetson Edge Agent | feat/P4-V02 | Jetson-specific edge pipeline and TensorRT detector, export tooling, Jetson container/runtime setup, and post-flash configuration scripts |
+| P4-V03 | LPR Module | feat/P4-V03 | LPR service with Triton plate detection + OCR, plate quality gating, buffered COPY writes into `lpr_results`, raw SQL migration, and Query API plate-text search with exact/prefix/wildcard modes |
+
+### Phase 4 — Pending (11 tasks remaining)
 
 ---
 
