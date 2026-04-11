@@ -633,9 +633,9 @@ phases:
       title: Jetson Edge Agent
       depends_on:
       - P1-V01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P4-V02
       prompt: .agents/prompts/P4-V02.md
       tool: claude-code
     - id: P4-V03

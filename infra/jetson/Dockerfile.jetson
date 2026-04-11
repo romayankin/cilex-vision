@@ -1,0 +1,58 @@
+# Jetson Edge Agent — TensorRT on-device inference + NATS publisher
+# Target: Jetson Orin NX 16GB / AGX Orin (JetPack 6.x, L4T r36.3)
+#
+# Build on Jetson (native):
+#   docker build -f infra/jetson/Dockerfile.jetson -t cilex-vision/jetson-edge .
+#
+# Build with QEMU (cross-compile from x86):
+#   docker buildx build --platform linux/arm64 \
+#       -f infra/jetson/Dockerfile.jetson -t cilex-vision/jetson-edge .
+
+FROM nvcr.io/nvidia/l4t-pytorch:r36.3.0-pth2.1-py3
+
+# --- System dependencies ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        pkg-config \
+        libgirepository1.0-dev \
+        libcairo2-dev \
+        gir1.2-gstreamer-1.0 \
+        gir1.2-gst-plugins-base-1.0 \
+        gstreamer1.0-tools \
+        gstreamer1.0-plugins-base \
+        gstreamer1.0-plugins-good \
+        gstreamer1.0-plugins-bad \
+        gstreamer1.0-plugins-ugly \
+        gstreamer1.0-libav \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Python dependencies ---
+WORKDIR /app
+
+COPY services/edge-agent/requirements.txt /tmp/edge-requirements.txt
+RUN pip install --no-cache-dir -r /tmp/edge-requirements.txt
+
+# pycuda is pre-installed in the L4T container; ensure it's up to date
+RUN pip install --no-cache-dir pycuda
+
+# --- Copy edge agent (base + jetson variant) ---
+COPY proto/ /proto/
+COPY services/edge-agent/ /app/
+
+# Generate protobuf Python code (includes detection.proto for Jetson)
+COPY infra/jetson/gen_proto_jetson.sh /app/jetson/gen_proto_jetson.sh
+RUN bash /app/jetson/gen_proto_jetson.sh
+
+# --- Model directory (engine file mounted at runtime) ---
+RUN mkdir -p /models
+
+# --- Buffer directory ---
+RUN mkdir -p /var/lib/edge-agent/buffer
+
+# --- Prometheus metrics port ---
+EXPOSE 9090
+
+# --- Entry point: Jetson pipeline ---
+WORKDIR /app/jetson
+ENV JETSON_CONFIG=/app/jetson/config.yaml
+CMD ["python", "jetson_pipeline.py"]
