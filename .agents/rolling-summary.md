@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-11 04:51 (after P4-V04)*
+*Auto-generated after each task. Last updated: 2026-04-11 05:00 (after P4-V05)*
 
 ## Current Goal
 
-Complete Scale & Productization (Phase 4) — 4/12 tasks done. Overall progress: 62/70 tasks complete across all phases.
+Complete Scale & Productization (Phase 4) — 5/12 tasks done. Overall progress: 63/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -21,10 +21,10 @@ Complete Scale & Productization (Phase 4) — 4/12 tasks done. Overall progress:
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
-- Same router pattern as detections.py, lpr.py: `APIRouter` with `require_role` dependency.
-- Same `get_current_user` + audit tagging pattern on every endpoint.
-- Same FakePool/conftest.py fixture pattern extended with FakeFAISSReader.
-- Reason: this stays aligned with the repo’s COPY-first write pattern instead of doing row-by-row inserts.
+- Same `"use client"` + `useEffect` + `useCallback` data fetching pattern as search/admin pages
+- Same loading/error/content rendering pattern
+- Same Tailwind class patterns (card borders, table styling, badges, buttons)
+- Same pagination button pattern from search page
 
 ## Open Issues
 
@@ -36,11 +36,11 @@ Complete Scale & Productization (Phase 4) — 4/12 tasks done. Overall progress:
 
 ## Next Steps
 
-8 task(s) ready to launch. Priority:
-- **P4-V05** (Multi-Site Portal) → claude-code
+7 task(s) ready to launch. Priority:
 - **P4-E01** (50-100 Camera Load Test) → codex-cli
 - **P4-E02** (Zone Benchmark) → codex-cli
 - **P4-O01** (Multi-Site Infrastructure) → codex-cli
 - **P4-O02** (Disaster Recovery) → codex-cli
 - **P4-A01** (Multi-Site Dataset) → claude-code
+- **P4-X01** (Commercial Documentation) → codex-cli
 
