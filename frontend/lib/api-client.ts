@@ -283,3 +283,50 @@ export async function removeCamera(siteId: string, cameraId: string): Promise<vo
 export async function upsertEdge(siteId: string, body: EdgeCreateRequest): Promise<TransitionEdge> {
   return apiMutate<TransitionEdge>(`/topology/${siteId}/edges`, "PUT", body);
 }
+
+// ---------------------------------------------------------------------------
+// Sites
+// ---------------------------------------------------------------------------
+
+export interface SiteResponse {
+  site_id: string;
+  name: string;
+  address: string | null;
+  timezone: string;
+  camera_count: number;
+}
+
+export interface SiteListResponse {
+  sites: SiteResponse[];
+  total: number;
+}
+
+export interface CreateSiteRequest {
+  name: string;
+  address: string | null;
+  timezone: string;
+}
+
+export interface UpdateSiteRequest {
+  name: string;
+  address: string | null;
+  timezone: string;
+}
+
+export async function getSites(
+  q: { offset?: number; limit?: number } = {},
+): Promise<SiteListResponse> {
+  return apiFetch<SiteListResponse>("/sites", q as Record<string, string | number | undefined>);
+}
+
+export async function getSite(siteId: string): Promise<SiteResponse> {
+  return apiFetch<SiteResponse>(`/sites/${siteId}`);
+}
+
+export async function createSite(body: CreateSiteRequest): Promise<SiteResponse> {
+  return apiMutate<SiteResponse>("/sites", "POST", body);
+}
+
+export async function updateSite(siteId: string, body: UpdateSiteRequest): Promise<SiteResponse> {
+  return apiMutate<SiteResponse>(`/sites/${siteId}`, "PUT", body);
+}

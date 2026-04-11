@@ -39,6 +39,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               ))}
               {isAdmin(role) && (
                 <Link
+                  href="/portal"
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    pathname?.startsWith("/portal")
+                      ? "bg-blue-100 text-blue-700"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  }`}
+                >
+                  Portal
+                </Link>
+              )}
+              {isAdmin(role) && (
+                <Link
                   href="/admin"
                   className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                     pathname?.startsWith("/admin")
