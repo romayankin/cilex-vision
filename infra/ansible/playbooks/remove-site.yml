@@ -1,0 +1,375 @@
+---
+- name: Prepare site decommission inputs
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    repo_root: "{{ playbook_dir | dirname | dirname | dirname }}"
+    target_site_group_resolved: "{{ site_group | default(target_site_group | default('')) }}"
+  tasks:
+    - name: Validate the requested site group
+      ansible.builtin.assert:
+        that:
+          - target_site_group_resolved | length > 0
+          - target_site_group_resolved in groups
+        fail_msg: "Set site_group=<inventory site group> when running remove-site.yml."
+
+    - name: Derive site-specific runtime values
+      ansible.builtin.set_fact:
+        target_site_group_resolved: "{{ target_site_group_resolved }}"
+        selected_site_inventory_host: "{{ groups[target_site_group_resolved] | first }}"
+        selected_site_id: "{{ hostvars[groups[target_site_group_resolved] | first].site_id }}"
+        selected_site_db_id: "{{ hostvars[groups[target_site_group_resolved] | first].site_db_id }}"
+        selected_site_name: "{{ hostvars[groups[target_site_group_resolved] | first].site_name | default(hostvars[groups[target_site_group_resolved] | first].site_id) }}"
+        selected_site_cameras: "{{ hostvars[groups[target_site_group_resolved] | first].site_cameras | default([]) }}"
+        selected_site_clock_targets: "{{ hostvars[groups[target_site_group_resolved] | first].site_clock_targets | default([]) }}"
+        selected_site_hosts: "{{ groups[target_site_group_resolved] }}"
+        selected_timescaledb_host: "{{ groups.get('timescaledb', []) | first | default('') }}"
+        selected_minio_host: "{{ groups.get('minio', []) | first | default('') }}"
+        selected_monitoring_hosts: "{{ groups.get('monitoring', []) }}"
+        selected_kafka_host: "{{ groups.get('kafka', []) | first | default('') }}"
+        selected_site_pki_output_dir: "{{ hostvars[groups[target_site_group_resolved] | first].site_pki_output_dir | default(repo_root ~ '/artifacts/pki/' ~ hostvars[groups[target_site_group_resolved] | first].site_id) }}"
+        selected_site_kafka_scram_user: "{{ hostvars[groups[target_site_group_resolved] | first].site_kafka_scram_user | default('svc-ingress-bridge-' ~ hostvars[groups[target_site_group_resolved] | first].site_id) }}"
+
+    - name: Validate central dependencies for site removal
+      ansible.builtin.assert:
+        that:
+          - selected_site_id | length > 0
+          - selected_site_db_id | length > 0
+          - selected_timescaledb_host | length > 0
+          - selected_minio_host | length > 0
+          - selected_kafka_host | length > 0
+          - selected_monitoring_hosts | length > 0
+        fail_msg: "Site removal requires TimescaleDB, MinIO, Kafka, and monitoring hosts."
+
+- name: Drain site tracks and mark cameras for decommission
+  hosts: "{{ hostvars['localhost'].selected_timescaledb_host }}"
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    site_drain_sql_path: "{{ cilex_config_dir }}/site-bootstrap/{{ hostvars['localhost'].selected_site_id }}-drain.sql"
+  tasks:
+    - name: Create the site decommission SQL directory
+      ansible.builtin.file:
+        path: "{{ site_drain_sql_path | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Render site drain SQL
+      ansible.builtin.copy:
+        dest: "{{ site_drain_sql_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          UPDATE cameras
+          SET status = 'maintenance'
+          WHERE site_id = '{{ hostvars["localhost"].selected_site_db_id }}';
+
+    - name: Apply site drain SQL
+      ansible.builtin.shell: >-
+        docker exec -i timescaledb
+        psql -v ON_ERROR_STOP=1
+        -U {{ timescaledb_postgres_user }}
+        -d {{ timescaledb_postgres_db }}
+        < {{ site_drain_sql_path }}
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Wait for active site tracks to drain
+      ansible.builtin.shell: >-
+        docker exec timescaledb
+        psql -t -A
+        -U {{ timescaledb_postgres_user }}
+        -d {{ timescaledb_postgres_db }}
+        -c "SELECT COUNT(*) FROM local_tracks lt JOIN cameras c ON c.camera_id = lt.camera_id WHERE c.site_id = '{{ hostvars['localhost'].selected_site_db_id }}' AND lt.state IN ('new', 'active', 'lost');"
+      args:
+        executable: /bin/bash
+      register: site_active_track_count
+      changed_when: false
+      retries: 20
+      delay: 15
+      until: site_active_track_count.stdout | trim | int == 0
+
+    - name: Render site topology cleanup SQL
+      ansible.builtin.copy:
+        dest: "{{ site_drain_sql_path | dirname }}/{{ hostvars['localhost'].selected_site_id }}-cleanup.sql"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          DELETE FROM topology_edges
+          WHERE camera_a_id IN (
+              SELECT camera_id FROM cameras WHERE site_id = '{{ hostvars["localhost"].selected_site_db_id }}'
+          )
+             OR camera_b_id IN (
+              SELECT camera_id FROM cameras WHERE site_id = '{{ hostvars["localhost"].selected_site_db_id }}'
+          );
+
+          UPDATE cameras
+          SET status = 'offline',
+              config_json = COALESCE(config_json, '{}'::jsonb) || '{"decommissioned": true}'::jsonb
+          WHERE site_id = '{{ hostvars["localhost"].selected_site_db_id }}';
+
+    - name: Apply site topology cleanup SQL
+      ansible.builtin.shell: >-
+        docker exec -i timescaledb
+        psql -v ON_ERROR_STOP=1
+        -U {{ timescaledb_postgres_user }}
+        -d {{ timescaledb_postgres_db }}
+        < {{ site_drain_sql_path | dirname }}/{{ hostvars['localhost'].selected_site_id }}-cleanup.sql
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+- name: Remove site-specific Kafka ACLs
+  hosts: "{{ hostvars['localhost'].selected_kafka_host }}"
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    site_kafka_scram_user: "{{ hostvars['localhost'].selected_site_kafka_scram_user }}"
+    kafka_container_name: "kafka-{{ kafka_node_id }}"
+  tasks:
+    - name: List current site Kafka ACLs
+      ansible.builtin.command:
+        cmd: >-
+          docker exec {{ kafka_container_name }}
+          /opt/bitnami/kafka/bin/kafka-acls.sh
+          --bootstrap-server localhost:{{ kafka_client_port }}
+          --command-config /opt/bitnami/kafka/config/admin.properties
+          --list
+          --principal User:{{ site_kafka_scram_user }}
+      register: site_kafka_acl_list
+      changed_when: false
+      no_log: true
+
+    - name: Remove site ingress-bridge ACLs
+      ansible.builtin.command:
+        cmd: >-
+          docker exec {{ kafka_container_name }}
+          /opt/bitnami/kafka/bin/kafka-acls.sh
+          --bootstrap-server localhost:{{ kafka_client_port }}
+          --command-config /opt/bitnami/kafka/config/admin.properties
+          --remove
+          --force
+          --allow-principal User:{{ site_kafka_scram_user }}
+          --operation Write
+          --operation Describe
+          --topic frames.sampled.refs
+      when: ('User:' ~ site_kafka_scram_user) in site_kafka_acl_list.stdout
+      no_log: true
+
+- name: Archive site data into the warm archive bucket
+  hosts: "{{ hostvars['localhost'].selected_minio_host }}"
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    site_archive_manifest: "{{ cilex_config_dir }}/site-bootstrap/{{ hostvars['localhost'].selected_site_id }}-archive-manifest.json"
+    site_archive_site_id: "{{ hostvars['localhost'].selected_site_id }}"
+  tasks:
+    - name: Render site archive manifest
+      ansible.builtin.copy:
+        dest: "{{ site_archive_manifest }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          {
+            "site_id": "{{ hostvars['localhost'].selected_site_id }}",
+            "site_name": "{{ hostvars['localhost'].selected_site_name }}",
+            "site_db_id": "{{ hostvars['localhost'].selected_site_db_id }}",
+            "archived_at": "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}",
+            "cameras": {{ hostvars['localhost'].selected_site_cameras | to_nice_json }}
+          }
+
+    - name: Upload the site archive manifest to archive-warm
+      ansible.builtin.command:
+        cmd: >-
+          docker run --rm --network host
+          -e MC_HOST_local=http://{{ minio_root_user }}:{{ minio_root_password }}@127.0.0.1:{{ minio_api_port }}
+          -v {{ site_archive_manifest }}:/tmp/site-archive.json:ro
+          {{ minio_mc_image }}
+          cp /tmp/site-archive.json
+          local/archive-warm/site-archive/{{ hostvars['localhost'].selected_site_id }}/manifest.json
+      changed_when: true
+      no_log: true
+
+    - name: Mirror raw frame prefixes for each site camera when present
+      ansible.builtin.shell: >-
+        docker run --rm --network host
+        -e MC_HOST_local=http://{{ minio_root_user }}:{{ minio_root_password }}@127.0.0.1:{{ minio_api_port }}
+        {{ minio_mc_image }}
+        sh -c "if mc ls 'local/frame-blobs/{{ item.camera_id }}' >/dev/null 2>&1; then mc mirror --overwrite 'local/frame-blobs/{{ item.camera_id }}' 'local/archive-warm/site-archive/{{ site_archive_site_id }}/frame-blobs/{{ item.camera_id }}'; fi"
+      args:
+        executable: /bin/bash
+      loop: "{{ hostvars['localhost'].selected_site_cameras }}"
+      changed_when: false
+      no_log: true
+
+    - name: Mirror decoded frame prefixes for each site camera when present
+      ansible.builtin.shell: >-
+        docker run --rm --network host
+        -e MC_HOST_local=http://{{ minio_root_user }}:{{ minio_root_password }}@127.0.0.1:{{ minio_api_port }}
+        {{ minio_mc_image }}
+        sh -c "if mc ls 'local/decoded-frames/{{ item.camera_id }}' >/dev/null 2>&1; then mc mirror --overwrite 'local/decoded-frames/{{ item.camera_id }}' 'local/archive-warm/site-archive/{{ site_archive_site_id }}/decoded-frames/{{ item.camera_id }}'; fi"
+      args:
+        executable: /bin/bash
+      loop: "{{ hostvars['localhost'].selected_site_cameras }}"
+      changed_when: false
+      no_log: true
+
+    - name: Mirror debug traces for each site camera when present
+      ansible.builtin.shell: >-
+        docker run --rm --network host
+        -e MC_HOST_local=http://{{ minio_root_user }}:{{ minio_root_password }}@127.0.0.1:{{ minio_api_port }}
+        {{ minio_mc_image }}
+        sh -c "if mc ls 'local/debug-traces/traces/{{ item.camera_id }}' >/dev/null 2>&1; then mc mirror --overwrite 'local/debug-traces/traces/{{ item.camera_id }}' 'local/archive-warm/site-archive/{{ site_archive_site_id }}/debug-traces/{{ item.camera_id }}'; fi"
+      args:
+        executable: /bin/bash
+      loop: "{{ hostvars['localhost'].selected_site_cameras }}"
+      changed_when: false
+      no_log: true
+
+    - name: Mirror event clips for each site camera when present
+      ansible.builtin.shell: >-
+        docker run --rm --network host
+        -e MC_HOST_local=http://{{ minio_root_user }}:{{ minio_root_password }}@127.0.0.1:{{ minio_api_port }}
+        {{ minio_mc_image }}
+        sh -c "if mc ls 'local/event-clips/{{ site_archive_site_id }}/{{ item.camera_id }}' >/dev/null 2>&1; then mc mirror --overwrite 'local/event-clips/{{ site_archive_site_id }}/{{ item.camera_id }}' 'local/archive-warm/site-archive/{{ site_archive_site_id }}/event-clips/{{ item.camera_id }}'; elif mc ls 'local/event-clips/{{ item.camera_id }}' >/dev/null 2>&1; then mc mirror --overwrite 'local/event-clips/{{ item.camera_id }}' 'local/archive-warm/site-archive/{{ site_archive_site_id }}/event-clips-fallback/{{ item.camera_id }}'; fi"
+      args:
+        executable: /bin/bash
+      loop: "{{ hostvars['localhost'].selected_site_cameras }}"
+      changed_when: false
+      no_log: true
+
+    - name: Mirror thumbnails for each site camera when present
+      ansible.builtin.shell: >-
+        docker run --rm --network host
+        -e MC_HOST_local=http://{{ minio_root_user }}:{{ minio_root_password }}@127.0.0.1:{{ minio_api_port }}
+        {{ minio_mc_image }}
+        sh -c "if mc ls 'local/thumbnails/{{ site_archive_site_id }}/{{ item.camera_id }}' >/dev/null 2>&1; then mc mirror --overwrite 'local/thumbnails/{{ site_archive_site_id }}/{{ item.camera_id }}' 'local/archive-warm/site-archive/{{ site_archive_site_id }}/thumbnails/{{ item.camera_id }}'; elif mc ls 'local/thumbnails/{{ item.camera_id }}' >/dev/null 2>&1; then mc mirror --overwrite 'local/thumbnails/{{ item.camera_id }}' 'local/archive-warm/site-archive/{{ site_archive_site_id }}/thumbnails-fallback/{{ item.camera_id }}'; fi"
+      args:
+        executable: /bin/bash
+      loop: "{{ hostvars['localhost'].selected_site_cameras }}"
+      changed_when: false
+      no_log: true
+
+- name: Remove monitoring targets for the decommissioned site
+  hosts: monitoring
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  vars:
+    monitoring_excluded_hosts: "{{ hostvars['localhost'].selected_site_hosts }}"
+    effective_monitoring_clock_targets: "{{ (monitoring_clock_targets | default([])) | rejectattr('site_id', 'equalto', hostvars['localhost'].selected_site_id) | list }}"
+  tasks:
+    - name: Render Prometheus config without the site hosts
+      ansible.builtin.template:
+        src: ../templates/monitoring/prometheus.yml.j2
+        dest: "{{ monitoring_prometheus_dir }}/prometheus.yml"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Render clock target file without the site
+      ansible.builtin.copy:
+        dest: "{{ monitoring_promtail_dir }}/clock-targets.json"
+        owner: root
+        group: root
+        mode: "0644"
+        content: "{{ effective_monitoring_clock_targets | to_nice_json }}"
+
+    - name: Reload Prometheus after removing the site
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ prometheus_port }}/-/reload"
+        method: POST
+        status_code: 200
+
+- name: Revoke site certificates when step-cli is available
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Check whether step-cli is available for certificate revocation
+      ansible.builtin.command:
+        cmd: which step
+      register: step_cli_check
+      changed_when: false
+      failed_when: false
+
+    - name: Revoke the site edge and NATS certificates
+      ansible.builtin.command:
+        cmd: >-
+          step ca revoke
+          --cert {{ item.cert }}
+          --key {{ item.key }}
+      loop:
+        - cert: "{{ hostvars['localhost'].selected_site_pki_output_dir }}/edge-agent/client.crt"
+          key: "{{ hostvars['localhost'].selected_site_pki_output_dir }}/edge-agent/client.key"
+        - cert: "{{ hostvars['localhost'].selected_site_pki_output_dir }}/nats-server/server.crt"
+          key: "{{ hostvars['localhost'].selected_site_pki_output_dir }}/nats-server/server.key"
+      when:
+        - step_cli_check.rc == 0
+        - site_skip_certificate_revocation | default(false) | bool == false
+      changed_when: false
+      failed_when: false
+
+- name: Remove edge workloads for the decommissioned site
+  hosts: "{{ hostvars['localhost'].target_site_group_resolved }}:&edge_gateways"
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Stop the site-edge workloads
+      community.docker.docker_container:
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ site_edge_agent_container_name }}-{{ hostvars['localhost'].selected_site_id }}"
+        - "{{ site_edge_local_minio_container_name }}-{{ hostvars['localhost'].selected_site_id }}"
+        - node-exporter
+      failed_when: false
+
+    - name: Remove site-edge directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ site_edge_base_dir }}"
+        - "{{ site_edge_data_dir }}"
+
+- name: Remove site-local NATS for the decommissioned site
+  hosts: "{{ hostvars['localhost'].target_site_group_resolved }}:&nats"
+  become: true
+  gather_facts: false
+  collections:
+    - community.docker
+  vars_files:
+    - ../group_vars/all.yml
+  tasks:
+    - name: Stop the site-local NATS container
+      community.docker.docker_container:
+        name: "nats-{{ hostvars['localhost'].selected_site_id }}"
+        state: absent
+      failed_when: false

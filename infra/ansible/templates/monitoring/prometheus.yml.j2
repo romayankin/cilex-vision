@@ -2,6 +2,8 @@ global:
   scrape_interval: {{ monitoring_scrape_interval }}
   evaluation_interval: {{ monitoring_evaluation_interval }}
 
+{% set excluded_hosts = monitoring_excluded_hosts | default([]) %}
+
 rule_files:
   - /etc/prometheus/rules/*.yml
 
@@ -17,9 +19,11 @@ scrape_configs:
 {% set node_targets = namespace(items=[]) %}
 {% for group_name in ['kafka', 'nats', 'timescaledb', 'minio', 'triton', 'monitoring', 'mlflow', 'cvat', 'services', 'edge_gateways'] %}
 {%   for host in groups.get(group_name, []) %}
-{%     set target = (hostvars[host].ansible_host | default(host)) ~ ':' ~ node_exporter_port %}
-{%     if target not in node_targets.items %}
-{%       set _ = node_targets.items.append(target) %}
+{%     if host not in excluded_hosts %}
+{%       set target = (hostvars[host].ansible_host | default(host)) ~ ':' ~ node_exporter_port %}
+{%       if target not in node_targets.items %}
+{%         set _ = node_targets.items.append(target) %}
+{%       endif %}
 {%     endif %}
 {%   endfor %}
 {% endfor %}
@@ -33,7 +37,9 @@ scrape_configs:
     static_configs:
       - targets:
 {%   for host in groups.get('minio', []) %}
+{%     if host not in excluded_hosts %}
           - {{ hostvars[host].ansible_host | default(host) }}:{{ minio_api_port }}
+{%     endif %}
 {%   endfor %}
 
   - job_name: minio-bucket
@@ -67,7 +73,9 @@ scrape_configs:
     static_configs:
       - targets:
 {%   for host in groups.get('triton', []) %}
+{%     if host not in excluded_hosts %}
           - {{ hostvars[host].ansible_host | default(host) }}:{{ triton_metrics_port }}
+{%     endif %}
 {%   endfor %}
 
 {% endif %}
@@ -77,7 +85,9 @@ scrape_configs:
     static_configs:
       - targets:
 {%   for host in groups.get('edge_gateways', []) %}
+{%     if host not in excluded_hosts %}
           - {{ hostvars[host].ansible_host | default(host) }}:{{ hostvars[host].edge_gateway_metrics_port | default(edge_gateway_metrics_port) }}
+{%     endif %}
 {%   endfor %}
 
 {% endif %}

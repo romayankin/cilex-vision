@@ -77,6 +77,24 @@ edge_gateway_buffer_dir: "{{ edge_gateway_data_dir }}/buffer"
 edge_gateway_buffer_budget_bytes: 21474836480
 edge_gateway_metrics_port: 9090
 
+site_edge_base_dir: "{{ cilex_root_dir }}/site-edge"
+site_edge_config_dir: "{{ site_edge_base_dir }}/config"
+site_edge_pki_dir: "{{ site_edge_base_dir }}/pki"
+site_edge_build_context_dir: "{{ site_edge_base_dir }}/build-context"
+site_edge_data_dir: "{{ cilex_data_dir }}/site-edge"
+site_edge_buffer_dir: "{{ site_edge_data_dir }}/buffer"
+site_edge_buffer_budget_bytes: 21474836480
+site_edge_metrics_port: 9090
+site_edge_local_minio_data_dir: "{{ site_edge_data_dir }}/minio"
+site_edge_local_minio_api_port: 9000
+site_edge_local_minio_console_port: 9001
+site_edge_local_minio_root_user: minioadmin
+site_edge_local_minio_root_password: minioadmin123
+site_edge_local_minio_bucket: frame-blobs
+site_edge_local_minio_container_name: site-buffer-minio
+site_edge_agent_container_name: site-edge-agent
+site_kafka_secret_root: "{{ cilex_config_dir }}/site-secrets"
+
 kafka_cluster_id: MkU3OEVBNTcwNTJENDM2Qk
 kafka_internal_port: 9092
 kafka_client_port: 9093

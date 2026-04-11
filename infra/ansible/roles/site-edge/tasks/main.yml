@@ -1,0 +1,297 @@
+---
+- name: Validate site-edge deployment inputs
+  ansible.builtin.assert:
+    that:
+      - site_id is defined
+      - site_cameras is defined
+      - edge_nats_url is defined
+      - edge_nats_client_cert_src is defined
+      - edge_nats_client_key_src is defined
+      - edge_nats_root_ca_src is defined
+    fail_msg: "site-edge requires site_id, site_cameras, edge_nats_url, and site-local NATS client certificate source paths."
+
+- name: Install site-edge prerequisites
+  ansible.builtin.apt:
+    name:
+      - gstreamer1.0-tools
+      - gstreamer1.0-plugins-base
+      - gstreamer1.0-plugins-good
+      - gstreamer1.0-plugins-bad
+      - gstreamer1.0-plugins-ugly
+      - gstreamer1.0-libav
+      - wireguard-tools
+    state: present
+    update_cache: true
+
+- name: Install GPU edge prerequisites when requested
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - ubuntu-drivers-common
+    state: present
+    update_cache: true
+  when: site_edge_gpu_enabled | default(false) | bool
+
+- name: Check whether NVIDIA userspace is already present on the site edge
+  ansible.builtin.command:
+    cmd: which nvidia-smi
+  register: site_edge_nvidia_smi
+  changed_when: false
+  failed_when: false
+  when: site_edge_gpu_enabled | default(false) | bool
+
+- name: Install NVIDIA driver package on GPU-capable site edges
+  ansible.builtin.apt:
+    name: "{{ gpu_nvidia_driver_package }}"
+    state: present
+    update_cache: true
+  when:
+    - site_edge_gpu_enabled | default(false) | bool
+    - site_edge_nvidia_smi.rc != 0
+
+- name: Add NVIDIA container toolkit apt signing key on GPU-capable site edges
+  ansible.builtin.apt_key:
+    url: https://nvidia.github.io/libnvidia-container/gpgkey
+    state: present
+  when: site_edge_gpu_enabled | default(false) | bool
+
+- name: Add NVIDIA container toolkit apt repository on GPU-capable site edges
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64] https://nvidia.github.io/libnvidia-container/stable/deb/amd64 /"
+    filename: nvidia-container-toolkit
+    state: present
+  when: site_edge_gpu_enabled | default(false) | bool
+
+- name: Install NVIDIA container toolkit on GPU-capable site edges
+  ansible.builtin.apt:
+    name: "{{ gpu_nvidia_container_toolkit_package }}"
+    state: present
+    update_cache: true
+  when: site_edge_gpu_enabled | default(false) | bool
+
+- name: Configure Docker to use the NVIDIA runtime on GPU-capable site edges
+  ansible.builtin.copy:
+    dest: "{{ gpu_docker_daemon_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {
+        "default-runtime": "nvidia",
+        "runtimes": {
+          "nvidia": {
+            "path": "nvidia-container-runtime",
+            "runtimeArgs": []
+          }
+        }
+      }
+  notify: Restart Docker
+  when: site_edge_gpu_enabled | default(false) | bool
+
+- name: Flush Docker restart handler before GPU validation
+  ansible.builtin.meta: flush_handlers
+  when: site_edge_gpu_enabled | default(false) | bool
+
+- name: Verify GPU visibility on the site edge
+  ansible.builtin.command:
+    cmd: nvidia-smi -L
+  register: site_edge_gpu_inventory
+  changed_when: false
+  when: site_edge_gpu_enabled | default(false) | bool
+
+- name: Create site-edge directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ site_edge_base_dir }}"
+    - "{{ site_edge_config_dir }}"
+    - "{{ site_edge_pki_dir }}"
+    - "{{ site_edge_build_context_dir }}"
+    - "{{ site_edge_build_context_dir }}/proto"
+    - "{{ site_edge_build_context_dir }}/services"
+    - "{{ site_edge_data_dir }}"
+    - "{{ site_edge_buffer_dir }}"
+    - "{{ site_edge_local_minio_data_dir }}"
+
+- name: Copy site-edge NATS client certificate
+  ansible.builtin.copy:
+    src: "{{ edge_nats_client_cert_src }}"
+    dest: "{{ site_edge_pki_dir }}/client.crt"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Copy site-edge NATS client key
+  ansible.builtin.copy:
+    src: "{{ edge_nats_client_key_src }}"
+    dest: "{{ site_edge_pki_dir }}/client.key"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Copy site-edge NATS root CA
+  ansible.builtin.copy:
+    src: "{{ edge_nats_root_ca_src }}"
+    dest: "{{ site_edge_pki_dir }}/root_ca.crt"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Build the rendered site-edge config model
+  ansible.builtin.set_fact:
+    site_edge_rendered_config:
+      site_id: "{{ site_id }}"
+      cameras: "{{ site_cameras }}"
+      nats:
+        url: "{{ edge_nats_url }}"
+        tls:
+          cert_file: /etc/cilex/pki/client.crt
+          key_file: /etc/cilex/pki/client.key
+          ca_file: /etc/cilex/pki/root_ca.crt
+      minio:
+        endpoint: "127.0.0.1:{{ site_edge_local_minio_api_port }}"
+        access_key: "{{ site_edge_local_minio_root_user }}"
+        secret_key: "{{ site_edge_local_minio_root_password }}"
+        bucket: "{{ site_edge_local_minio_bucket }}"
+        secure: "false"
+      buffer:
+        path: /var/lib/edge-agent/buffer
+        max_bytes: "{{ site_edge_buffer_max_bytes | default(site_edge_buffer_budget_bytes) | int }}"
+        replay_rate_limit: "{{ site_edge_replay_rate_limit | default(100) | int }}"
+      metrics_port: "{{ site_edge_metrics_port | int }}"
+      log_level: "{{ site_edge_log_level | default('INFO') }}"
+
+- name: Render site-edge config.yaml
+  ansible.builtin.copy:
+    dest: "{{ site_edge_config_dir }}/config.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ site_edge_rendered_config | to_nice_yaml(indent=2, sort_keys=false) }}"
+
+- name: Write the site-edge local buffer budget marker
+  ansible.builtin.copy:
+    dest: "{{ site_edge_buffer_dir }}/BUFFER_BUDGET_BYTES"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ site_edge_buffer_max_bytes | default(site_edge_buffer_budget_bytes) | int }}\n"
+
+- name: Copy site-edge proto build context
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/proto/"
+    dest: "{{ site_edge_build_context_dir }}/proto/"
+    owner: root
+    group: root
+    mode: preserve
+    directory_mode: "0755"
+
+- name: Copy site-edge service build context
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/services/edge-agent/"
+    dest: "{{ site_edge_build_context_dir }}/services/edge-agent/"
+    owner: root
+    group: root
+    mode: preserve
+    directory_mode: "0755"
+
+- name: Build site-edge image from repo-root-compatible context
+  community.docker.docker_image:
+    name: "{{ edge_agent_image }}"
+    source: build
+    force_source: false
+    build:
+      path: "{{ site_edge_build_context_dir }}"
+      dockerfile: services/edge-agent/Dockerfile
+      pull: true
+
+- name: Start local MinIO for the site frame buffer
+  community.docker.docker_container:
+    name: "{{ site_edge_local_minio_container_name }}-{{ site_id }}"
+    image: "{{ minio_image }}"
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    env:
+      MINIO_ROOT_USER: "{{ site_edge_local_minio_root_user }}"
+      MINIO_ROOT_PASSWORD: "{{ site_edge_local_minio_root_password }}"
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    command:
+      - server
+      - /data
+      - --console-address
+      - ":{{ site_edge_local_minio_console_port }}"
+    volumes:
+      - "{{ site_edge_local_minio_data_dir }}:/data"
+  no_log: true
+
+- name: Wait for local site MinIO API
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ site_edge_local_minio_api_port }}"
+    delay: 3
+    timeout: 90
+
+- name: Ensure local site MinIO frame bucket exists
+  ansible.builtin.command:
+    cmd: >-
+      docker run --rm --network host
+      -e MC_HOST_local=http://{{ site_edge_local_minio_root_user }}:{{ site_edge_local_minio_root_password }}@127.0.0.1:{{ site_edge_local_minio_api_port }}
+      {{ minio_mc_image }}
+      mb --ignore-existing local/{{ site_edge_local_minio_bucket }}
+  register: site_edge_bucket_create
+  changed_when: "'Created' in (site_edge_bucket_create.stdout | default('') ~ site_edge_bucket_create.stderr | default(''))"
+  no_log: true
+
+- name: Start node-exporter on the site edge
+  community.docker.docker_container:
+    name: node-exporter
+    image: "{{ node_exporter_image }}"
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    command:
+      - --path.rootfs=/host
+      - --collector.textfile.directory=/textfile_collector
+    volumes:
+      - "/:/host:ro,rslave"
+      - "/proc:/host/proc:ro"
+      - "/sys:/host/sys:ro"
+      - "{{ monitoring_textfile_dir }}:/textfile_collector"
+
+- name: Start site-edge agent container
+  community.docker.docker_container:
+    name: "{{ site_edge_agent_container_name }}-{{ site_id }}"
+    image: "{{ edge_agent_image }}"
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    env:
+      EDGE_CONFIG: /app/config.yaml
+    volumes:
+      - "{{ site_edge_config_dir }}/config.yaml:/app/config.yaml:ro"
+      - "{{ site_edge_pki_dir }}:/etc/cilex/pki:ro"
+      - "{{ site_edge_buffer_dir }}:/var/lib/edge-agent/buffer"
+
+- name: Wait for the site-edge metrics endpoint
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ site_edge_metrics_port }}"
+    delay: 3
+    timeout: 90
+
+- name: Smoke test local site MinIO health endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ site_edge_local_minio_api_port }}/minio/health/live"
+    status_code: 200
+
+- name: Smoke test site-edge metrics endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ site_edge_metrics_port }}/metrics"
+    status_code: 200

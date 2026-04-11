@@ -1,0 +1,187 @@
+---
+all:
+  vars:
+    ansible_user: ubuntu
+    ansible_become: true
+    ansible_python_interpreter: /usr/bin/python3
+
+    step_ca_url: https://ca.cilex.internal
+    step_ca_fingerprint: replace-me
+    step_provisioner: ops-bootstrap
+    step_provisioner_password_file: /secure/step/provisioner-password
+
+    kafka_inter_broker_password: replace-me
+    kafka_admin_password: replace-me
+    kafka_ssl_keystore_password: replace-me
+    kafka_ssl_key_password: replace-me
+    kafka_ssl_truststore_password: replace-me
+    minio_root_password: replace-me
+    grafana_admin_password: replace-me
+    cvat_postgres_password: replace-me
+    cvat_admin_password: replace-me
+
+    monitoring_clock_targets:
+      - camera_id: cam-alpha-001
+        chrony_host: edge-alpha.cilex.internal
+        site_id: alpha
+      - camera_id: cam-beta-001
+        chrony_host: edge-beta.cilex.internal
+        site_id: beta
+
+  children:
+    central:
+      children:
+        kafka:
+          hosts:
+            kafka-1.core.cilex.internal:
+              ansible_host: 10.43.10.11
+              kafka_node_id: 1
+              kafka_ssl_keystore_src: /secure/kafka/kafka-1/broker.keystore.p12
+              kafka_ssl_truststore_src: /secure/kafka/kafka-1/broker.truststore.p12
+            kafka-2.core.cilex.internal:
+              ansible_host: 10.43.10.12
+              kafka_node_id: 2
+              kafka_ssl_keystore_src: /secure/kafka/kafka-2/broker.keystore.p12
+              kafka_ssl_truststore_src: /secure/kafka/kafka-2/broker.truststore.p12
+            kafka-3.core.cilex.internal:
+              ansible_host: 10.43.10.13
+              kafka_node_id: 3
+              kafka_ssl_keystore_src: /secure/kafka/kafka-3/broker.keystore.p12
+              kafka_ssl_truststore_src: /secure/kafka/kafka-3/broker.truststore.p12
+
+        timescaledb:
+          hosts:
+            timescaledb-1.core.cilex.internal:
+              ansible_host: 10.43.20.11
+
+        minio:
+          hosts:
+            minio-1.core.cilex.internal:
+              ansible_host: 10.43.20.12
+
+        triton:
+          hosts:
+            triton-1.core.cilex.internal:
+              ansible_host: 10.43.30.11
+              triton_gpu_devices:
+                - "0"
+            triton-2.core.cilex.internal:
+              ansible_host: 10.43.30.12
+              triton_gpu_devices:
+                - "0"
+
+        monitoring:
+          hosts:
+            monitoring-1.core.cilex.internal:
+              ansible_host: 10.43.40.11
+
+        services:
+          hosts:
+            app-1.core.cilex.internal:
+              ansible_host: 10.43.70.11
+              mtmc_enabled: true
+              service_deployments: []
+            app-2.core.cilex.internal:
+              ansible_host: 10.43.70.12
+              mtmc_enabled: false
+              service_deployments: []
+
+        mlflow:
+          hosts:
+            mlflow-1.core.cilex.internal:
+              ansible_host: 10.43.50.11
+
+        cvat:
+          hosts: {}
+
+    sites:
+      children:
+        site_alpha:
+          vars:
+            site_id: alpha
+            site_db_id: "11111111-1111-1111-1111-111111111111"
+            site_name: "Alpha Site"
+            camera_count: 10
+            site_pki_output_dir: /secure/sites/alpha
+            site_kafka_scram_user: svc-ingress-bridge-alpha
+            site_cameras:
+              - camera_id: cam-alpha-001
+                name: "Alpha Entrance"
+                rtsp_url: rtsp://replace-me/alpha/cam-001
+                zone_id: entrance
+                location_description: "Front entrance"
+                enabled: true
+              - camera_id: cam-alpha-002
+                name: "Alpha Lobby"
+                rtsp_url: rtsp://replace-me/alpha/cam-002
+                zone_id: lobby
+                location_description: "Lobby overview"
+                enabled: true
+            site_clock_targets:
+              - camera_id: cam-alpha-001
+                chrony_host: edge-alpha.cilex.internal
+                site_id: alpha
+          hosts:
+            edge-alpha.cilex.internal: {}
+            nats-alpha.edge.cilex.internal: {}
+
+        site_beta:
+          vars:
+            site_id: beta
+            site_db_id: "22222222-2222-2222-2222-222222222222"
+            site_name: "Beta Site"
+            camera_count: 8
+            site_pki_output_dir: /secure/sites/beta
+            site_kafka_scram_user: svc-ingress-bridge-beta
+            site_cameras:
+              - camera_id: cam-beta-001
+                name: "Beta Gate"
+                rtsp_url: rtsp://replace-me/beta/cam-001
+                zone_id: gate
+                location_description: "Vehicle gate"
+                enabled: true
+              - camera_id: cam-beta-002
+                name: "Beta Yard"
+                rtsp_url: rtsp://replace-me/beta/cam-002
+                zone_id: yard
+                location_description: "Yard overview"
+                enabled: true
+            site_clock_targets:
+              - camera_id: cam-beta-001
+                chrony_host: edge-beta.cilex.internal
+                site_id: beta
+          hosts:
+            edge-beta.cilex.internal: {}
+            nats-beta.edge.cilex.internal: {}
+
+    edge_gateways:
+      hosts:
+        edge-alpha.cilex.internal:
+          ansible_host: 10.44.1.10
+          edge_site_id: alpha
+          edge_nats_url: tls://nats-alpha.edge.cilex.internal:4222
+          edge_nats_client_cert_src: /secure/sites/alpha/edge-agent/client.crt
+          edge_nats_client_key_src: /secure/sites/alpha/edge-agent/client.key
+          edge_nats_root_ca_src: /secure/sites/alpha/edge-agent/root_ca.crt
+        edge-beta.cilex.internal:
+          ansible_host: 10.44.2.10
+          edge_site_id: beta
+          edge_nats_url: tls://nats-beta.edge.cilex.internal:4222
+          edge_nats_client_cert_src: /secure/sites/beta/edge-agent/client.crt
+          edge_nats_client_key_src: /secure/sites/beta/edge-agent/client.key
+          edge_nats_root_ca_src: /secure/sites/beta/edge-agent/root_ca.crt
+
+    nats:
+      hosts:
+        nats-alpha.edge.cilex.internal:
+          ansible_host: 10.44.1.20
+          nats_site_id: alpha
+          nats_server_cert_src: /secure/sites/alpha/nats-server/server.crt
+          nats_server_key_src: /secure/sites/alpha/nats-server/server.key
+          nats_root_ca_src: /secure/sites/alpha/nats-server/root_ca.crt
+        nats-beta.edge.cilex.internal:
+          ansible_host: 10.44.2.20
+          nats_site_id: beta
+          nats_server_cert_src: /secure/sites/beta/nats-server/server.crt
+          nats_server_key_src: /secure/sites/beta/nats-server/server.key
+          nats_root_ca_src: /secure/sites/beta/nats-server/root_ca.crt

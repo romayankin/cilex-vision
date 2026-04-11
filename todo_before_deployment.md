@@ -140,6 +140,12 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `scripts/evaluation/zone_benchmark.py` is an offline synthetic benchmark that applies the zone-threshold and boundary-search rules with NumPy search pools; it does not yet drive the live `services/mtmc-service` zone-sharding modules or a real FAISS-backed MTMC deployment. Add a service-backed benchmark path if final large-site sign-off must validate runtime behavior instead of a deterministic proxy
 - [ ] The benchmark hard-requires Python `mlflow` at execution time and no dedicated evaluation environment or requirements file is committed for `scripts/evaluation/`. Install MLflow in the operator/CI environment before relying on `P4-E02` automation for repeatable reports
 
+## Multi-Site Infrastructure Gaps (P4-O01)
+
+- [ ] `infra/ansible/playbooks/remove-site.yml` removes deployed scrape targets at runtime via `monitoring_excluded_hosts`, but it does not delete the site from inventory source files or generated inventory fragments. Add an inventory cleanup workflow before treating decommission as fully automated
+- [ ] Site archival in `remove-site.yml` is prefix-based and therefore only captures objects that are already keyed by `site_id` or `camera_id`. Buckets with other key layouts still need a stronger metadata index or archive manifest workflow for complete site-level retention handling
+- [ ] The new multi-site Terraform modules were syntax-shaped against the existing module interfaces, but Terraform CLI validation was not run in this environment. Run `terraform fmt` and `terraform validate` once Terraform is available before first apply
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover
