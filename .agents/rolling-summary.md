@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-11 02:18 (after P3-A01)*
+*Auto-generated after each task. Last updated: 2026-04-11 03:18 (after P3-A02)*
 
 ## Current Goal
 
-Complete Maturity (Phase 3) — 10/13 tasks done. Overall progress: 56/70 tasks complete across all phases.
+Complete Maturity (Phase 3) — 11/13 tasks done. Overall progress: 57/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -21,6 +21,7 @@ Complete Maturity (Phase 3) — 10/13 tasks done. Overall progress: 56/70 tasks 
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- reuse of existing annotation patterns from `P3-A01` for multipart media upload and dataset export polling
 - Grafana dashboard metadata matches existing repo conventions:
 - PromQL follows existing dashboard/alert conventions:
 - FakePool / FakeConn test pattern from topology conftest.py
@@ -35,11 +36,11 @@ Complete Maturity (Phase 3) — 10/13 tasks done. Overall progress: 56/70 tasks 
 
 ## Next Steps
 
-14 task(s) ready to launch. Priority:
-- **P3-A02** (Re-ID Training Data Collection) → codex-cli
+13 task(s) ready to launch. Priority:
 - **P3-X02** (Operations Handbook) → claude-code
 - **P3-X03** (Updated Cost Model) → claude-code
 - **P4-V02** (Jetson Edge Agent) → claude-code
 - **P4-V03** (LPR Module) → codex-cli
 - **P4-V04** (Embedding Search) → claude-code
+- **P4-V05** (Multi-Site Portal) → claude-code
 
