@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-11 04:18 (after P4-V02)*
+*Auto-generated after each task. Last updated: 2026-04-11 04:38 (after P4-V03)*
 
 ## Current Goal
 
-Complete Scale & Productization (Phase 4) — 2/12 tasks done. Overall progress: 60/70 tasks complete across all phases.
+Complete Scale & Productization (Phase 4) — 3/12 tasks done. Overall progress: 61/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -21,10 +21,10 @@ Complete Scale & Productization (Phase 4) — 2/12 tasks done. Overall progress:
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- Reason: this stays aligned with the repo’s COPY-first write pattern instead of doing row-by-row inserts.
+- Query API dynamic raw-SQL filtering pattern reused for `/lpr/results`
+- The task asked for a raw SQL migration, and there is no consistent ORM model pattern yet for this new table.
 - Same GStreamer RTSP patterns (lazy `gi` imports, decodebin pipeline)
-- Same proto serialization pattern (lazy imports inside function)
-- Same dataclass patterns as v1: frozen dataclasses for all value types, `CostModelInputs` aggregates everything.
-- Same Excel generation pattern with openpyxl (lazy import via `require_module`).
 
 ## Open Issues
 
@@ -36,11 +36,11 @@ Complete Scale & Productization (Phase 4) — 2/12 tasks done. Overall progress:
 
 ## Next Steps
 
-10 task(s) ready to launch. Priority:
-- **P4-V03** (LPR Module) → codex-cli
+9 task(s) ready to launch. Priority:
 - **P4-V04** (Embedding Search) → claude-code
 - **P4-V05** (Multi-Site Portal) → claude-code
 - **P4-E01** (50-100 Camera Load Test) → codex-cli
 - **P4-E02** (Zone Benchmark) → codex-cli
 - **P4-O01** (Multi-Site Infrastructure) → codex-cli
+- **P4-O02** (Disaster Recovery) → codex-cli
 
