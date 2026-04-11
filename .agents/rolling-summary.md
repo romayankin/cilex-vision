@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-11 05:00 (after P4-V05)*
+*Auto-generated after each task. Last updated: 2026-04-12 00:46 (after P4-E01)*
 
 ## Current Goal
 
-Complete Scale & Productization (Phase 4) — 5/12 tasks done. Overall progress: 63/70 tasks complete across all phases.
+Complete Scale & Productization (Phase 4) — 6/12 tasks done. Overall progress: 64/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -24,7 +24,6 @@ Complete Scale & Productization (Phase 4) — 5/12 tasks done. Overall progress:
 - Same `"use client"` + `useEffect` + `useCallback` data fetching pattern as search/admin pages
 - Same loading/error/content rendering pattern
 - Same Tailwind class patterns (card borders, table styling, badges, buttons)
-- Same pagination button pattern from search page
 
 ## Open Issues
 
@@ -36,11 +35,11 @@ Complete Scale & Productization (Phase 4) — 5/12 tasks done. Overall progress:
 
 ## Next Steps
 
-7 task(s) ready to launch. Priority:
-- **P4-E01** (50-100 Camera Load Test) → codex-cli
+6 task(s) ready to launch. Priority:
 - **P4-E02** (Zone Benchmark) → codex-cli
 - **P4-O01** (Multi-Site Infrastructure) → codex-cli
 - **P4-O02** (Disaster Recovery) → codex-cli
 - **P4-A01** (Multi-Site Dataset) → claude-code
 - **P4-X01** (Commercial Documentation) → codex-cli
+- **P4-X02** (Architecture Reference) → codex-cli
 
