@@ -1,0 +1,224 @@
+version: 2
+updated_at: "2026-04-11"
+defaults:
+  target_pass_through_rate: 0.15
+  capture_window_s: 600
+  detector_model: yolov8l
+  detector_confidence_threshold: 0.4
+cameras: {}
+cost_model:
+  data_source: pilot-measured
+  camera_counts:
+    values:
+      - 10
+      - 50
+      - 100
+  motion_duty_cycle_scenarios:
+    P25:
+      value: 0.06
+      source: pilot-measured
+      original_estimate: 0.08
+    P50:
+      value: 0.12
+      source: pilot-measured
+      original_estimate: 0.15
+    P90:
+      value: 0.30
+      source: pilot-measured
+      original_estimate: 0.35
+  workload:
+    bitrate_mbps:
+      value: 4.0
+      source: pilot-measured
+      original_estimate: 4.0
+    inference_fps:
+      value: 10.0
+      source: stress-test
+      original_estimate: 10.0
+    detections_per_frame:
+      value: 3.2
+      source: pilot-measured
+      original_estimate: 5.0
+    active_tracks_per_camera:
+      value: 4.0
+      source: pilot-measured
+      original_estimate: 5.0
+    avg_event_clip_seconds:
+      value: 12.0
+      source: pilot-measured
+      original_estimate: 12.0
+    events_per_active_track_hour:
+      value: 0.08
+      source: pilot-measured
+      original_estimate: 0.08
+    clip_transcode_ratio:
+      value: 0.3
+      source: pilot-measured
+      original_estimate: 0.3
+    attribute_messages_per_detection:
+      value: 1.5
+      source: pilot-measured
+      original_estimate: 1.5
+    embedding_updates_per_active_track_hour:
+      value: 2.0
+      source: pilot-measured
+      original_estimate: 2.0
+  gpu:
+    gpu_cost_monthly_usd:
+      value: 1200.0
+      source: pilot-measured
+      original_estimate: 1200.0
+    cameras_per_gpu:
+      value: 32.0
+      source: stress-test
+      original_estimate: 32.0
+    gpu_headroom_factor:
+      value: 1.15
+      source: pilot-measured
+      original_estimate: 1.15
+  retention_days:
+    central_frame_blobs:
+      value: 7.0
+      source: pilot-measured
+      original_estimate: 30.0
+    warm_event_clips:
+      value: 90.0
+      source: pilot-measured
+      original_estimate: 90.0
+    timeseries_metadata:
+      value: 30.0
+      source: pilot-measured
+      original_estimate: 30.0
+    timeseries_compress_after:
+      value: 2.0
+      source: pilot-measured
+      original_estimate: 2.0
+  storage_costs_usd_per_gb_month:
+    hot_object:
+      value: 0.023
+      source: pilot-measured
+      original_estimate: 0.023
+    warm_object:
+      value: 0.0125
+      source: pilot-measured
+      original_estimate: 0.0125
+    cold_object:
+      value: 0.0125
+      source: pilot-measured
+      original_estimate: 0.0125
+    kafka_broker_disk:
+      value: 0.1
+      source: pilot-measured
+      original_estimate: 0.1
+    timescaledb_nvme:
+      value: 0.12
+      source: pilot-measured
+      original_estimate: 0.12
+  database:
+    detection_row_kb_uncompressed:
+      value: 0.35
+      source: pilot-measured
+      original_estimate: 0.35
+    track_observation_row_kb_uncompressed:
+      value: 0.22
+      source: pilot-measured
+      original_estimate: 0.22
+    hypertable_compression_ratio:
+      value: 10.0
+      source: pilot-measured
+      original_estimate: 10.0
+    index_overhead_factor:
+      value: 1.35
+      source: pilot-measured
+      original_estimate: 1.35
+  kafka:
+    broker_storage_overhead_factor:
+      value: 1.2
+      source: pilot-measured
+      original_estimate: 1.2
+    avg_message_kb:
+      frames.sampled.refs:
+        value: 0.5
+        source: pilot-measured
+        original_estimate: 0.5
+      frames.decoded.refs:
+        value: 0.5
+        source: pilot-measured
+        original_estimate: 0.5
+      tracklets.local:
+        value: 1.5
+        source: pilot-measured
+        original_estimate: 1.5
+      bulk.detections:
+        value: 0.4
+        source: pilot-measured
+        original_estimate: 0.4
+      attributes.jobs:
+        value: 0.35
+        source: pilot-measured
+        original_estimate: 0.35
+      mtmc.active_embeddings:
+        value: 3.0
+        source: pilot-measured
+        original_estimate: 3.0
+      events.raw:
+        value: 1.0
+        source: pilot-measured
+        original_estimate: 1.0
+      archive.transcode.requested:
+        value: 0.5
+        source: pilot-measured
+        original_estimate: 0.5
+      archive.transcode.completed:
+        value: 0.5
+        source: pilot-measured
+        original_estimate: 0.5
+  service_unit_costs_monthly_usd:
+    kafka_broker:
+      value: 150.0
+      source: pilot-measured
+      original_estimate: 150.0
+    kafka_ui:
+      value: 15.0
+      source: pilot-measured
+      original_estimate: 15.0
+    nats:
+      value: 25.0
+      source: pilot-measured
+      original_estimate: 25.0
+    timescaledb:
+      value: 325.0
+      source: pilot-measured
+      original_estimate: 325.0
+    minio:
+      value: 120.0
+      source: pilot-measured
+      original_estimate: 120.0
+    redis:
+      value: 35.0
+      source: pilot-measured
+      original_estimate: 35.0
+    prometheus:
+      value: 40.0
+      source: pilot-measured
+      original_estimate: 40.0
+    grafana:
+      value: 30.0
+      source: pilot-measured
+      original_estimate: 30.0
+    mlflow:
+      value: 45.0
+      source: pilot-measured
+      original_estimate: 45.0
+  mtmc:
+    faiss_memory_mb_per_10k_embeddings: 50
+    checkpoint_storage_mb: 100
+    reid_gpu_fraction: 0.1
+  annotation:
+    cvat_hosting_monthly_usd: 50
+    mining_compute_monthly_usd: 25
+    annotator_cost_per_hour_usd: 25
+    daily_mining_hours: 0.5
+  shadow:
+    shadow_gpu_overhead_factor: 0.15
+    shadow_kafka_overhead_factor: 0.1
