@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-12 03:29 (after P4-O01)*
+*Auto-generated after each task. Last updated: 2026-04-12 04:15 (after P4-O02)*
 
 ## Current Goal
 
-Complete Scale & Productization (Phase 4) — 8/12 tasks done. Overall progress: 66/70 tasks complete across all phases.
+Complete Scale & Productization (Phase 4) — 9/12 tasks done. Overall progress: 67/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -15,17 +15,14 @@ Complete Scale & Productization (Phase 4) — 8/12 tasks done. Overall progress:
 - Triton EXPLICIT mode — shadow deploy before cutover.
 - Protobuf for all inter-service messages, buf lint in CI.
 - Python str enums as TEXT with CHECK constraints, not native PG ENUMs.
-- Do not feed the slug into topology SQL.
-- The task inputs do not include real camera RTSP URLs or zone layouts.
 
 ## Key Decisions
 
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- It extracts the config archive into the chosen restore root and copies the archived repo subtree over it.
 - **Site archival is best-effort against current object-key conventions**
-- Same `"use client"` + `useEffect` + `useCallback` data fetching pattern as search/admin pages
-- Same loading/error/content rendering pattern
 
 ## Open Issues
 
@@ -37,8 +34,7 @@ Complete Scale & Productization (Phase 4) — 8/12 tasks done. Overall progress:
 
 ## Next Steps
 
-4 task(s) ready to launch. Priority:
-- **P4-O02** (Disaster Recovery) → codex-cli
+3 task(s) ready to launch. Priority:
 - **P4-A01** (Multi-Site Dataset) → claude-code
 - **P4-X01** (Commercial Documentation) → codex-cli
 - **P4-X02** (Architecture Reference) → codex-cli
