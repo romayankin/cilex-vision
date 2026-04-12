@@ -8,7 +8,7 @@ WORKDIR /app
 COPY services/bulk-collector/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY proto /app/proto
+COPY proto /proto
 COPY services/bulk-collector /app
 
 RUN bash /app/gen_proto.sh

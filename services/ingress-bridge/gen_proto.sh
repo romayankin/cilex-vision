@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-OUT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/proto_gen"
-
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+OUT_DIR="${SCRIPT_DIR}/proto_gen"
 rm -rf "${OUT_DIR}"
 mkdir -p "${OUT_DIR}"
-
+if [ -d "/proto/vidanalytics" ]; then
+    PROTO_ROOT="/proto"
+elif [ -d "${SCRIPT_DIR}/../../proto/vidanalytics" ]; then
+    PROTO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)/proto"
+else
+    echo "Cannot find proto directory" >&2
+    exit 1
+fi
 python3 -m grpc_tools.protoc \
-  -I "${ROOT_DIR}/proto" \
+  -I "${PROTO_ROOT}" \
   --python_out="${OUT_DIR}" \
-  "${ROOT_DIR}"/proto/vidanalytics/v1/*/*.proto
+  "${PROTO_ROOT}"/vidanalytics/v1/*/*.proto
