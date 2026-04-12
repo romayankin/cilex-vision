@@ -1,10 +1,10 @@
 # Rolling Summary
 
-*Auto-generated after each task. Last updated: 2026-04-12 04:15 (after P4-O02)*
+*Auto-generated after each task. Last updated: 2026-04-12 04:29 (after P4-A01)*
 
 ## Current Goal
 
-Complete Scale & Productization (Phase 4) — 9/12 tasks done. Overall progress: 67/70 tasks complete across all phases.
+Complete Scale & Productization (Phase 4) — 10/12 tasks done. Overall progress: 68/70 tasks complete across all phases.
 
 ## Active Constraints
 
@@ -21,6 +21,7 @@ Complete Scale & Productization (Phase 4) — 9/12 tasks done. Overall progress:
 - ByteTrack selected as tracker (proxy bake-off on MOT17, live re-validation pending).
 - FAISS flat index for real-time MTMC (30-min horizon), pgvector for historical (90 days).
 - CPU-only pilot: YOLOv8n ONNX on Triton, 4 cameras, single Ubuntu node.
+- `if __name__ == "__main__"` with `try/except SystemExit(str(exc))` entry pattern
 - It extracts the config archive into the chosen restore root and copies the archived repo subtree over it.
 - **Site archival is best-effort against current object-key conventions**
 
@@ -34,8 +35,7 @@ Complete Scale & Productization (Phase 4) — 9/12 tasks done. Overall progress:
 
 ## Next Steps
 
-3 task(s) ready to launch. Priority:
-- **P4-A01** (Multi-Site Dataset) → claude-code
+2 task(s) ready to launch. Priority:
 - **P4-X01** (Commercial Documentation) → codex-cli
 - **P4-X02** (Architecture Reference) → codex-cli
 
