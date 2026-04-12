@@ -196,3 +196,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     ip_address    VARCHAR(45),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Seed default site
+INSERT INTO sites (site_id, name, timezone)
+VALUES ('00000000-0000-0000-0000-000000000001', 'Default Site', 'UTC')
+ON CONFLICT (site_id) DO NOTHING;

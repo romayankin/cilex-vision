@@ -9,7 +9,7 @@ import type { TopologyGraph, CameraNode } from "@/lib/api-client";
 import { getUserRole, isAdmin } from "@/lib/auth";
 import TopologyEditor from "@/components/TopologyEditor";
 
-const DEFAULT_SITE = "site-01";
+const DEFAULT_SITE = "00000000-0000-0000-0000-000000000001";
 
 export default function TopologyPage() {
   const role = getUserRole();

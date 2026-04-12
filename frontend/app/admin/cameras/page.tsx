@@ -10,7 +10,7 @@ import type { CameraNode, CameraCreateRequest, TopologyGraph } from "@/lib/api-c
 import { getUserRole, isAdmin } from "@/lib/auth";
 import CameraForm from "@/components/CameraForm";
 
-const DEFAULT_SITE = "site-01";
+const DEFAULT_SITE = "00000000-0000-0000-0000-000000000001";
 
 export default function CamerasPage() {
   const role = getUserRole();

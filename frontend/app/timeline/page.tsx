@@ -12,7 +12,7 @@ export default function TimelineIndexPage() {
   useEffect(() => {
     (async () => {
       try {
-        const topo = await getTopologyGraph("site-01");
+        const topo = await getTopologyGraph("00000000-0000-0000-0000-000000000001");
         setCameras(topo.cameras ?? []);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to load cameras";

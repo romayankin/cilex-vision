@@ -5,7 +5,7 @@ import { getTopologyGraph } from "@/lib/api-client";
 import type { CameraNode, TopologyGraph } from "@/lib/api-client";
 import { getUserRole, isAdmin } from "@/lib/auth";
 
-const DEFAULT_SITE = "site-01";
+const DEFAULT_SITE = "00000000-0000-0000-0000-000000000001";
 
 interface CalibrationInfo {
   camera_id: string;
