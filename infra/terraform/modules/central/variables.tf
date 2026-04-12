@@ -1,11 +1,11 @@
-variable "provider" {
+variable "deployment_provider" {
   description = "Target infrastructure provider."
   type        = string
   default     = "aws"
 
   validation {
-    condition     = contains(["aws", "gcp", "bare_metal"], var.provider)
-    error_message = "provider must be one of aws, gcp, or bare_metal."
+    condition     = contains(["aws", "gcp", "bare_metal"], var.deployment_provider)
+    error_message = "deployment_provider must be one of aws, gcp, or bare_metal."
   }
 }
 
@@ -160,7 +160,7 @@ variable "gcp_labels" {
 }
 
 variable "bare_metal_hosts" {
-  description = "Per-role bare-metal hostnames and IPs when provider=bare_metal."
+  description = "Per-role bare-metal hostnames and IPs when deployment_provider=bare_metal."
   type = map(object({
     hostnames   = list(string)
     private_ips = list(string)

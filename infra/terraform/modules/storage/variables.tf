@@ -1,11 +1,11 @@
-variable "provider" {
+variable "deployment_provider" {
   description = "Target infrastructure provider."
   type        = string
   default     = "aws"
 
   validation {
-    condition     = contains(["aws", "gcp", "bare_metal"], var.provider)
-    error_message = "provider must be one of aws, gcp, or bare_metal."
+    condition     = contains(["aws", "gcp", "bare_metal"], var.deployment_provider)
+    error_message = "deployment_provider must be one of aws, gcp, or bare_metal."
   }
 }
 

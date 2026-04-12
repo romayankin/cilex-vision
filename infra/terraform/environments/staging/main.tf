@@ -132,34 +132,34 @@ provider "google" {
 module "network" {
   source = "../../modules/network"
 
-  provider           = var.deployment_provider
-  name_prefix        = var.site_prefix
-  vpc_cidr           = "10.0.0.0/8"
-  core_subnet_cidr   = "10.43.0.0/16"
-  edge_subnet_cidr   = "10.42.0.0/16"
-  camera_subnet_cidr = "192.168.0.0/16"
-  public_https_cidrs = var.public_https_cidrs
-  aws_tags           = local.common_aws_tags
-  gcp_project        = var.gcp_project
-  gcp_region         = var.gcp_region
+  deployment_provider = var.deployment_provider
+  name_prefix         = var.site_prefix
+  vpc_cidr            = "10.0.0.0/8"
+  core_subnet_cidr    = "10.43.0.0/16"
+  edge_subnet_cidr    = "10.42.0.0/16"
+  camera_subnet_cidr  = "192.168.0.0/16"
+  public_https_cidrs  = var.public_https_cidrs
+  aws_tags            = local.common_aws_tags
+  gcp_project         = var.gcp_project
+  gcp_region          = var.gcp_region
 }
 
 module "storage" {
   source = "../../modules/storage"
 
-  provider           = var.deployment_provider
-  name_prefix        = var.site_prefix
-  availability_zone  = var.aws_availability_zone
-  gcp_zone           = var.gcp_zone
-  kafka_broker_count = local.counts.kafka
-  gpu_node_count     = local.counts.triton
-  aws_tags           = local.common_aws_tags
+  deployment_provider = var.deployment_provider
+  name_prefix         = var.site_prefix
+  availability_zone   = var.aws_availability_zone
+  gcp_zone            = var.gcp_zone
+  kafka_broker_count  = local.counts.kafka
+  gpu_node_count      = local.counts.triton
+  aws_tags            = local.common_aws_tags
 }
 
 module "kafka" {
   source = "../../modules/compute"
 
-  provider               = var.deployment_provider
+  deployment_provider    = var.deployment_provider
   node_type              = "cpu_service"
   name_prefix            = "${var.site_prefix}-kafka"
   node_count             = local.counts.kafka
@@ -180,7 +180,7 @@ module "kafka" {
 module "timescaledb" {
   source = "../../modules/compute"
 
-  provider               = var.deployment_provider
+  deployment_provider    = var.deployment_provider
   node_type              = "cpu_service"
   name_prefix            = "${var.site_prefix}-timescaledb"
   node_count             = local.counts.timescaledb
@@ -201,7 +201,7 @@ module "timescaledb" {
 module "minio" {
   source = "../../modules/compute"
 
-  provider               = var.deployment_provider
+  deployment_provider    = var.deployment_provider
   node_type              = "cpu_service"
   name_prefix            = "${var.site_prefix}-minio"
   node_count             = local.counts.minio
@@ -222,7 +222,7 @@ module "minio" {
 module "triton" {
   source = "../../modules/compute"
 
-  provider               = var.deployment_provider
+  deployment_provider    = var.deployment_provider
   node_type              = "gpu_inference"
   name_prefix            = "${var.site_prefix}-triton"
   node_count             = local.counts.triton
@@ -244,7 +244,7 @@ module "triton" {
 module "monitoring" {
   source = "../../modules/compute"
 
-  provider               = var.deployment_provider
+  deployment_provider    = var.deployment_provider
   node_type              = "monitoring"
   name_prefix            = "${var.site_prefix}-monitoring"
   node_count             = local.counts.monitoring
@@ -265,7 +265,7 @@ module "monitoring" {
 module "services" {
   source = "../../modules/compute"
 
-  provider               = var.deployment_provider
+  deployment_provider    = var.deployment_provider
   node_type              = "cpu_service"
   name_prefix            = "${var.site_prefix}-services"
   node_count             = local.counts.services
@@ -286,7 +286,7 @@ module "services" {
 module "edge_gateways" {
   source = "../../modules/compute"
 
-  provider               = var.deployment_provider
+  deployment_provider    = var.deployment_provider
   node_type              = "edge_gateway"
   name_prefix            = "${var.site_prefix}-edge"
   node_count             = local.counts.edge_gateways
@@ -307,7 +307,7 @@ module "edge_gateways" {
 module "nats" {
   source = "../../modules/compute"
 
-  provider               = var.deployment_provider
+  deployment_provider    = var.deployment_provider
   node_type              = "edge_gateway"
   name_prefix            = "${var.site_prefix}-nats"
   node_count             = local.counts.nats
@@ -328,7 +328,7 @@ module "nats" {
 module "mlflow" {
   source = "../../modules/compute"
 
-  provider               = var.deployment_provider
+  deployment_provider    = var.deployment_provider
   node_type              = "cpu_service"
   name_prefix            = "${var.site_prefix}-mlflow"
   node_count             = local.counts.mlflow

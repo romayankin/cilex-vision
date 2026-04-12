@@ -36,9 +36,9 @@ output "site_storage_endpoint" {
 output "site_storage_volume_ids" {
   description = "Provisioned site-local storage volume IDs or placeholders."
   value = (
-    var.provider == "aws"
+    var.deployment_provider == "aws"
     ? aws_ebs_volume.site_storage[*].id
-    : var.provider == "gcp"
+    : var.deployment_provider == "gcp"
     ? google_compute_disk.site_storage[*].id
     : null_resource.site_storage[*].id
   )

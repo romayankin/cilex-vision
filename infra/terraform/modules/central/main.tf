@@ -21,36 +21,36 @@ locals {
 module "network" {
   source = "../network"
 
-  provider           = var.provider
-  name_prefix        = var.name_prefix
-  vpc_cidr           = var.vpc_cidr
-  core_subnet_cidr   = var.core_subnet_cidr
-  edge_subnet_cidr   = var.edge_subnet_cidr
-  camera_subnet_cidr = var.camera_subnet_cidr
-  public_https_cidrs = var.public_https_cidrs
-  aws_tags           = local.common_aws_tags
-  gcp_project        = var.gcp_project
-  gcp_region         = var.gcp_region
-  gcp_labels         = local.common_gcp_labels
+  deployment_provider = var.deployment_provider
+  name_prefix         = var.name_prefix
+  vpc_cidr            = var.vpc_cidr
+  core_subnet_cidr    = var.core_subnet_cidr
+  edge_subnet_cidr    = var.edge_subnet_cidr
+  camera_subnet_cidr  = var.camera_subnet_cidr
+  public_https_cidrs  = var.public_https_cidrs
+  aws_tags            = local.common_aws_tags
+  gcp_project         = var.gcp_project
+  gcp_region          = var.gcp_region
+  gcp_labels          = local.common_gcp_labels
 }
 
 module "storage" {
   source = "../storage"
 
-  provider           = var.provider
-  name_prefix        = var.name_prefix
-  availability_zone  = var.aws_availability_zone
-  gcp_zone           = var.gcp_zone
-  kafka_broker_count = var.kafka_broker_count
-  gpu_node_count     = var.gpu_node_count
-  aws_tags           = local.common_aws_tags
-  gcp_labels         = local.common_gcp_labels
+  deployment_provider = var.deployment_provider
+  name_prefix         = var.name_prefix
+  availability_zone   = var.aws_availability_zone
+  gcp_zone            = var.gcp_zone
+  kafka_broker_count  = var.kafka_broker_count
+  gpu_node_count      = var.gpu_node_count
+  aws_tags            = local.common_aws_tags
+  gcp_labels          = local.common_gcp_labels
 }
 
 module "kafka" {
   source = "../compute"
 
-  provider               = var.provider
+  deployment_provider    = var.deployment_provider
   node_type              = "cpu_service"
   name_prefix            = "${var.name_prefix}-kafka"
   node_count             = var.kafka_broker_count
@@ -72,7 +72,7 @@ module "kafka" {
 module "timescaledb" {
   source = "../compute"
 
-  provider               = var.provider
+  deployment_provider    = var.deployment_provider
   node_type              = "cpu_service"
   name_prefix            = "${var.name_prefix}-timescaledb"
   node_count             = var.timescaledb_node_count
@@ -94,7 +94,7 @@ module "timescaledb" {
 module "minio" {
   source = "../compute"
 
-  provider               = var.provider
+  deployment_provider    = var.deployment_provider
   node_type              = "cpu_service"
   name_prefix            = "${var.name_prefix}-minio"
   node_count             = var.minio_node_count
@@ -116,7 +116,7 @@ module "minio" {
 module "gpu_pool" {
   source = "../compute"
 
-  provider               = var.provider
+  deployment_provider    = var.deployment_provider
   node_type              = "gpu_inference"
   name_prefix            = "${var.name_prefix}-triton"
   node_count             = var.gpu_node_count
@@ -139,7 +139,7 @@ module "gpu_pool" {
 module "monitoring" {
   source = "../compute"
 
-  provider               = var.provider
+  deployment_provider    = var.deployment_provider
   node_type              = "monitoring"
   name_prefix            = "${var.name_prefix}-monitoring"
   node_count             = var.monitoring_node_count
@@ -162,7 +162,7 @@ module "monitoring" {
 module "services" {
   source = "../compute"
 
-  provider               = var.provider
+  deployment_provider    = var.deployment_provider
   node_type              = "cpu_service"
   name_prefix            = "${var.name_prefix}-services"
   node_count             = var.service_node_count

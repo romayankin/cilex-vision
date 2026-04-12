@@ -1,5 +1,5 @@
 resource "aws_vpc" "this" {
-  count = var.provider == "aws" ? 1 : 0
+  count = var.deployment_provider == "aws" ? 1 : 0
 
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
@@ -15,7 +15,7 @@ resource "aws_vpc" "this" {
 }
 
 resource "aws_subnet" "core" {
-  count = var.provider == "aws" ? 1 : 0
+  count = var.deployment_provider == "aws" ? 1 : 0
 
   vpc_id                  = aws_vpc.this[0].id
   cidr_block              = var.core_subnet_cidr
@@ -25,7 +25,7 @@ resource "aws_subnet" "core" {
 }
 
 resource "aws_subnet" "edge" {
-  count = var.provider == "aws" ? 1 : 0
+  count = var.deployment_provider == "aws" ? 1 : 0
 
   vpc_id                  = aws_vpc.this[0].id
   cidr_block              = var.edge_subnet_cidr
@@ -35,7 +35,7 @@ resource "aws_subnet" "edge" {
 }
 
 resource "aws_subnet" "camera" {
-  count = var.provider == "aws" ? 1 : 0
+  count = var.deployment_provider == "aws" ? 1 : 0
 
   vpc_id                  = aws_vpc.this[0].id
   cidr_block              = var.camera_subnet_cidr
@@ -45,7 +45,7 @@ resource "aws_subnet" "camera" {
 }
 
 resource "aws_security_group" "core_internal" {
-  count = var.provider == "aws" ? 1 : 0
+  count = var.deployment_provider == "aws" ? 1 : 0
 
   name        = "${var.name_prefix}-core-internal"
   description = "Allow full east-west access across core nodes."
@@ -70,7 +70,7 @@ resource "aws_security_group" "core_internal" {
 }
 
 resource "aws_security_group" "edge_to_core" {
-  count = var.provider == "aws" ? 1 : 0
+  count = var.deployment_provider == "aws" ? 1 : 0
 
   name        = "${var.name_prefix}-edge-to-core"
   description = "Allow edge-originated NATS and Kafka traffic into core."
@@ -103,7 +103,7 @@ resource "aws_security_group" "edge_to_core" {
 }
 
 resource "aws_security_group" "camera_to_edge" {
-  count = var.provider == "aws" ? 1 : 0
+  count = var.deployment_provider == "aws" ? 1 : 0
 
   name        = "${var.name_prefix}-camera-to-edge"
   description = "Allow RTSP only from the camera VLAN into edge gateways."
@@ -128,7 +128,7 @@ resource "aws_security_group" "camera_to_edge" {
 }
 
 resource "aws_security_group" "monitoring" {
-  count = var.provider == "aws" ? 1 : 0
+  count = var.deployment_provider == "aws" ? 1 : 0
 
   name        = "${var.name_prefix}-monitoring"
   description = "Allow Prometheus and service metrics from the monitoring subnet."
@@ -169,7 +169,7 @@ resource "aws_security_group" "monitoring" {
 }
 
 resource "aws_security_group" "public_api" {
-  count = var.provider == "aws" ? 1 : 0
+  count = var.deployment_provider == "aws" ? 1 : 0
 
   name        = "${var.name_prefix}-public-api"
   description = "Expose HTTPS only on the designated API gateway."
@@ -194,7 +194,7 @@ resource "aws_security_group" "public_api" {
 }
 
 resource "google_compute_network" "this" {
-  count = var.provider == "gcp" ? 1 : 0
+  count = var.deployment_provider == "gcp" ? 1 : 0
 
   project                 = var.gcp_project
   name                    = "${var.name_prefix}-network"
@@ -202,7 +202,7 @@ resource "google_compute_network" "this" {
 }
 
 resource "google_compute_subnetwork" "core" {
-  count = var.provider == "gcp" ? 1 : 0
+  count = var.deployment_provider == "gcp" ? 1 : 0
 
   project       = var.gcp_project
   region        = var.gcp_region
@@ -212,7 +212,7 @@ resource "google_compute_subnetwork" "core" {
 }
 
 resource "google_compute_subnetwork" "edge" {
-  count = var.provider == "gcp" ? 1 : 0
+  count = var.deployment_provider == "gcp" ? 1 : 0
 
   project       = var.gcp_project
   region        = var.gcp_region
@@ -222,7 +222,7 @@ resource "google_compute_subnetwork" "edge" {
 }
 
 resource "google_compute_subnetwork" "camera" {
-  count = var.provider == "gcp" ? 1 : 0
+  count = var.deployment_provider == "gcp" ? 1 : 0
 
   project       = var.gcp_project
   region        = var.gcp_region
@@ -232,7 +232,7 @@ resource "google_compute_subnetwork" "camera" {
 }
 
 resource "google_compute_firewall" "core_internal" {
-  count = var.provider == "gcp" ? 1 : 0
+  count = var.deployment_provider == "gcp" ? 1 : 0
 
   project = var.gcp_project
   name    = "${var.name_prefix}-core-internal"
@@ -247,7 +247,7 @@ resource "google_compute_firewall" "core_internal" {
 }
 
 resource "google_compute_firewall" "edge_to_core" {
-  count = var.provider == "gcp" ? 1 : 0
+  count = var.deployment_provider == "gcp" ? 1 : 0
 
   project = var.gcp_project
   name    = "${var.name_prefix}-edge-to-core"
@@ -263,7 +263,7 @@ resource "google_compute_firewall" "edge_to_core" {
 }
 
 resource "google_compute_firewall" "camera_to_edge" {
-  count = var.provider == "gcp" ? 1 : 0
+  count = var.deployment_provider == "gcp" ? 1 : 0
 
   project = var.gcp_project
   name    = "${var.name_prefix}-camera-to-edge"
@@ -279,7 +279,7 @@ resource "google_compute_firewall" "camera_to_edge" {
 }
 
 resource "google_compute_firewall" "monitoring" {
-  count = var.provider == "gcp" ? 1 : 0
+  count = var.deployment_provider == "gcp" ? 1 : 0
 
   project = var.gcp_project
   name    = "${var.name_prefix}-monitoring"
@@ -295,7 +295,7 @@ resource "google_compute_firewall" "monitoring" {
 }
 
 resource "google_compute_firewall" "public_api" {
-  count = var.provider == "gcp" ? 1 : 0
+  count = var.deployment_provider == "gcp" ? 1 : 0
 
   project = var.gcp_project
   name    = "${var.name_prefix}-public-api"
@@ -311,7 +311,7 @@ resource "google_compute_firewall" "public_api" {
 }
 
 resource "null_resource" "bare_metal_network" {
-  count = var.provider == "bare_metal" ? 1 : 0
+  count = var.deployment_provider == "bare_metal" ? 1 : 0
 
   triggers = {
     core_subnet   = var.core_subnet_cidr

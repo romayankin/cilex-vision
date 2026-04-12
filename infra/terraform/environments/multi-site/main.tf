@@ -115,16 +115,16 @@ variable "bare_metal_hosts" {
 variable "sites" {
   description = "Multi-site edge definitions keyed by site slug."
   type = map(object({
-    site_name         = string
-    edge_count        = number
-    camera_count      = number
-    vpc_cidr          = string
-    core_subnet_cidr  = string
-    edge_subnet_cidr  = string
-    camera_subnet_cidr = string
-    assign_public_ip  = optional(bool, true)
-    storage_size_gb   = optional(number, 250)
-    storage_iops      = optional(number, 3000)
+    site_name              = string
+    edge_count             = number
+    camera_count           = number
+    vpc_cidr               = string
+    core_subnet_cidr       = string
+    edge_subnet_cidr       = string
+    camera_subnet_cidr     = string
+    assign_public_ip       = optional(bool, true)
+    storage_size_gb        = optional(number, 250)
+    storage_iops           = optional(number, 3000)
     bare_metal_hostnames   = optional(list(string), [])
     bare_metal_private_ips = optional(list(string), [])
   }))
@@ -173,28 +173,28 @@ provider "google" {
 module "central" {
   source = "../../modules/central"
 
-  provider           = var.deployment_provider
-  name_prefix        = "${local.workspace_prefix}-central"
-  site_count         = length(var.sites)
-  gpu_node_count     = var.central_gpu_node_count
-  kafka_broker_count = var.central_kafka_broker_count
-  ssh_public_key     = var.ssh_public_key
-  public_https_cidrs = var.public_https_cidrs
+  deployment_provider   = var.deployment_provider
+  name_prefix           = "${local.workspace_prefix}-central"
+  site_count            = length(var.sites)
+  gpu_node_count        = var.central_gpu_node_count
+  kafka_broker_count    = var.central_kafka_broker_count
+  ssh_public_key        = var.ssh_public_key
+  public_https_cidrs    = var.public_https_cidrs
   aws_availability_zone = var.aws_availability_zone
-  aws_linux_ami_id   = var.aws_linux_ami_id
-  aws_gpu_ami_id     = var.aws_gpu_ami_id
-  aws_key_name       = var.aws_key_name
-  gcp_project        = var.gcp_project
-  gcp_region         = var.gcp_region
-  gcp_zone           = var.gcp_zone
-  bare_metal_hosts   = var.bare_metal_hosts
+  aws_linux_ami_id      = var.aws_linux_ami_id
+  aws_gpu_ami_id        = var.aws_gpu_ami_id
+  aws_key_name          = var.aws_key_name
+  gcp_project           = var.gcp_project
+  gcp_region            = var.gcp_region
+  gcp_zone              = var.gcp_zone
+  bare_metal_hosts      = var.bare_metal_hosts
 }
 
 module "sites" {
   source   = "../../modules/site"
   for_each = var.sites
 
-  provider               = var.deployment_provider
+  deployment_provider    = var.deployment_provider
   site_id                = each.key
   site_name              = each.value.site_name
   name_prefix            = "${local.workspace_prefix}-site"
@@ -233,13 +233,13 @@ resource "null_resource" "site_wireguard_peering" {
 output "central_summary" {
   description = "Central multi-site infrastructure summary."
   value = {
-    network_id          = module.central.network_id
-    kafka_hostnames     = module.central.kafka_hostnames
-    timescaledb_hosts   = module.central.timescaledb_hostnames
-    minio_hosts         = module.central.minio_hostnames
-    gpu_hosts           = module.central.gpu_hostnames
-    monitoring_hosts    = module.central.monitoring_hostnames
-    service_hosts       = module.central.service_hostnames
+    network_id           = module.central.network_id
+    kafka_hostnames      = module.central.kafka_hostnames
+    timescaledb_hosts    = module.central.timescaledb_hostnames
+    minio_hosts          = module.central.minio_hostnames
+    gpu_hosts            = module.central.gpu_hostnames
+    monitoring_hosts     = module.central.monitoring_hostnames
+    service_hosts        = module.central.service_hostnames
     central_vpn_endpoint = module.central.central_vpn_endpoint
   }
 }
@@ -248,13 +248,13 @@ output "site_summaries" {
   description = "Per-site edge, storage, and VPN endpoints."
   value = {
     for site_id, site in module.sites : site_id => {
-      site_name            = site.site_name
-      edge_hostnames       = site.edge_hostnames
-      edge_private_ips     = site.edge_private_ips
-      edge_public_ips      = site.edge_public_ips
-      site_vpn_endpoint    = site.site_vpn_endpoint
+      site_name             = site.site_name
+      edge_hostnames        = site.edge_hostnames
+      edge_private_ips      = site.edge_private_ips
+      edge_public_ips       = site.edge_public_ips
+      site_vpn_endpoint     = site.site_vpn_endpoint
       site_storage_endpoint = site.site_storage_endpoint
-      network_id           = site.network_id
+      network_id            = site.network_id
     }
   }
 }

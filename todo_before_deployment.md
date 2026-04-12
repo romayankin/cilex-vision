@@ -87,7 +87,6 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 ## Deployment Automation Gaps (P3-O01)
 
 - [ ] `infra/ansible/inventory/production.yml` is intentionally a template: replace the placeholder IPs, PKI source paths, credentials, and empty `service_deployments` entries before running `deploy-multi-node.yml`
-- [ ] The new Terraform modules were syntax-reviewed but could not be `terraform fmt` / `terraform validate` checked locally because the Terraform CLI is not installed in this environment. Run `terraform init`, `terraform fmt`, and `terraform validate` in CI or an operator workstation before first apply
 - [ ] The `gpu-node` role overwrites `/etc/docker/daemon.json` to set `default-runtime: nvidia`. If Triton hosts need additional Docker daemon settings, merge them into managed config before production rollout
 
 ## Shadow Deploy Tooling Gaps (P3-V02)
@@ -144,7 +143,6 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 
 - [ ] `infra/ansible/playbooks/remove-site.yml` removes deployed scrape targets at runtime via `monitoring_excluded_hosts`, but it does not delete the site from inventory source files or generated inventory fragments. Add an inventory cleanup workflow before treating decommission as fully automated
 - [ ] Site archival in `remove-site.yml` is prefix-based and therefore only captures objects that are already keyed by `site_id` or `camera_id`. Buckets with other key layouts still need a stronger metadata index or archive manifest workflow for complete site-level retention handling
-- [ ] The new multi-site Terraform modules were syntax-shaped against the existing module interfaces, but Terraform CLI validation was not run in this environment. Run `terraform fmt` and `terraform validate` once Terraform is available before first apply
 
 ## Model Rollout SOP Gaps (P0-D09)
 

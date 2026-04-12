@@ -27,7 +27,7 @@ locals {
 }
 
 resource "aws_instance" "nodes" {
-  count = var.provider == "aws" ? var.node_count : 0
+  count = var.deployment_provider == "aws" ? var.node_count : 0
 
   ami                         = local.effective_aws_ami
   instance_type               = local.aws_instance_types[var.node_type]
@@ -52,7 +52,7 @@ resource "aws_instance" "nodes" {
 }
 
 resource "google_compute_instance" "nodes" {
-  count = var.provider == "gcp" ? var.node_count : 0
+  count = var.deployment_provider == "gcp" ? var.node_count : 0
 
   project      = var.gcp_project
   zone         = var.gcp_zone
@@ -112,7 +112,7 @@ resource "google_compute_instance" "nodes" {
 }
 
 resource "null_resource" "nodes" {
-  count = var.provider == "bare_metal" ? length(var.bare_metal_hostnames) : 0
+  count = var.deployment_provider == "bare_metal" ? length(var.bare_metal_hostnames) : 0
 
   triggers = {
     hostname = var.bare_metal_hostnames[count.index]
