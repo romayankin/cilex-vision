@@ -25,7 +25,7 @@ from prometheus_client import make_asgi_app
 
 from auth.audit import AuditMiddleware
 from config import Settings
-from routers import debug, detections, events, lpr, similarity, topology, tracks
+from routers import auth, debug, detections, events, lpr, similarity, topology, tracks
 from utils.db import create_pool
 from utils.minio_urls import create_minio_client
 
@@ -91,7 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors.allowed_origins,
         allow_credentials=settings.cors.allow_credentials,
-        allow_methods=["GET", "OPTIONS"],
+        allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
     )
 
@@ -99,6 +99,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(AuditMiddleware)
 
     # Routers
+    app.include_router(auth.router)
     app.include_router(detections.router)
     app.include_router(tracks.router)
     app.include_router(events.router)

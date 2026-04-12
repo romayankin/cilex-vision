@@ -5,7 +5,12 @@
  * All requests include credentials (cookies) for JWT auth.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Browser requests go through the Next.js rewrite proxy (/api/... -> query-api).
+// Server-side requests can reach query-api directly via the Docker network.
+const API_BASE =
+  typeof window !== "undefined"
+    ? "/api"
+    : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ---------------------------------------------------------------------------
 // Response types
@@ -208,15 +213,19 @@ export interface EventQuery {
 // ---------------------------------------------------------------------------
 
 function buildUrl(path: string, params?: Record<string, string | number | undefined>): string {
-  const url = new URL(path, API_BASE);
+  // On the client side API_BASE is "/api" (relative), so we can't use new URL()
+  // directly — build the query string manually.
+  const base = `${API_BASE}${path}`;
+  const qs = new URLSearchParams();
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined && v !== "") {
-        url.searchParams.set(k, String(v));
+        qs.set(k, String(v));
       }
     }
   }
-  return url.toString();
+  const query = qs.toString();
+  return query ? `${base}?${query}` : base;
 }
 
 async function apiFetch<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {

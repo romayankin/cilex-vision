@@ -7,11 +7,12 @@ const GRAFANA_URL = process.env.NEXT_PUBLIC_GRAFANA_URL || "http://localhost:300
 
 const PANELS = [
   { title: "Stream Health", path: "/d/stream-health" },
-  { title: "Inference Performance", path: "/d/inference-perf" },
+  { title: "Inference Performance", path: "/d/inference-performance" },
   { title: "Bus Health", path: "/d/bus-health" },
   { title: "Storage", path: "/d/storage" },
+  { title: "Storage Tiering", path: "/d/storage-tiering" },
   { title: "Model Quality", path: "/d/model-quality" },
-  { title: "Node Exporter", path: "/d/node-exporter" },
+  { title: "MTMC Health", path: "/d/mtmc-health" },
 ];
 
 export default function HealthPage() {
