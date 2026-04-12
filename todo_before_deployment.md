@@ -144,6 +144,11 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `infra/ansible/playbooks/remove-site.yml` removes deployed scrape targets at runtime via `monitoring_excluded_hosts`, but it does not delete the site from inventory source files or generated inventory fragments. Add an inventory cleanup workflow before treating decommission as fully automated
 - [ ] Site archival in `remove-site.yml` is prefix-based and therefore only captures objects that are already keyed by `site_id` or `camera_id`. Buckets with other key layouts still need a stronger metadata index or archive manifest workflow for complete site-level retention handling
 
+## Disaster Recovery Gaps (P4-O02)
+
+- [ ] Kafka offset backup and restore remain operator-documented steps only. `P4-O02` added DB, MinIO, and config automation, but there is still no dedicated `kafka-consumer-groups` snapshot/restore script for the 15-minute offset RPO target
+- [ ] `infra/backup/backup-db.sh` ships logical `pg_dump` backups only. If 15-minute PostgreSQL RPO must be guaranteed under sustained write load, add WAL archiving / PITR automation rather than relying on dump cadence alone
+
 ## Model Rollout SOP Gaps (P0-D09)
 
 - [ ] No automated rollout orchestration — SOP is manual copy-paste commands. Consider an Ansible playbook or rollout script to reduce human error during model cutover

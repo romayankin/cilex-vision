@@ -706,9 +706,9 @@ phases:
       title: Disaster Recovery
       depends_on:
       - P1-O01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P4-O02
       prompt: .agents/prompts/P4-O02.md
       tool: codex-cli
     - id: P4-A01
