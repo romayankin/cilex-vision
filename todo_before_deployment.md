@@ -144,6 +144,10 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 - [ ] `infra/ansible/playbooks/remove-site.yml` removes deployed scrape targets at runtime via `monitoring_excluded_hosts`, but it does not delete the site from inventory source files or generated inventory fragments. Add an inventory cleanup workflow before treating decommission as fully automated
 - [ ] Site archival in `remove-site.yml` is prefix-based and therefore only captures objects that are already keyed by `site_id` or `camera_id`. Buckets with other key layouts still need a stronger metadata index or archive manifest workflow for complete site-level retention handling
 
+## Commercial Readiness Gaps (P4-X01)
+
+- [ ] The multi-site portal is now part of commercial collateral, but `frontend/app/portal/comparison/page.tsx` still uses derived/mock comparison metrics and the portal depends on site-management APIs that are not yet implemented server-side. Do not position live cross-site KPI dashboards or site CRUD as generally available until the backing `/sites` and real metrics APIs exist
+
 ## Disaster Recovery Gaps (P4-O02)
 
 - [ ] Kafka offset backup and restore remain operator-documented steps only. `P4-O02` added DB, MinIO, and config automation, but there is still no dedicated `kafka-consumer-groups` snapshot/restore script for the 15-minute offset RPO target

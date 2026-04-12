@@ -726,9 +726,9 @@ phases:
       title: Commercial Documentation
       depends_on:
       - P3-X01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P4-X01
       prompt: .agents/prompts/P4-X01.md
       tool: codex-cli
     - id: P4-X02

@@ -184,8 +184,9 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P4-E02 | Zone Benchmark | feat/P4-E02 | Synthetic multi-zone dataset generator, offline full-site vs zone-sharded MTMC benchmark with Re-ID metrics + latency/memory comparisons, MLflow logging harness, and a zone benchmark report template |
 | P4-O01 | Multi-Site Infrastructure | feat/P4-O01 | Multi-site Terraform `central` + `site` modules with a `multi-site` environment, additive Ansible site add/remove automation, a site-edge role with local MinIO buffering, a multi-site inventory template, and an end-to-end site onboarding script |
 | P4-O02 | Disaster Recovery | feat/P4-O02 | Cron-safe PostgreSQL, MinIO, and config backup scripts; database and full-restore automation; a Prometheus-aware health watchdog; DR documentation; and an isolated test-restore harness for regular recovery drills |
+| P4-X01 | Commercial Documentation | feat/P4-X01 | Sales-facing product overview, commercial feature matrix, procurement datasheet, vertical use cases, stakeholder FAQ, and ROI calculator template aligned to current platform capabilities |
 
-### Phase 4 — Pending (7 tasks remaining)
+### Phase 4 — Pending (6 tasks remaining)
 
 ---
 
