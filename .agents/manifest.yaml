@@ -716,9 +716,9 @@ phases:
       title: Multi-Site Dataset
       depends_on:
       - P2-A01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P4-A01
       prompt: .agents/prompts/P4-A01.md
       tool: claude-code
     - id: P4-X01
