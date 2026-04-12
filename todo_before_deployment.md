@@ -148,6 +148,13 @@ Updated after each task completion. Referenced in PROJECT-STATUS.md.
 
 - [ ] The multi-site portal is now part of commercial collateral, but `frontend/app/portal/comparison/page.tsx` still uses derived/mock comparison metrics and the portal depends on site-management APIs that are not yet implemented server-side. Do not position live cross-site KPI dashboards or site CRUD as generally available until the backing `/sites` and real metrics APIs exist
 
+## Architecture Contract Gaps (P4-X02)
+
+- [ ] The canonical Kafka topic inventory and the active runtime are not fully aligned. `attributes.jobs` is still documented as a first-class lane, but the current `attribute-service` consumes `tracklets.local` and writes attributes directly to PostgreSQL. Decide whether to restore the explicit jobs topic or update the canonical contract before external architecture review
+- [ ] `event-engine` currently both publishes `events.raw` and persists events directly, while the broader architecture story still implies a cleaner event-bus-to-storage separation. Either converge the runtime on one persistence pattern or document the hybrid path as intentional
+- [ ] The architecture reference now documents `topology` as an architectural domain whose router is mounted inside `query-api`, not as a separately deployed API container. Keep external diagrams and deployment collateral aligned with that current runtime shape until a standalone topology service actually exists
+- [ ] `archive.transcode.requested` and `archive.transcode.completed` remain provisioned topics, but a dedicated transcode worker is not part of the active 13-service deployment inventory. Avoid presenting the archive lane as fully staffed runtime automation until that worker exists
+
 ## Disaster Recovery Gaps (P4-O02)
 
 - [ ] Kafka offset backup and restore remain operator-documented steps only. `P4-O02` added DB, MinIO, and config automation, but there is still no dedicated `kafka-consumer-groups` snapshot/restore script for the 15-minute offset RPO target

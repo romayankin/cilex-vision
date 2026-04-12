@@ -185,8 +185,9 @@ Not PostgreSQL native ENUM (requires migration to add values). TEXT with CHECK c
 | P4-O01 | Multi-Site Infrastructure | feat/P4-O01 | Multi-site Terraform `central` + `site` modules with a `multi-site` environment, additive Ansible site add/remove automation, a site-edge role with local MinIO buffering, a multi-site inventory template, and an end-to-end site onboarding script |
 | P4-O02 | Disaster Recovery | feat/P4-O02 | Cron-safe PostgreSQL, MinIO, and config backup scripts; database and full-restore automation; a Prometheus-aware health watchdog; DR documentation; and an isolated test-restore harness for regular recovery drills |
 | P4-X01 | Commercial Documentation | feat/P4-X01 | Sales-facing product overview, commercial feature matrix, procurement datasheet, vertical use cases, stakeholder FAQ, and ROI calculator template aligned to current platform capabilities |
+| P4-X02 | Architecture Reference | feat/P4-X02 | Engineering-facing architecture reference with Mermaid C4 system/context/container diagrams, end-to-end data-flow and security/deployment views, and an ADR summary that calls out current implementation-vs-contract drift |
 
-### Phase 4 — Pending (6 tasks remaining)
+### Phase 4 — Pending (5 tasks remaining)
 
 ---
 

@@ -736,8 +736,8 @@ phases:
       title: Architecture Reference
       depends_on:
       - P3-X01
-      status: pending
+      status: done
       assigned_to: null
-      branch: null
+      branch: feat/P4-X02
       prompt: .agents/prompts/P4-X02.md
       tool: codex-cli
