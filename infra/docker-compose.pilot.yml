@@ -12,7 +12,7 @@ services:
   # ====================================================================
 
   kafka:
-    image: bitnami/kafka:3.7.0
+    image: bitnamilegacy/kafka:3.7.0
     container_name: pilot-kafka
     hostname: kafka
     ports:
