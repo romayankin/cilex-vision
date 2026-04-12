@@ -321,6 +321,269 @@ services:
       retries: 10
       start_period: 60s
 
+  # ====================================================================
+  #  Application services
+  # ====================================================================
+
+  edge-agent:
+    build:
+      context: ..
+      dockerfile: services/edge-agent/Dockerfile
+    container_name: edge-agent
+    depends_on:
+      nats:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    environment:
+      EDGE_LOG_LEVEL: INFO
+    volumes:
+      - ./dev/edge-agent.yaml:/app/config.yaml:ro
+    mem_limit: 512m
+    restart: unless-stopped
+
+  ingress-bridge:
+    build:
+      context: ..
+      dockerfile: services/ingress-bridge/Dockerfile
+    container_name: ingress-bridge
+    depends_on:
+      nats:
+        condition: service_healthy
+      kafka-0:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    command: ["python", "main.py", "--config", "/dev/null"]
+    environment:
+      BRIDGE_NATS__URL: nats://nats:4222
+      BRIDGE_KAFKA__BOOTSTRAP_SERVERS: kafka-0:9092
+      BRIDGE_KAFKA__SECURITY_PROTOCOL: PLAINTEXT
+      BRIDGE_KAFKA__SASL_MECHANISM: ""
+      BRIDGE_KAFKA__SASL_USERNAME: ""
+      BRIDGE_KAFKA__SASL_PASSWORD: ""
+      BRIDGE_KAFKA__TOPIC_FRAMES_SAMPLED_REFS: frames.sampled.refs
+      BRIDGE_MINIO__ENDPOINT: minio:9000
+      BRIDGE_MINIO__ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
+      BRIDGE_MINIO__SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+      BRIDGE_MINIO__SECURE: "false"
+      BRIDGE_METRICS_PORT: "9091"
+      BRIDGE_LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+
+  decode-service:
+    build:
+      context: ..
+      dockerfile: services/decode-service/Dockerfile
+    container_name: decode-service
+    depends_on:
+      kafka-0:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    environment:
+      DECODE_KAFKA__BOOTSTRAP_SERVERS: kafka-0:9092
+      DECODE_KAFKA__SECURITY_PROTOCOL: PLAINTEXT
+      DECODE_KAFKA__INPUT_TOPIC: frames.sampled.refs
+      DECODE_KAFKA__OUTPUT_TOPIC: frames.decoded.refs
+      DECODE_MINIO__ENDPOINT: minio:9000
+      DECODE_MINIO__ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
+      DECODE_MINIO__SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+      DECODE_MINIO__SECURE: "false"
+      DECODE_MINIO__SOURCE_BUCKET: frame-blobs
+      DECODE_MINIO__DECODED_BUCKET: decoded-frames
+      DECODE_SAMPLER__TARGET_FPS: "5.0"
+      DECODE_METRICS_PORT: "9090"
+      DECODE_LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+
+  inference-worker:
+    build:
+      context: ..
+      dockerfile: services/inference-worker/Dockerfile
+    container_name: inference-worker
+    depends_on:
+      kafka-0:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    environment:
+      # No Triton in dev compose — worker will log warnings and retry.
+      INFERENCE_TRITON__URL: ""
+      INFERENCE_KAFKA__BOOTSTRAP_SERVERS: kafka-0:9092
+      INFERENCE_KAFKA__SECURITY_PROTOCOL: PLAINTEXT
+      INFERENCE_KAFKA__INPUT_TOPIC: frames.decoded.refs
+      INFERENCE_KAFKA__TRACKLET_TOPIC: tracklets.local
+      INFERENCE_KAFKA__EMBEDDING_TOPIC: mtmc.active_embeddings
+      INFERENCE_KAFKA__DETECTION_TOPIC: bulk.detections
+      INFERENCE_KAFKA__CONSUMER_GROUP: detector-worker
+      INFERENCE_MINIO__ENDPOINT: minio:9000
+      INFERENCE_MINIO__ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
+      INFERENCE_MINIO__SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+      INFERENCE_MINIO__SECURE: "false"
+      INFERENCE_METRICS_PORT: "9090"
+      INFERENCE_LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+
+  attribute-service:
+    build:
+      context: ..
+      dockerfile: services/attribute-service/Dockerfile
+    container_name: attribute-service
+    depends_on:
+      kafka-0:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    environment:
+      ATTR_KAFKA_BOOTSTRAP: kafka-0:9092
+      ATTR_KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      ATTR_KAFKA_TOPIC: tracklets.local
+      ATTR_MINIO_URL: minio:9000
+      ATTR_MINIO_ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
+      ATTR_MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+      ATTR_MINIO_SECURE: "false"
+      ATTR_MINIO_FRAME_BUCKET: frame-blobs
+      ATTR_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+      ATTR_LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+
+  event-engine:
+    build:
+      context: ..
+      dockerfile: services/event-engine/Dockerfile
+    container_name: event-engine
+    depends_on:
+      kafka-0:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    environment:
+      EVENT_KAFKA_BOOTSTRAP: kafka-0:9092
+      EVENT_KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      EVENT_KAFKA_INPUT_TOPIC: tracklets.local
+      EVENT_KAFKA_OUTPUT_TOPIC: events.raw
+      EVENT_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+      EVENT_LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+
+  clip-service:
+    build:
+      context: ..
+      dockerfile: services/clip-service/Dockerfile
+    container_name: clip-service
+    depends_on:
+      kafka-0:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    environment:
+      CLIP_KAFKA_BOOTSTRAP: kafka-0:9092
+      CLIP_KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      CLIP_KAFKA_INPUT_TOPIC: events.raw
+      CLIP_MINIO_URL: minio:9000
+      CLIP_MINIO_ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
+      CLIP_MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+      CLIP_MINIO_SECURE: "false"
+      CLIP_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+      CLIP_LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+
+  mtmc-service:
+    build:
+      context: ..
+      dockerfile: services/mtmc-service/Dockerfile
+    container_name: mtmc-service
+    depends_on:
+      kafka-0:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    environment:
+      MTMC_KAFKA_BOOTSTRAP: kafka-0:9092
+      MTMC_KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      MTMC_KAFKA_TOPIC: mtmc.active_embeddings
+      MTMC_MINIO_URL: minio:9000
+      MTMC_MINIO_ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
+      MTMC_MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+      MTMC_MINIO_SECURE: "false"
+      MTMC_MINIO_BUCKET: mtmc-checkpoints
+      MTMC_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+      MTMC_LOG_LEVEL: INFO
+    mem_limit: 1024m
+    restart: unless-stopped
+
+  bulk-collector:
+    build:
+      context: ..
+      dockerfile: services/bulk-collector/Dockerfile
+    container_name: bulk-collector
+    depends_on:
+      kafka-0:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    command: ["python", "main.py", "--config", "/dev/null"]
+    environment:
+      BULK_KAFKA__BOOTSTRAP_SERVERS: kafka-0:9092
+      BULK_KAFKA__SECURITY_PROTOCOL: PLAINTEXT
+      BULK_KAFKA__SASL_MECHANISM: ""
+      BULK_KAFKA__SASL_USERNAME: ""
+      BULK_KAFKA__SASL_PASSWORD: ""
+      BULK_DATABASE__DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+      BULK_METRICS_PORT: "9091"
+      BULK_LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+
+  query-api:
+    build:
+      context: ..
+      dockerfile: services/query-api/Dockerfile
+    container_name: query-api
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      minio-init:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      QUERY_DB__DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+      QUERY_MINIO__ENDPOINT: minio:9000
+      QUERY_MINIO__ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
+      QUERY_MINIO__SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+      QUERY_MINIO__SECURE: "false"
+      QUERY_JWT__SECRET_KEY: "${JWT_SECRET:-pilot-jwt-secret-change-me}"
+      QUERY_LOG_LEVEL: INFO
+    mem_limit: 512m
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    depends_on:
+      query-api:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://query-api:8000"
+    mem_limit: 256m
+    restart: unless-stopped
+
 volumes:
   kafka_0_data:
   kafka_1_data:

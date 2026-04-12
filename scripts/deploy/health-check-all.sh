@@ -290,6 +290,8 @@ if [[ "${#CHECK_NAMES[@]}" -eq 0 ]]; then
     append_check "tcp" "Redis" "localhost:6379"
     append_check "http" "Prometheus" "http://localhost:9090/-/healthy"
     append_check "http" "Grafana" "http://localhost:3001/api/health"
+    append_check "http" "Query API" "http://localhost:8000/docs"
+    append_check "http" "Frontend" "http://localhost:3000"
   fi
 fi
 

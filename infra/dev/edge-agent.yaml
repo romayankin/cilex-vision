@@ -1,0 +1,20 @@
+# Edge-agent config for local docker-compose dev stack.
+# The edge-agent's pydantic Settings lacks env_nested_delimiter,
+# so nats/minio settings must come from YAML (not env vars).
+
+site_id: dev-site
+
+nats:
+  url: nats://nats:4222
+
+minio:
+  endpoint: minio:9000
+  access_key: minioadmin
+  secret_key: minioadmin123
+  secure: false
+  bucket: frame-blobs
+
+cameras:
+  - camera_id: cam-demo
+    rtsp_url: "rtsp://localhost:8554/stream"
+    enabled: false
