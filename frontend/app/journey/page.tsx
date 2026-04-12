@@ -2,43 +2,26 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getUserRole } from "@/lib/auth";
 import { getTracks, type TrackSummaryResponse } from "@/lib/api-client";
 
 export default function JourneyIndexPage() {
-  const role = getUserRole();
   const [tracks, setTracks] = useState<TrackSummaryResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!role) {
-      setLoading(false);
-      return;
-    }
-
     (async () => {
       try {
         const res = await getTracks({ limit: 10 });
         setTracks(res.items ?? []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load tracks");
+        const msg = err instanceof Error ? err.message : "Failed to load tracks";
+        setError(msg.includes("401") ? "Login required" : msg);
       } finally {
         setLoading(false);
       }
     })();
-  }, [role]);
-
-  if (!role) {
-    return (
-      <div className="text-center py-12 space-y-2">
-        <p className="text-gray-500">Login required to view cross-camera journeys.</p>
-        <Link href="/login" className="text-blue-600 hover:underline text-sm">
-          Go to login
-        </Link>
-      </div>
-    );
-  }
+  }, []);
 
   if (loading) {
     return <div className="text-center py-8 text-gray-400">Loading tracks...</div>;

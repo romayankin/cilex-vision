@@ -2,43 +2,26 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getUserRole } from "@/lib/auth";
 import { getTopologyGraph, type CameraNode } from "@/lib/api-client";
 
 export default function TimelineIndexPage() {
-  const role = getUserRole();
   const [cameras, setCameras] = useState<CameraNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!role) {
-      setLoading(false);
-      return;
-    }
-
     (async () => {
       try {
         const topo = await getTopologyGraph("site-01");
         setCameras(topo.cameras ?? []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load cameras");
+        const msg = err instanceof Error ? err.message : "Failed to load cameras";
+        setError(msg.includes("401") ? "Login required" : msg);
       } finally {
         setLoading(false);
       }
     })();
-  }, [role]);
-
-  if (!role) {
-    return (
-      <div className="text-center py-12 space-y-2">
-        <p className="text-gray-500">Login required to view camera timelines.</p>
-        <Link href="/login" className="text-blue-600 hover:underline text-sm">
-          Go to login
-        </Link>
-      </div>
-    );
-  }
+  }, []);
 
   if (loading) {
     return <div className="text-center py-8 text-gray-400">Loading cameras...</div>;

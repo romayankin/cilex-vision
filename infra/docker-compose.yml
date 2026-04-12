@@ -584,6 +584,7 @@ services:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: "http://query-api:8000"
+      API_URL: "http://query-api:8000"
     mem_limit: 256m
     restart: unless-stopped
 
