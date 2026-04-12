@@ -3,7 +3,11 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: health-check-all.sh [--inventory infra/ansible/inventory/production.yml] [--no-color]
+Usage: health-check-all.sh [--inventory infra/ansible/inventory/production.yml] [--local] [--no-color]
+
+Options:
+  --local              Use localhost defaults for docker-compose stack
+                       (auto-detected when no other config is provided)
 
 Environment overrides:
   KAFKA_HOSTS          Comma-separated broker hosts
@@ -27,6 +31,7 @@ EOF
 }
 
 NO_COLOR=0
+LOCAL_MODE=0
 INVENTORY_PATH=""
 
 while [[ $# -gt 0 ]]; do
@@ -34,6 +39,10 @@ while [[ $# -gt 0 ]]; do
     --inventory)
       INVENTORY_PATH="$2"
       shift 2
+      ;;
+    --local)
+      LOCAL_MODE=1
+      shift
       ;;
     --no-color)
       NO_COLOR=1
@@ -268,8 +277,24 @@ append_csv_http_checks "Grafana" "${GRAFANA_HOSTS:-}" "${GRAFANA_PORT:-3000}" "/
 append_csv_http_checks "Edge Agent" "${EDGE_AGENT_HOSTS:-}" "${EDGE_AGENT_PORT:-9090}" "/metrics"
 append_app_endpoints "${APP_ENDPOINTS:-}"
 
+# Auto-detect local docker-compose when no other config provided
 if [[ "${#CHECK_NAMES[@]}" -eq 0 ]]; then
-  printf '%sNo checks configured.%s Use --inventory or set host env vars.\n' "$COLOR_YELLOW" "$COLOR_RESET" >&2
+  if [[ "$LOCAL_MODE" -eq 1 ]] || docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^kafka-0$'; then
+    printf '%sAuto-detected local docker-compose stack%s\n\n' "$COLOR_GREEN" "$COLOR_RESET"
+    append_check "tcp" "Kafka 1" "localhost:19092"
+    append_check "tcp" "Kafka 2" "localhost:19093"
+    append_check "tcp" "Kafka 3" "localhost:19094"
+    append_check "http" "NATS" "http://localhost:8222/healthz"
+    append_check "tcp" "TimescaleDB" "localhost:5432"
+    append_check "http" "MinIO" "http://localhost:9000/minio/health/live"
+    append_check "tcp" "Redis" "localhost:6379"
+    append_check "http" "Prometheus" "http://localhost:9090/-/healthy"
+    append_check "http" "Grafana" "http://localhost:3000/api/health"
+  fi
+fi
+
+if [[ "${#CHECK_NAMES[@]}" -eq 0 ]]; then
+  printf '%sNo checks configured.%s Use --inventory, --local, or set host env vars.\n' "$COLOR_YELLOW" "$COLOR_RESET" >&2
   exit 1
 fi
 
