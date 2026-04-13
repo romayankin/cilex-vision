@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { getUserRole, isAdmin, canAccessDebug } from "@/lib/auth";
 
 const NAV_ITEMS = [
+  { href: "/live", label: "Live" },
   { href: "/search", label: "Search" },
   { href: "/timeline", label: "Timeline" },
   { href: "/journey", label: "Journey" },

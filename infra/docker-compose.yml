@@ -287,6 +287,19 @@ services:
       retries: 10
       start_period: 30s
 
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: go2rtc
+    ports:
+      - "1984:1984"
+      - "8554:8554"
+    volumes:
+      - ./dev/go2rtc.yaml:/config/go2rtc.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 256m
+    restart: unless-stopped
+
   mlflow:
     image: python:3.11-slim
     container_name: mlflow

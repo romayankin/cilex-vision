@@ -1,0 +1,9 @@
+streams:
+  cam-1: rtsp://admin:Qwerty12@192.168.1.66:554/Streaming/Channels/101
+
+api:
+  listen: ":1984"
+  origin: "*"
+
+rtsp:
+  listen: ":8554"
