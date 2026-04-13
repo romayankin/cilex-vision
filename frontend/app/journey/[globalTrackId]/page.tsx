@@ -23,7 +23,7 @@ export default function JourneyPage() {
 
         const journeyStops: JourneyStop[] = [];
 
-        for (const tr of res.items.slice(0, 10)) {
+        for (const tr of res.tracks.slice(0, 10)) {
           let attrs: { color_value: string; attribute_type: string }[] = [];
           let thumb: string | null = null;
           try {

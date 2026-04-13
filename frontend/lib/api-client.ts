@@ -35,7 +35,7 @@ export interface DetectionResponse {
 }
 
 export interface DetectionListResponse {
-  items: DetectionResponse[];
+  detections: DetectionResponse[];
   total: number;
   offset: number;
   limit: number;
@@ -68,7 +68,7 @@ export interface TrackDetailResponse extends TrackSummaryResponse {
 }
 
 export interface TrackListResponse {
-  items: TrackSummaryResponse[];
+  tracks: TrackSummaryResponse[];
   total: number;
   offset: number;
   limit: number;
@@ -91,7 +91,7 @@ export interface EventResponse {
 }
 
 export interface EventListResponse {
-  items: EventResponse[];
+  events: EventResponse[];
   total: number;
   offset: number;
   limit: number;

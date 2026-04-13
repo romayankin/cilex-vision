@@ -80,7 +80,7 @@ export default function SearchPage() {
             limit: PAGE_SIZE,
           });
           fetchedTotal = res.total;
-          for (const ev of res.items) {
+          for (const ev of res.events) {
             items.push({
               kind: "event",
               id: ev.event_id,
@@ -105,7 +105,7 @@ export default function SearchPage() {
             limit: PAGE_SIZE,
           });
           fetchedTotal = res.total;
-          for (const tr of res.items) {
+          for (const tr of res.tracks) {
             let detail: TrackDetailResponse | null = null;
             try {
               detail = await getTrackDetail(tr.local_track_id);
@@ -136,7 +136,7 @@ export default function SearchPage() {
             limit: PAGE_SIZE,
           });
           fetchedTotal = res.total;
-          for (const det of res.items) {
+          for (const det of res.detections) {
             items.push({
               kind: "detection",
               id: `${det.camera_id}-${det.frame_seq}-${det.time}`,

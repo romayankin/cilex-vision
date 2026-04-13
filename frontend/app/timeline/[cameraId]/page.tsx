@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import VideoPlayer from "@/components/VideoPlayer";
 import Timeline, { TimelineEntry } from "@/components/Timeline";
 import { getDetections, getEvents, getTrackDetail } from "@/lib/api-client";
+import { getStreamUrls } from "@/lib/stream-urls";
 
 const POLL_INTERVAL = 5000;
 
@@ -45,7 +46,7 @@ export default function CameraTimelinePage() {
 
       const items: TimelineEntry[] = [];
 
-      for (const det of detRes.items) {
+      for (const det of detRes.detections) {
         items.push({
           id: `det-${det.camera_id}-${det.frame_seq}`,
           timestamp: det.time,
@@ -57,7 +58,7 @@ export default function CameraTimelinePage() {
         });
       }
 
-      for (const ev of evtRes.items) {
+      for (const ev of evtRes.events) {
         items.push({
           id: `evt-${ev.event_id}`,
           timestamp: ev.start_time,
@@ -138,8 +139,23 @@ export default function CameraTimelinePage() {
         </div>
       )}
 
-      {/* Video player */}
-      <VideoPlayer src={clipUrl} />
+      {/* Video player — falls back to the live feed when no event clip is available */}
+      {clipUrl ? (
+        <VideoPlayer src={clipUrl} autoPlay />
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400">
+            No recorded events yet. Showing live feed.
+          </p>
+          <video
+            src={getStreamUrls(cameraId).mse_url}
+            autoPlay
+            muted
+            playsInline
+            className="w-full rounded-lg bg-black aspect-video object-cover"
+          />
+        </div>
+      )}
 
       {/* Timeline entries */}
       {loading ? (

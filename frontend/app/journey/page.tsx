@@ -13,7 +13,7 @@ export default function JourneyIndexPage() {
     (async () => {
       try {
         const res = await getTracks({ limit: 10 });
-        setTracks(res.items ?? []);
+        setTracks(res.tracks ?? []);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to load tracks";
         setError(msg.includes("401") ? "Login required" : msg);

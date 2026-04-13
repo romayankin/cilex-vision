@@ -7,8 +7,9 @@ MinIO URL (1hr expiry) before returning to the client.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 
@@ -18,6 +19,21 @@ from utils.db import fetch_rows, fetch_val
 from utils.minio_urls import generate_signed_url
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+def _parse_jsonb(value: Any) -> dict | None:
+    """asyncpg returns JSONB as a string by default — decode to a dict."""
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return None
+        return parsed if isinstance(parsed, dict) else None
+    return None
 
 
 @router.get(
@@ -130,7 +146,7 @@ async def list_events(
             if row["clip_uri"]
             else None,
             state=row["state"],
-            metadata=row["metadata_jsonb"],
+            metadata=_parse_jsonb(row["metadata_jsonb"]),
             source_capture_ts=row["source_capture_ts"],
             edge_receive_ts=row["edge_receive_ts"],
             core_ingest_ts=row["core_ingest_ts"],
