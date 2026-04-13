@@ -24,3 +24,4 @@ detections.db
 yolov8n.pt
 infra/triton/cpu-inference/
 mlflow-env/
+.claude/
