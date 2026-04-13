@@ -640,10 +640,12 @@ class SchemaRegistryValidator:
         subject: str,
         cache_ttl_s: int = 300,
         fetcher: Callable[[str], dict[str, Any]] | None = None,
+        enabled: bool = True,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.subject = subject
         self.cache_ttl_s = cache_ttl_s
+        self.enabled = enabled
         self._fetcher = fetcher or self._default_fetcher
         self._cached_schema: dict[str, Any] | None = None
         self._cached_at = 0.0
@@ -721,6 +723,10 @@ class SchemaRegistryValidator:
         return frame
 
     def validate_frame(self, payload: bytes) -> Any:
+        if not getattr(self, "enabled", True):
+            # Schema Registry disabled — skip schema fetch, just parse the proto.
+            frame = self._deserialize_generated(payload)
+            return frame
         schema = self._ensure_schema_available()
         schema_text = str(schema.get("schema", ""))
         if "message FrameRef" not in schema_text and "FrameRef" not in self.subject:
@@ -848,9 +854,6 @@ class KafkaProducerAdapter:
             conf: dict[str, Any] = {
                 "bootstrap.servers": self.settings.kafka.bootstrap_servers,
                 "security.protocol": self.settings.kafka.security_protocol,
-                "sasl.mechanism": self.settings.kafka.sasl_mechanism,
-                "sasl.username": self.settings.kafka.sasl_username,
-                "sasl.password": self.settings.kafka.sasl_password,
                 "client.id": self.settings.kafka.client_id,
                 "acks": self.settings.kafka.acks,
                 "compression.type": self.settings.kafka.compression_type,
@@ -859,6 +862,10 @@ class KafkaProducerAdapter:
                 "enable.idempotence": self.settings.kafka.enable_idempotence,
                 "request.timeout.ms": self.settings.kafka.request_timeout_ms,
             }
+            if self.settings.kafka.security_protocol.upper() in ("SASL_SSL", "SASL_PLAINTEXT"):
+                conf["sasl.mechanism"] = self.settings.kafka.sasl_mechanism
+                conf["sasl.username"] = self.settings.kafka.sasl_username
+                conf["sasl.password"] = self.settings.kafka.sasl_password
             conf.update(self._create_ssl_context())
             self._producer = Producer(conf)
         return self._producer
@@ -929,6 +936,7 @@ class IngressBridgeService:
             settings.schema_registry.url,
             settings.schema_registry.frame_ref_subject,
             settings.schema_registry.cache_ttl_s,
+            enabled=settings.schema_registry.enabled,
         )
         self.blob_offloader = blob_offloader or MinioBlobOffloader(
             settings.minio.endpoint,

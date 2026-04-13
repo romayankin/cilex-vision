@@ -342,6 +342,8 @@ services:
       EDGE_LOG_LEVEL: INFO
     volumes:
       - ./dev/edge-agent.yaml:/app/config.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     mem_limit: 512m
     restart: unless-stopped
 
@@ -357,21 +359,11 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_healthy
-    command: ["python", "main.py", "--config", "/dev/null"]
+    command: ["python", "main.py", "--config", "/app/config.yaml"]
     environment:
-      BRIDGE_NATS__URL: nats://nats:4222
-      BRIDGE_KAFKA__BOOTSTRAP_SERVERS: kafka-0:9092
-      BRIDGE_KAFKA__SECURITY_PROTOCOL: PLAINTEXT
-      BRIDGE_KAFKA__SASL_MECHANISM: ""
-      BRIDGE_KAFKA__SASL_USERNAME: ""
-      BRIDGE_KAFKA__SASL_PASSWORD: ""
-      BRIDGE_KAFKA__TOPIC_FRAMES_SAMPLED_REFS: frames.sampled.refs
-      BRIDGE_MINIO__ENDPOINT: minio:9000
-      BRIDGE_MINIO__ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
-      BRIDGE_MINIO__SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
-      BRIDGE_MINIO__SECURE: "false"
-      BRIDGE_METRICS_PORT: "9091"
       BRIDGE_LOG_LEVEL: INFO
+    volumes:
+      - ./dev/ingress-bridge.yaml:/app/config.yaml:ro
     mem_limit: 512m
     restart: unless-stopped
 
@@ -522,6 +514,7 @@ services:
       MTMC_MINIO_SECURE: "false"
       MTMC_MINIO_BUCKET: mtmc-checkpoints
       MTMC_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+      MTMC_SITE_ID: "00000000-0000-0000-0000-000000000001"
       MTMC_LOG_LEVEL: INFO
     mem_limit: 1024m
     restart: unless-stopped

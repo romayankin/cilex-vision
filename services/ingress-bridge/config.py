@@ -61,6 +61,7 @@ class SchemaRegistryConfig(BaseModel):
     url: str = "http://localhost:8081"
     frame_ref_subject: str = "frames.sampled.refs-value"
     cache_ttl_s: int = 300
+    enabled: bool = True
 
 
 class MinioConfig(BaseModel):

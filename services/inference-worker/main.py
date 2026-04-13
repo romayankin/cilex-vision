@@ -82,8 +82,19 @@ class InferenceWorker:
         self.settings = settings
         self._shutdown = asyncio.Event()
 
-        self._detector = DetectorClient(settings.triton, settings.detector)
-        self._embedder = EmbedderClient(settings.triton)
+        if settings.triton.url:
+            self._detector = DetectorClient(settings.triton, settings.detector)
+            self._embedder = EmbedderClient(settings.triton)
+        else:
+            from detector_cpu import CpuDetectorClient  # noqa: PLC0415
+            from embedder_cpu import CpuEmbedderClient  # noqa: PLC0415
+
+            logger.info("Triton URL not set — using CPU inference mode")
+            self._detector = CpuDetectorClient(
+                confidence_threshold=settings.detector.confidence_threshold,
+                nms_iou_threshold=settings.detector.nms_iou_threshold,
+            )
+            self._embedder = CpuEmbedderClient()
         self._publisher = KafkaPublisher(settings.kafka)
         self._trackers: dict[str, ByteTracker] = {}
 

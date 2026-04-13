@@ -1,4 +1,5 @@
 nats-py>=2.7.0
+PyGObject>=3.44.0,<3.50.0
 protobuf>=4.25.0
 grpcio-tools>=1.60.0
 pydantic>=2.5.0

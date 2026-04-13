@@ -1,0 +1,47 @@
+# Ingress-bridge config for local docker-compose dev stack.
+# Env vars under BRIDGE_* override individual fields; sites come from YAML
+# because pydantic-settings cannot parse list-of-model from env vars reliably.
+
+nats:
+  url: nats://nats:4222
+  durable_prefix: ingress-bridge
+  live_subject_template: "frames.live.{site_id}.>"
+  replay_subject_template: "frames.replay.{site_id}.>"
+  dlq_subject_template: "frames.dlq.{site_id}"
+  stream_name_template: frames
+  ack_wait_s: 30
+  max_redeliver: 3
+  fetch_batch_size: 10
+  fetch_timeout_s: 1.0
+
+kafka:
+  bootstrap_servers: kafka-0:9092
+  security_protocol: PLAINTEXT
+  sasl_mechanism: ""
+  sasl_username: ""
+  sasl_password: ""
+  compression_type: zstd
+  topic_frames_sampled_refs: frames.sampled.refs
+
+schema_registry:
+  url: http://schema-registry:8081
+  enabled: false
+
+minio:
+  endpoint: minio:9000
+  access_key: minioadmin
+  secret_key: minioadmin123
+  secure: false
+  bucket_blobs: frame-blobs
+
+spool:
+  path: /tmp/ingress-bridge-spool
+  max_bytes: 1073741824
+
+sites:
+  - site_id: pilot-site
+    rate_limit_msg_per_sec: 500
+
+metrics_port: 9091
+health_port: 8080
+log_level: INFO

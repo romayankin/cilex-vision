@@ -2,7 +2,7 @@
 # The edge-agent's pydantic Settings lacks env_nested_delimiter,
 # so nats/minio settings must come from YAML (not env vars).
 
-site_id: dev-site
+site_id: pilot-site
 
 nats:
   url: nats://nats:4222
@@ -14,7 +14,13 @@ minio:
   secure: false
   bucket: frame-blobs
 
+motion:
+  pixel_threshold: 5
+  motion_threshold: 0.00001
+  scene_change_threshold: 0.80
+  reference_update_interval_s: 30
+
 cameras:
-  - camera_id: cam-demo
-    rtsp_url: "rtsp://localhost:8554/stream"
-    enabled: false
+  - camera_id: cam-1
+    rtsp_url: "rtsp://admin:Qwerty12@192.168.1.66:554/Streaming/Channels/101"
+    enabled: true

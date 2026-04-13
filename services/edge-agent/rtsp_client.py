@@ -64,7 +64,7 @@ class RtspClient:
 
         gi.require_version("Gst", "1.0")
         gi.require_version("GstApp", "1.0")
-        from gi.repository import Gst  # noqa: PLC0415
+        from gi.repository import Gst, GstApp  # noqa: PLC0415, F401
 
         if not Gst.is_initialized():
             Gst.init(None)
@@ -127,10 +127,11 @@ class RtspClient:
         import gi  # noqa: PLC0415
 
         gi.require_version("Gst", "1.0")
-        from gi.repository import Gst  # noqa: PLC0415
+        gi.require_version("GstApp", "1.0")
+        from gi.repository import Gst, GstApp  # noqa: PLC0415, F401
 
         sample = await asyncio.to_thread(
-            self._appsink.try_pull_sample, Gst.SECOND  # 1-second timeout
+            self._appsink.emit, "try-pull-sample", Gst.SECOND  # 1-second timeout
         )
         if sample is None:
             return None
