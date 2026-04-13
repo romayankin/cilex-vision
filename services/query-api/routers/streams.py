@@ -81,25 +81,35 @@ class AddCameraRequest(BaseModel):
 
 
 async def _register_go2rtc(camera_id: str, rtsp_url: str) -> None:
-    # go2rtc API: name=<stream_id>, src=<source_url>. Multiple PUTs append sources.
+    # go2rtc PUT replaces the stream's sources. Use a single ffmpeg source that
+    # transcodes the RTSP feed to H.264 at 720p — needed because 1440p H.265
+    # can overwhelm browser MSE and strain the CPU.
+    src = f"ffmpeg:{rtsp_url}#video=h264#width=1280"
     async with httpx.AsyncClient(timeout=5.0) as client:
-        r1 = await client.put(
+        resp = await client.put(
             f"{GO2RTC_INTERNAL}/api/streams",
-            params={"name": camera_id, "src": rtsp_url},
+            params={"name": camera_id, "src": src},
         )
-        r2 = await client.put(
-            f"{GO2RTC_INTERNAL}/api/streams",
-            params={"name": camera_id, "src": f"ffmpeg:{camera_id}#video=h264"},
-        )
-        # go2rtc returns 400 when the mounted config is read-only, but the
-        # stream is still registered in memory. Only log real failures.
-        for resp in (r1, r2):
-            if resp.status_code >= 500:
-                logger.warning("go2rtc PUT failed: %s %s", resp.status_code, resp.text)
+        # 400 appears when the mounted config is read-only, but the stream is
+        # still registered in memory. Only log real failures.
+        if resp.status_code >= 500:
+            logger.warning("go2rtc PUT failed: %s %s", resp.status_code, resp.text)
 
 
 async def sync_all_to_go2rtc(pool) -> int:
-    """Register every DB camera with go2rtc. Returns count of attempts."""
+    """Register DB cameras with go2rtc, skipping those already configured.
+
+    Cameras defined in the mounted config (infra/dev/go2rtc.yaml) already have
+    a two-source setup (raw RTSP + ffmpeg transcode) that we must not clobber,
+    since PUT on go2rtc replaces the stream's sources.
+    """
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            resp = await client.get(f"{GO2RTC_INTERNAL}/api/streams")
+            existing = set(resp.json().keys()) if resp.status_code == 200 else set()
+        except Exception:
+            existing = set()
+
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT camera_id, rtsp_uri FROM cameras "
@@ -107,11 +117,14 @@ async def sync_all_to_go2rtc(pool) -> int:
         )
     count = 0
     for r in rows:
+        cam_id = r["camera_id"]
+        if cam_id in existing:
+            continue
         try:
-            await _register_go2rtc(r["camera_id"], r["rtsp_uri"])
+            await _register_go2rtc(cam_id, r["rtsp_uri"])
             count += 1
         except Exception as exc:
-            logger.warning("go2rtc sync failed for %s: %s", r["camera_id"], exc)
+            logger.warning("go2rtc sync failed for %s: %s", cam_id, exc)
     return count
 
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getUserRole, isAdmin } from "@/lib/auth";
+import { getStreamUrls } from "@/lib/stream-urls";
 
 interface StreamInfo {
   camera_id: string;
@@ -33,60 +34,69 @@ interface DiscoveryResponse {
   scan_time_ms: number;
 }
 
-const GO2RTC_PORT = 1984;
 type SortKey = "name" | "id" | "status";
 type ViewMode = "grid" | "single";
 type StatusFilter = "all" | "online" | "offline";
-
-function getStreamUrls(cameraId: string) {
-  const host = typeof window !== "undefined" ? window.location.hostname : "localhost";
-  const base = `http://${host}:${GO2RTC_PORT}`;
-  return {
-    mse_url: `${base}/api/stream.mp4?src=${cameraId}`,
-    snapshot_url: `${base}/api/frame.jpeg?src=${cameraId}`,
-  };
-}
 
 function slugifyCameraId(model: string | null, ip: string): string {
   const base = (model || ip).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return base || `cam-${ip.split(".").pop()}`;
 }
 
+type PlayerMode = "mse" | "hls" | "snapshot";
+
 function CameraPlayer({ stream, large = false }: { stream: StreamInfo; large?: boolean }) {
-  const [fallback, setFallback] = useState(false);
+  const [mode, setMode] = useState<PlayerMode>("mse");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [reconnectKey, setReconnectKey] = useState(0);
   const urls = getStreamUrls(stream.camera_id);
 
   useEffect(() => {
-    if (!fallback) return;
+    if (mode !== "snapshot") return;
     const id = setInterval(() => setRefreshKey((k) => k + 1), 5000);
     return () => clearInterval(id);
-  }, [fallback]);
+  }, [mode]);
+
+  const reconnect = () => {
+    setMode("mse");
+    setReconnectKey((k) => k + 1);
+  };
 
   if (!stream.has_rtsp) {
     return (
-      <div className={`${large ? "aspect-video" : "aspect-video"} bg-gray-900 flex items-center justify-center text-gray-400 text-sm`}>
+      <div className="aspect-video bg-gray-900 flex items-center justify-center text-gray-400 text-sm">
         No RTSP configured
       </div>
     );
   }
-  if (fallback) {
+  if (mode === "snapshot") {
     return (
-      <img
-        src={`${urls.snapshot_url}&t=${refreshKey}`}
-        alt={stream.name}
-        className="w-full aspect-video bg-black object-cover"
-      />
+      <div className="relative">
+        <img
+          src={`${urls.snapshot_url}&t=${refreshKey}`}
+          alt={stream.name}
+          className="w-full aspect-video bg-black object-cover"
+        />
+        <button
+          onClick={reconnect}
+          className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-black/80"
+          title="Reconnect live stream"
+        >
+          ↻ Reconnect
+        </button>
+      </div>
     );
   }
+  const src = mode === "mse" ? urls.mse_url : urls.hls_url;
   return (
     <video
-      src={urls.mse_url}
+      key={`${mode}-${reconnectKey}`}
+      src={src}
       autoPlay
       muted
       playsInline
-      onError={() => setFallback(true)}
-      className="w-full aspect-video bg-black"
+      onError={() => setMode((m) => (m === "mse" ? "hls" : "snapshot"))}
+      className="w-full aspect-video bg-black object-cover"
     />
   );
 }

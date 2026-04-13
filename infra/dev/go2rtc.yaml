@@ -1,6 +1,10 @@
 streams:
-  cam-1: "ffmpeg:rtsp://admin:Qwerty12@192.168.1.67:554/Streaming/Channels/101#video=h264"
-  cam-2: "ffmpeg:rtsp://admin:Qwerty12@192.168.1.64:554/Streaming/Channels/101#video=h264"
+  cam-1:
+    - rtsp://admin:Qwerty12@192.168.1.67:554/Streaming/Channels/101
+    - "ffmpeg:cam-1#video=h264#width=1280"
+  cam-2:
+    - rtsp://admin:Qwerty12@192.168.1.64:554/Streaming/Channels/101
+    - "ffmpeg:cam-2#video=h264#width=1280"
 
 api:
   listen: ":1984"
