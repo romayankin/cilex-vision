@@ -15,10 +15,10 @@ minio:
   bucket: frame-blobs
 
 motion:
-  pixel_threshold: 5
-  motion_threshold: 0.00001
+  pixel_threshold: 15
+  motion_threshold: 0.005
   scene_change_threshold: 0.80
-  reference_update_interval_s: 30
+  reference_update_interval_s: 60
 
 cameras:
   - camera_id: cam-1
