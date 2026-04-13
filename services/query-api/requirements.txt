@@ -10,3 +10,4 @@ minio>=7.2.0
 faiss-cpu>=1.7.4
 numpy>=1.24.0
 Pillow>=10.0.0
+httpx>=0.27.0
