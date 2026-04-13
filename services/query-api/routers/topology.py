@@ -254,7 +254,7 @@ async def upsert_edge(
 @router.post(
     "/{site_id}/cameras",
     response_model=CameraNode,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
 )
 async def add_camera(
     request: Request,
@@ -262,7 +262,12 @@ async def add_camera(
     body: CameraCreateRequest,
     user: dict = Depends(_require_admin),
 ) -> CameraNode:
-    """Add a camera to a site."""
+    """Add or update a camera on a site.
+
+    Idempotent upsert — re-POSTing the same camera_id updates its properties
+    (e.g. editing the zone assignment). Fields that arrive as NULL leave the
+    existing DB value untouched.
+    """
     pool = _pool(request)
 
     config_json = json.dumps({"zone_id": body.zone_id}) if body.zone_id else None
@@ -278,36 +283,44 @@ async def add_camera(
                 detail="Site not found",
             )
 
-        try:
-            await conn.execute(
-                "INSERT INTO cameras "
-                "(camera_id, site_id, name, latitude, longitude, "
-                "location_description, config_json) "
-                "VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)",
-                body.camera_id,
-                site_id,
-                body.name,
-                body.latitude,
-                body.longitude,
-                body.location_description,
-                config_json,
-            )
-        except Exception as exc:
-            if "duplicate key" in str(exc).lower():
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Camera {body.camera_id} already exists",
-                )
-            raise
+        row = await conn.fetchrow(
+            "INSERT INTO cameras "
+            "(camera_id, site_id, name, latitude, longitude, "
+            "location_description, config_json) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) "
+            "ON CONFLICT (camera_id) DO UPDATE SET "
+            "name = EXCLUDED.name, "
+            "latitude = COALESCE(EXCLUDED.latitude, cameras.latitude), "
+            "longitude = COALESCE(EXCLUDED.longitude, cameras.longitude), "
+            "location_description = COALESCE("
+            "  EXCLUDED.location_description, cameras.location_description"
+            "), "
+            "config_json = CASE "
+            "  WHEN EXCLUDED.config_json IS NULL THEN cameras.config_json "
+            "  ELSE COALESCE(cameras.config_json, '{}'::jsonb) "
+            "       || EXCLUDED.config_json "
+            "END "
+            "RETURNING status, config_json",
+            body.camera_id,
+            site_id,
+            body.name,
+            body.latitude,
+            body.longitude,
+            body.location_description,
+            config_json,
+        )
+
+    current_status = row["status"] if row else "offline"
+    zone_id = _extract_zone_id(row["config_json"]) if row else body.zone_id
 
     return CameraNode(
         camera_id=body.camera_id,
         site_id=site_id,
         name=body.name,
-        zone_id=body.zone_id,
+        zone_id=zone_id,
         latitude=body.latitude,
         longitude=body.longitude,
-        status="offline",
+        status=current_status,
         location_description=body.location_description,
     )
 
