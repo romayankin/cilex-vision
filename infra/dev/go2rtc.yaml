@@ -1,6 +1,6 @@
 streams:
   cam-1:
-    - rtsp://admin:Qwerty12@192.168.1.66:554/Streaming/Channels/101
+    - rtsp://admin:Qwerty12@192.168.1.67:554/Streaming/Channels/101
     - "ffmpeg:cam-1#video=h264"
   cam-2:
     - rtsp://admin:Qwerty12@192.168.1.64:554/Streaming/Channels/101
