@@ -203,6 +203,11 @@ services:
         mc mb -p local/thumbnails || true;
         mc mb -p local/archive-warm || true;
         mc mb -p local/mtmc-checkpoints || true;
+        mc ilm rule ls local/frame-blobs >/dev/null 2>&1 || mc ilm rule add local/frame-blobs --expire-days 7 || true;
+        mc ilm rule ls local/decoded-frames >/dev/null 2>&1 || mc ilm rule add local/decoded-frames --expire-days 3 || true;
+        mc ilm rule ls local/debug-traces >/dev/null 2>&1 || mc ilm rule add local/debug-traces --expire-days 30 || true;
+        mc ilm rule ls local/thumbnails >/dev/null 2>&1 || mc ilm rule add local/thumbnails --expire-days 30 || true;
+        mc ilm rule ls local/raw-video >/dev/null 2>&1 || mc ilm rule add local/raw-video --expire-days 30 || true;
         exec tail -f /dev/null
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minioadmin}"

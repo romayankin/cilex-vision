@@ -25,7 +25,20 @@ from prometheus_client import make_asgi_app
 
 from auth.audit import AuditMiddleware
 from config import Settings
-from routers import auth, debug, detections, discovery, events, lpr, pipeline, similarity, streams, topology, tracks
+from routers import (
+    auth,
+    debug,
+    detections,
+    discovery,
+    events,
+    lpr,
+    pipeline,
+    similarity,
+    storage,
+    streams,
+    topology,
+    tracks,
+)
 from routers.streams import sync_all_to_go2rtc
 from utils.db import create_pool
 from utils.minio_urls import create_minio_client
@@ -118,6 +131,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(streams.router)
     app.include_router(discovery.router)
     app.include_router(pipeline.router)
+    app.include_router(storage.router)
 
     # Prometheus metrics
     metrics_app = make_asgi_app()
