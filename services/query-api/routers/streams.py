@@ -98,6 +98,23 @@ async def _register_go2rtc(camera_id: str, rtsp_url: str) -> None:
                 logger.warning("go2rtc PUT failed: %s %s", resp.status_code, resp.text)
 
 
+async def sync_all_to_go2rtc(pool) -> int:
+    """Register every DB camera with go2rtc. Returns count of attempts."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT camera_id, rtsp_uri FROM cameras "
+            "WHERE rtsp_uri IS NOT NULL AND rtsp_uri <> ''"
+        )
+    count = 0
+    for r in rows:
+        try:
+            await _register_go2rtc(r["camera_id"], r["rtsp_uri"])
+            count += 1
+        except Exception as exc:
+            logger.warning("go2rtc sync failed for %s: %s", r["camera_id"], exc)
+    return count
+
+
 async def _unregister_go2rtc(camera_id: str) -> None:
     async with httpx.AsyncClient(timeout=5.0) as client:
         await client.delete(

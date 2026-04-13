@@ -26,6 +26,7 @@ from prometheus_client import make_asgi_app
 from auth.audit import AuditMiddleware
 from config import Settings
 from routers import auth, debug, detections, events, lpr, similarity, streams, topology, tracks
+from routers.streams import sync_all_to_go2rtc
 from utils.db import create_pool
 from utils.minio_urls import create_minio_client
 
@@ -63,6 +64,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         secret_key=settings.minio.secret_key,
         secure=settings.minio.secure,
     )
+
+    # Register all DB cameras with go2rtc so streams survive a go2rtc restart.
+    try:
+        synced = await sync_all_to_go2rtc(pool)
+        logger.info("go2rtc sync registered %d cameras", synced)
+    except Exception as exc:  # noqa: BLE001 — sync is best-effort at startup
+        logger.warning("go2rtc startup sync skipped: %s", exc)
 
     yield
 
