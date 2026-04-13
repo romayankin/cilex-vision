@@ -32,7 +32,7 @@ export default function PortalPage() {
       setOffset(newOffset);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load sites");
+      setError(err instanceof Error && err.message.includes("404") ? "Multi-site portal is not yet connected. The /sites API endpoint is pending implementation." : err instanceof Error ? err.message : "Failed to load sites");
     } finally {
       setLoading(false);
     }
