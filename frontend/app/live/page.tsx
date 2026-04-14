@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getUserRole, isAdmin } from "@/lib/auth";
 import { getStreamUrls } from "@/lib/stream-urls";
+import WebRtcPlayer from "@/components/WebRtcPlayer";
 
 interface StreamInfo {
   camera_id: string;
@@ -95,6 +96,12 @@ function CameraPlayer({ stream, large = false }: { stream: StreamInfo; large?: b
     setMode("snapshot");
   };
 
+  const handleWebRtcError = useCallback(() => {
+    setFallbackNotice("WebRTC unavailable, using MSE");
+    setMode("hls"); // any non-"mse" value leaves the WebRTC branch
+    setReconnectKey((k) => k + 1);
+  }, []);
+
   if (!stream.has_rtsp) {
     return (
       <div className="aspect-video bg-gray-900 flex items-center justify-center text-gray-400 text-sm">
@@ -109,6 +116,12 @@ function CameraPlayer({ stream, large = false }: { stream: StreamInfo; large?: b
       : quality === "hd" ? urls.hls_url : urls.hls_sub_url;
   const snapshotSrc = quality === "hd" ? urls.snapshot_url : urls.snapshot_sub_url;
 
+  // WebRTC path: Fast quality while still on the primary "mse" mode slot.
+  // Once we fall back to hls (via handleWebRtcError below), the normal
+  // <video src> path takes over.
+  const useWebRtc = quality === "fast" && mode === "mse";
+  const host = typeof window !== "undefined" ? window.location.hostname : "localhost";
+
   return (
     <>
       {mode === "snapshot" ? (
@@ -117,6 +130,23 @@ function CameraPlayer({ stream, large = false }: { stream: StreamInfo; large?: b
             src={`${snapshotSrc}&t=${refreshKey}`}
             alt={stream.name}
             className="w-full aspect-video bg-black object-cover"
+          />
+          <button
+            onClick={reconnect}
+            className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-black/80"
+            title="Reconnect live stream"
+          >
+            ↻ Reconnect
+          </button>
+        </div>
+      ) : useWebRtc ? (
+        <div className="relative">
+          <WebRtcPlayer
+            key={`webrtc-${stream.camera_id}-${reconnectKey}`}
+            src={`${stream.camera_id}-sub`}
+            go2rtcHost={host}
+            className="w-full aspect-video bg-black object-cover"
+            onError={handleWebRtcError}
           />
           <button
             onClick={reconnect}
@@ -190,7 +220,7 @@ function QualityBar({
       </button>
       <span className={`text-[10px] ml-auto ${tone}`}>
         {notice ??
-          (quality === "hd" ? "1080p · 2-3s delay" : "Low-res · <1s delay")}
+          (quality === "hd" ? "1080p · ~3s delay" : "Low-res · <1s WebRTC")}
       </span>
     </div>
   );
