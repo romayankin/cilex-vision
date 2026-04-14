@@ -43,14 +43,54 @@ ALLOWED_PURGE_BUCKETS = {
 }
 
 BUCKET_CATALOG = [
-    {"name": "frame-blobs", "purpose": "Raw camera frames (JPEG)", "retention_days": 7},
-    {"name": "decoded-frames", "purpose": "Decoded/resized frames for inference", "retention_days": 3},
-    {"name": "event-clips", "purpose": "Video clips from events", "retention_days": 90},
-    {"name": "debug-traces", "purpose": "Debug trace archives", "retention_days": 30},
-    {"name": "thumbnails", "purpose": "Detection/track thumbnails", "retention_days": 30},
-    {"name": "archive-warm", "purpose": "Archived video (warm tier)", "retention_days": None},
-    {"name": "raw-video", "purpose": "Raw video recordings", "retention_days": 30},
-    {"name": "mtmc-checkpoints", "purpose": "MTMC matching checkpoints", "retention_days": None},
+    {
+        "name": "frame-blobs",
+        "purpose": "Camera snapshots captured when motion is detected — individual JPEG photos, not video",
+        "retention_days": 7,
+        "planned": False,
+    },
+    {
+        "name": "decoded-frames",
+        "purpose": "Smaller copies of camera snapshots, resized for the AI detector to process",
+        "retention_days": 3,
+        "planned": False,
+    },
+    {
+        "name": "event-clips",
+        "purpose": "Short video clips stitched together when an event occurs (e.g., person enters and leaves a zone)",
+        "retention_days": 90,
+        "planned": False,
+    },
+    {
+        "name": "debug-traces",
+        "purpose": "Diagnostic snapshots used by engineers to debug AI detection issues",
+        "retention_days": 30,
+        "planned": False,
+    },
+    {
+        "name": "thumbnails",
+        "purpose": "Cropped images of detected objects — a person or vehicle cut out from the full frame",
+        "retention_days": 30,
+        "planned": False,
+    },
+    {
+        "name": "archive-warm",
+        "purpose": "Planned feature — automatic archival of old data to slower/cheaper storage",
+        "retention_days": None,
+        "planned": True,
+    },
+    {
+        "name": "raw-video",
+        "purpose": "Planned feature — continuous DVR-style video recording",
+        "retention_days": 30,
+        "planned": True,
+    },
+    {
+        "name": "mtmc-checkpoints",
+        "purpose": "State files for tracking the same person across multiple cameras",
+        "retention_days": None,
+        "planned": False,
+    },
 ]
 
 

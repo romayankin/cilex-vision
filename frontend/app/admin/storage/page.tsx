@@ -27,6 +27,7 @@ interface BucketCatalogEntry {
   name: string;
   purpose: string;
   retention_days: number | null;
+  planned?: boolean;
 }
 
 interface StorageConfig {
@@ -580,9 +581,9 @@ export default function StoragePage() {
             <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>
                 <th className="text-left px-3 py-2">Bucket</th>
+                <th className="text-left px-3 py-2">Description</th>
                 <th className="text-right px-3 py-2">Size</th>
                 <th className="text-right px-3 py-2">Objects</th>
-                <th className="text-left px-3 py-2">Purpose</th>
                 <th className="text-left px-3 py-2">Retention</th>
                 <th className="text-right px-3 py-2">Actions</th>
               </tr>
@@ -592,20 +593,25 @@ export default function StoragePage() {
                 const cat = catalog.get(b.name);
                 return (
                   <tr key={b.name} className="border-t border-gray-100">
-                    <td className="px-3 py-2 font-mono">{b.name}</td>
-                    <td className="px-3 py-2 text-right font-mono">{b.size_human}</td>
-                    <td className="px-3 py-2 text-right font-mono">
+                    <td className="px-3 py-2 font-mono align-top">{b.name}</td>
+                    <td className="px-3 py-2 text-xs text-gray-600 max-w-md">
+                      {cat?.purpose ?? "—"}
+                      {cat?.planned && (
+                        <span className="ml-1 italic text-gray-400">
+                          (coming soon)
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono align-top">{b.size_human}</td>
+                    <td className="px-3 py-2 text-right font-mono align-top">
                       {b.object_count.toLocaleString()}
                     </td>
-                    <td className="px-3 py-2 text-xs text-gray-600">
-                      {cat?.purpose ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-gray-600">
+                    <td className="px-3 py-2 text-xs text-gray-600 align-top">
                       {cat?.retention_days != null
                         ? `${cat.retention_days} days`
                         : "indefinite"}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-right align-top">
                       {b.purgeable ? (
                         <PurgeMenu
                           bucket={b.name}
