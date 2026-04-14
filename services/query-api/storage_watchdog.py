@@ -94,6 +94,9 @@ class StorageWatchdog:
         quota_bytes = int(assignable * self.quota_percent / 100)
         over = video_bytes > quota_bytes
 
+        # Preserve purge progress / last_purge across iterations so the UI
+        # can keep showing them while the next check runs.
+        prev = self._stats
         self._stats = {
             "disk_total": disk.total,
             "disk_used": disk.used,
@@ -106,6 +109,13 @@ class StorageWatchdog:
             "over_quota": over,
             "bucket_sizes": bucket_sizes,
             "checked_at": datetime.now(timezone.utc).isoformat(),
+            "purging": False,
+            "purge_deleted": 0,
+            "purge_freed": 0,
+            "purge_freed_human": "",
+            "purge_target": 0,
+            "purge_target_human": "",
+            "last_purge": prev.get("last_purge") if prev else None,
         }
 
         if over:
@@ -115,7 +125,18 @@ class StorageWatchdog:
                 "Over quota: %s > %s, purging %s from frame-blobs",
                 _human(video_bytes), _human(quota_bytes), _human(to_free),
             )
-            self._purge_oldest("frame-blobs", to_free)
+            self._stats["purging"] = True
+            self._stats["purge_target"] = to_free
+            self._stats["purge_target_human"] = _human(to_free)
+            try:
+                self._purge_oldest("frame-blobs", to_free)
+            finally:
+                self._stats["purging"] = False
+                self._stats["last_purge"] = {
+                    "deleted": self._stats.get("purge_deleted", 0),
+                    "freed_human": self._stats.get("purge_freed_human", ""),
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
 
     def _bucket_size(self, bucket: str) -> int:
         if self.minio is None:
@@ -150,17 +171,25 @@ class StorageWatchdog:
         entries.sort(key=lambda e: e[0])
 
         freed = 0
+        deleted = 0
         batch: list[Any] = []
         for _, size, name in entries:
             if freed >= bytes_to_free:
                 break
             batch.append(DeleteObject(name))
             freed += size
+            deleted += 1
             if len(batch) >= BATCH_SIZE:
                 self._flush(bucket, batch)
                 batch = []
+                self._stats["purge_deleted"] = deleted
+                self._stats["purge_freed"] = freed
+                self._stats["purge_freed_human"] = _human(freed)
         if batch:
             self._flush(bucket, batch)
+        self._stats["purge_deleted"] = deleted
+        self._stats["purge_freed"] = freed
+        self._stats["purge_freed_human"] = _human(freed)
         logger.info("Watchdog purged %s from %s", _human(freed), bucket)
 
     def _flush(self, bucket: str, batch: list[Any]) -> None:

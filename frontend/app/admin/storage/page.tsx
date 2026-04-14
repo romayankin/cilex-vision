@@ -69,9 +69,21 @@ interface WatchdogStats {
   video_bytes_human?: string;
   quota_bytes_human?: string;
   bucket_sizes_human?: Record<string, string>;
+  purging?: boolean;
+  purge_deleted?: number;
+  purge_freed?: number;
+  purge_freed_human?: string;
+  purge_target?: number;
+  purge_target_human?: string;
+  last_purge?: {
+    deleted: number;
+    freed_human: string;
+    completed_at: string;
+  } | null;
 }
 
 const REFRESH_MS = 30_000;
+const REFRESH_MS_ACTIVE = 3_000;
 const QUOTA_DEBOUNCE_MS = 500;
 
 const PURGE_OPTIONS: { label: string; hours: number }[] = [
@@ -258,6 +270,7 @@ export default function StoragePage() {
   const [stats, setStats] = useState<WatchdogStats | null>(null);
   const [quotaDraft, setQuotaDraft] = useState<number | null>(null);
   const [quotaSaving, setQuotaSaving] = useState(false);
+  const [quotaMessage, setQuotaMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastFetch, setLastFetch] = useState<number>(Date.now());
   const [purgingBucket, setPurgingBucket] = useState<string | null>(null);
@@ -289,14 +302,19 @@ export default function StoragePage() {
 
   useEffect(() => {
     if (!isAdmin(role)) return;
-    loadAll();
     fetch("/api/storage/config", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then(setConfig)
       .catch(() => {});
-    const id = setInterval(loadAll, REFRESH_MS);
+  }, [role]);
+
+  const pollInterval = stats?.purging ? REFRESH_MS_ACTIVE : REFRESH_MS;
+  useEffect(() => {
+    if (!isAdmin(role)) return;
+    loadAll();
+    const id = setInterval(loadAll, pollInterval);
     return () => clearInterval(id);
-  }, [role, loadAll]);
+  }, [role, loadAll, pollInterval]);
 
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -319,6 +337,18 @@ export default function StoragePage() {
           body: JSON.stringify({ percent: quotaDraft }),
         });
         if (!res.ok) throw new Error(`quota HTTP ${res.status}`);
+        // Compute new quota ceiling and compare to current video usage so
+        // the user knows whether auto-cleanup is about to start.
+        const assignable = stats?.assignable ?? 0;
+        const newCap = (assignable * quotaDraft) / 100;
+        const videoBytes = stats?.video_bytes ?? 0;
+        if (videoBytes > newCap) {
+          setQuotaMessage(
+            `Quota set to ${quotaDraft}%. Auto-cleanup will start within 60 seconds.`,
+          );
+        } else {
+          setQuotaMessage(`Quota set to ${quotaDraft}%.`);
+        }
         await loadAll();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Quota update failed");
@@ -327,7 +357,14 @@ export default function StoragePage() {
       }
     }, QUOTA_DEBOUNCE_MS);
     return () => window.clearTimeout(handle);
-  }, [quotaDraft, serverQuota, loadAll]);
+  }, [quotaDraft, serverQuota, loadAll, stats?.assignable, stats?.video_bytes]);
+
+  // Auto-dismiss quota message after 6 seconds.
+  useEffect(() => {
+    if (!quotaMessage) return;
+    const id = window.setTimeout(() => setQuotaMessage(null), 6000);
+    return () => window.clearTimeout(id);
+  }, [quotaMessage]);
 
   async function onPurge(bucket: string, hours: number, label: string) {
     const confirmMsg =
@@ -467,7 +504,67 @@ export default function StoragePage() {
         </section>
       )}
 
-      {/* Last purge result */}
+      {/* Quota change confirmation */}
+      {quotaMessage && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded p-3 text-sm">
+          {quotaMessage}
+        </div>
+      )}
+
+      {/* Live auto-cleanup progress */}
+      {stats?.purging && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-amber-400 border-t-amber-600 rounded-full animate-spin" />
+            <span className="text-sm font-medium text-amber-800">
+              Auto-cleanup in progress…
+            </span>
+          </div>
+          <div className="text-sm text-amber-700">
+            Deleted{" "}
+            <span className="font-mono">
+              {(stats.purge_deleted ?? 0).toLocaleString()}
+            </span>{" "}
+            objects · Freed{" "}
+            <span className="font-mono">{stats.purge_freed_human || "0 B"}</span>{" "}
+            of{" "}
+            <span className="font-mono">
+              {stats.purge_target_human || "—"}
+            </span>{" "}
+            target
+          </div>
+          {(stats.purge_target ?? 0) > 0 && (
+            <div className="w-full h-2 bg-amber-100 rounded">
+              <div
+                className="h-full bg-amber-500 rounded transition-all"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    ((stats.purge_freed ?? 0) / (stats.purge_target ?? 1)) * 100,
+                  )}%`,
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Last auto-cleanup summary (shown when not actively purging) */}
+      {stats && !stats.purging && stats.last_purge && (
+        <div className="text-xs text-gray-500 flex items-center gap-1">
+          <span className="text-green-600">✓</span>
+          Last auto-cleanup: deleted{" "}
+          <span className="font-mono">
+            {stats.last_purge.deleted.toLocaleString()}
+          </span>{" "}
+          objects ({stats.last_purge.freed_human} freed) at{" "}
+          <span className="font-mono">
+            {new Date(stats.last_purge.completed_at).toLocaleTimeString()}
+          </span>
+        </div>
+      )}
+
+      {/* Manual purge result */}
       {lastPurge && (
         <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded p-3 text-sm">
           Purged <span className="font-mono">{lastPurge.deleted_objects}</span>{" "}
