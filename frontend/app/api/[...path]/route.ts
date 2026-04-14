@@ -7,6 +7,7 @@ async function proxy(req: NextRequest) {
   const target = `${API_URL}${path}${req.nextUrl.search}`;
 
   const headers = new Headers(req.headers);
+  headers.set("x-forwarded-host", req.headers.get("host") || "");
   headers.delete("host");
 
   const res = await fetch(target, {

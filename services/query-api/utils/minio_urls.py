@@ -86,7 +86,7 @@ def generate_signed_url(
     if request is not None:
         try:
             settings = request.app.state.settings.minio
-            host_header = request.headers.get("host", "localhost")
+            host_header = request.headers.get("x-forwarded-host") or request.headers.get("host", "localhost")
             external_host = host_header.split(":")[0]
             external_client = create_minio_client(
                 endpoint=f"{external_host}:9000",
