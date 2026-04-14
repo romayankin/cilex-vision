@@ -197,8 +197,10 @@ class KafkaPublisher:
         track_assignments: dict[int, str],
         model_name: str = "yolov8l",
         model_version: str = "1",
+        thumbnail_uris: dict[int, str] | None = None,
     ) -> None:
         """Publish Detection protos to bulk.detections topic."""
+        thumbnail_uris = thumbnail_uris or {}
         for i, det in enumerate(detections):
             payload = build_detection_proto(
                 det, frame_id, camera_id, model_name, model_version, timestamps,
@@ -210,6 +212,9 @@ class KafkaPublisher:
             ]
             if track_id:
                 headers.append(("x-local-track-id", track_id.encode()))
+            thumb_uri = thumbnail_uris.get(i)
+            if thumb_uri:
+                headers.append(("x-thumbnail-uri", thumb_uri.encode()))
 
             await self._send(
                 self._cfg.detection_topic,

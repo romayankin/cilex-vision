@@ -71,6 +71,15 @@ class DebugConfig(BaseModel):
     enabled: bool = True
 
 
+class ThumbnailConfig(BaseModel):
+    enabled: bool = True
+    bucket: str = "thumbnails"
+    max_per_track: int = 5
+    min_confidence: float = 0.50
+    max_width: int = 224
+    quality: int = 80
+
+
 class Settings(BaseSettings):
     model_config = {"env_prefix": "INFERENCE_", "env_nested_delimiter": "__"}
 
@@ -80,6 +89,7 @@ class Settings(BaseSettings):
     tracker: TrackerConfig = Field(default_factory=TrackerConfig)
     detector: DetectorConfig = Field(default_factory=DetectorConfig)
     debug: DebugConfig = Field(default_factory=DebugConfig)
+    thumbnail: ThumbnailConfig = Field(default_factory=ThumbnailConfig)
     metrics_port: int = 9090
     log_level: str = "INFO"
 

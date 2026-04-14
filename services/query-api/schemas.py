@@ -33,6 +33,7 @@ class DetectionResponse(BaseModel):
     bbox: BoundingBox
     local_track_id: Optional[str] = None
     model_version: str
+    thumbnail_url: Optional[str] = None  # signed MinIO URL
 
 
 class DetectionListResponse(BaseModel):

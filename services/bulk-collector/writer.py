@@ -23,6 +23,7 @@ DETECTIONS_COLUMNS = [
     "bbox_h",
     "local_track_id",
     "model_version",
+    "thumbnail_uri",
 ]
 
 TRACK_OBSERVATIONS_COLUMNS = [
@@ -51,6 +52,7 @@ class DetectionRow:
     bbox_h: float
     local_track_id: UUID | None
     model_version: str
+    thumbnail_uri: str | None = None
 
     @property
     def dedupe_key(self) -> tuple[str, int, str]:
@@ -69,6 +71,7 @@ class DetectionRow:
             self.bbox_h,
             self.local_track_id,
             self.model_version,
+            self.thumbnail_uri,
         )
 
 
@@ -304,6 +307,7 @@ class AsyncpgBulkWriter:
             bbox_h=float(row.bbox_h),
             local_track_id=row.local_track_id,
             model_version=str(row.model_version),
+            thumbnail_uri=row.thumbnail_uri,
         )
 
     def _normalise_track_observation_row(self, row: TrackObservationRow) -> TrackObservationRow:

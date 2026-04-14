@@ -21,6 +21,7 @@ from schemas import (
     UserClaims,
 )
 from utils.db import fetch_rows, fetch_val
+from utils.minio_urls import generate_signed_url
 
 router = APIRouter(prefix="/detections", tags=["detections"])
 
@@ -99,7 +100,8 @@ async def list_detections(
 
     data_sql = f"""
         SELECT time, camera_id, frame_seq, object_class, confidence,
-               bbox_x, bbox_y, bbox_w, bbox_h, local_track_id, model_version
+               bbox_x, bbox_y, bbox_w, bbox_h, local_track_id, model_version,
+               thumbnail_uri
         FROM detections
         {where}
         ORDER BY time DESC
@@ -107,6 +109,7 @@ async def list_detections(
     """
 
     rows = await fetch_rows(pool, data_sql, data_args, query_type="detections")
+    minio_client = request.app.state.minio_client
 
     detections = [
         DetectionResponse(
@@ -123,6 +126,11 @@ async def list_detections(
             ),
             local_track_id=str(row["local_track_id"]) if row["local_track_id"] else None,
             model_version=row["model_version"],
+            thumbnail_url=(
+                generate_signed_url(minio_client, row["thumbnail_uri"])
+                if row["thumbnail_uri"]
+                else None
+            ),
         )
         for row in rows
     ]

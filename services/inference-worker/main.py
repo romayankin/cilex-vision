@@ -39,6 +39,7 @@ from metrics import (
     TRACKS_CLOSED,
 )
 from publisher import KafkaPublisher
+from thumbnail_writer import ThumbnailWriter
 from tracker import ByteTracker, TrackState
 
 logger = logging.getLogger(__name__)
@@ -98,9 +99,10 @@ class InferenceWorker:
         self._publisher = KafkaPublisher(settings.kafka)
         self._trackers: dict[str, ByteTracker] = {}
 
-        # MinIO client for frame download and debug traces
+        # MinIO client for frame download, debug traces, and thumbnails
         self._minio = None  # lazy init
         self._trace_collector = None  # lazy init
+        self._thumbnail_writer: ThumbnailWriter | None = None
 
     async def start(self) -> None:
         """Connect to Kafka, MinIO, and start the consumer loop."""
@@ -113,6 +115,12 @@ class InferenceWorker:
                 bucket=self.settings.minio.debug_bucket,
             )
             await self._trace_collector.ensure_bucket()
+
+        if self.settings.thumbnail.enabled:
+            self._thumbnail_writer = ThumbnailWriter(
+                self.settings.thumbnail, self._minio
+            )
+            await self._thumbnail_writer.ensure_bucket()
 
         await self._publisher.connect()
         logger.info("Kafka publisher connected")
@@ -327,6 +335,22 @@ class InferenceWorker:
                     track_assignments[i] = track.track_id
                     break
 
+        # --- Thumbnails (one per tracked detection, per-track budget) ---
+        thumbnail_uris: dict[int, str] = {}
+        if self._thumbnail_writer is not None:
+            for i, det in enumerate(detections):
+                track_id = track_assignments.get(i)
+                if not track_id:
+                    continue
+                uri = await self._thumbnail_writer.maybe_write(
+                    frame=frame_data,
+                    detection=det,
+                    track_id=track_id,
+                    camera_id=camera_id,
+                )
+                if uri:
+                    thumbnail_uris[i] = uri
+
         # --- Embed (best frame per active/new track) ---
         t_embed_start = time.monotonic()
         embeddings: dict[str, np.ndarray] = {}
@@ -372,6 +396,7 @@ class InferenceWorker:
             frame_sequence,
             timestamps,
             track_assignments,
+            thumbnail_uris=thumbnail_uris,
         )
 
         # 2. Tracklet protos → tracklets.local
@@ -390,6 +415,8 @@ class InferenceWorker:
         for track in terminated_tracks:
             await self._publisher.publish_tracklet(track, timestamps)
             await self._publisher.publish_tombstone(track.track_id)
+            if self._thumbnail_writer is not None:
+                self._thumbnail_writer.clear_track(track.track_id)
 
         t_pub_end = time.monotonic()
 

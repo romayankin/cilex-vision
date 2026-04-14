@@ -521,6 +521,8 @@ class BulkCollectorService:
         if not model_version:
             raise DecodeError("missing_model_version")
 
+        thumbnail_uri = headers.get("x-thumbnail-uri") or None
+
         detection_row = DetectionRow(
             time=message_time,
             camera_id=camera_id,
@@ -533,6 +535,7 @@ class BulkCollectorService:
             bbox_h=bbox_h,
             local_track_id=local_track_id,
             model_version=model_version,
+            thumbnail_uri=thumbnail_uri,
         )
 
         track_rows: list[TrackObservationRow] = []

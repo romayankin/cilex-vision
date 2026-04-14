@@ -156,6 +156,7 @@ class Detection(Base):
     bbox_h: Mapped[float] = mapped_column(Float, nullable=False)
     local_track_id: Mapped[Optional[UUID]] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    thumbnail_uri: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint(f"object_class IN ({_OBJECT_CLASSES})", name="ck_detections_class"),
