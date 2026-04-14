@@ -53,9 +53,15 @@ async def list_tracks(
     param_idx = 0
 
     if camera_id:
-        param_idx += 1
-        conditions.append(f"camera_id = ${param_idx}")
-        args.append(camera_id)
+        cams = [c.strip() for c in camera_id.split(",") if c.strip()]
+        if len(cams) == 1:
+            param_idx += 1
+            conditions.append(f"camera_id = ${param_idx}")
+            args.append(cams[0])
+        elif len(cams) > 1:
+            param_idx += 1
+            conditions.append(f"camera_id = ANY(${param_idx})")
+            args.append(cams)
     if camera_filter is not None:
         param_idx += 1
         conditions.append(f"camera_id = ANY(${param_idx})")
@@ -71,13 +77,25 @@ async def list_tracks(
         args.append(end)
 
     if object_class:
-        param_idx += 1
-        conditions.append(f"object_class = ${param_idx}")
-        args.append(object_class)
+        classes = [c.strip() for c in object_class.split(",") if c.strip()]
+        if len(classes) == 1:
+            param_idx += 1
+            conditions.append(f"object_class = ${param_idx}")
+            args.append(classes[0])
+        elif len(classes) > 1:
+            param_idx += 1
+            conditions.append(f"object_class = ANY(${param_idx})")
+            args.append(classes)
     if state:
-        param_idx += 1
-        conditions.append(f"state = ${param_idx}")
-        args.append(state)
+        states = [s.strip() for s in state.split(",") if s.strip()]
+        if len(states) == 1:
+            param_idx += 1
+            conditions.append(f"state = ${param_idx}")
+            args.append(states[0])
+        elif len(states) > 1:
+            param_idx += 1
+            conditions.append(f"state = ANY(${param_idx})")
+            args.append(states)
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 

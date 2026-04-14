@@ -67,18 +67,30 @@ async def list_detections(
 
     # Camera scope filtering
     if camera_id:
-        param_idx += 1
-        conditions.append(f"camera_id = ${param_idx}")
-        args.append(camera_id)
+        cams = [c.strip() for c in camera_id.split(",") if c.strip()]
+        if len(cams) == 1:
+            param_idx += 1
+            conditions.append(f"camera_id = ${param_idx}")
+            args.append(cams[0])
+        elif len(cams) > 1:
+            param_idx += 1
+            conditions.append(f"camera_id = ANY(${param_idx})")
+            args.append(cams)
     if camera_filter is not None:
         param_idx += 1
         conditions.append(f"camera_id = ANY(${param_idx})")
         args.append(camera_filter)
 
     if object_class:
-        param_idx += 1
-        conditions.append(f"object_class = ${param_idx}")
-        args.append(object_class)
+        classes = [c.strip() for c in object_class.split(",") if c.strip()]
+        if len(classes) == 1:
+            param_idx += 1
+            conditions.append(f"object_class = ${param_idx}")
+            args.append(classes[0])
+        elif len(classes) > 1:
+            param_idx += 1
+            conditions.append(f"object_class = ANY(${param_idx})")
+            args.append(classes)
 
     if min_confidence is not None:
         param_idx += 1

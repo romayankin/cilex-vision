@@ -66,9 +66,15 @@ async def list_events(
     param_idx = 0
 
     if camera_id:
-        param_idx += 1
-        conditions.append(f"e.camera_id = ${param_idx}")
-        args.append(camera_id)
+        cams = [c.strip() for c in camera_id.split(",") if c.strip()]
+        if len(cams) == 1:
+            param_idx += 1
+            conditions.append(f"e.camera_id = ${param_idx}")
+            args.append(cams[0])
+        elif len(cams) > 1:
+            param_idx += 1
+            conditions.append(f"e.camera_id = ANY(${param_idx})")
+            args.append(cams)
     if camera_filter is not None:
         param_idx += 1
         conditions.append(f"e.camera_id = ANY(${param_idx})")
@@ -90,14 +96,26 @@ async def list_events(
         args.append(end)
 
     if event_type:
-        param_idx += 1
-        conditions.append(f"e.event_type = ${param_idx}")
-        args.append(event_type)
+        types = [t.strip() for t in event_type.split(",") if t.strip()]
+        if len(types) == 1:
+            param_idx += 1
+            conditions.append(f"e.event_type = ${param_idx}")
+            args.append(types[0])
+        elif len(types) > 1:
+            param_idx += 1
+            conditions.append(f"e.event_type = ANY(${param_idx})")
+            args.append(types)
 
     if state:
-        param_idx += 1
-        conditions.append(f"e.state = ${param_idx}")
-        args.append(state)
+        states = [s.strip() for s in state.split(",") if s.strip()]
+        if len(states) == 1:
+            param_idx += 1
+            conditions.append(f"e.state = ${param_idx}")
+            args.append(states[0])
+        elif len(states) > 1:
+            param_idx += 1
+            conditions.append(f"e.state = ANY(${param_idx})")
+            args.append(states)
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
