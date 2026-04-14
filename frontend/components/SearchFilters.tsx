@@ -52,19 +52,6 @@ const COLOR_MAP: Record<string, string> = {
   unknown: "#D1D5DB",
 };
 
-const COLOR_INITIAL: Record<string, string> = {
-  red: "r",
-  blue: "b",
-  white: "w",
-  black: "k",
-  silver: "s",
-  green: "g",
-  yellow: "y",
-  brown: "br",
-  orange: "or",
-  unknown: "?",
-};
-
 const LABELS: Record<string, string> = {
   entered_scene: "enter",
   exited_scene: "exit",
@@ -312,7 +299,7 @@ export default function SearchFilters({
                 onClick={() => toggle("color", c)}
                 title={c}
                 aria-pressed={active}
-                className="flex flex-col items-center gap-1 group"
+                className="group"
               >
                 <span
                   className={`relative inline-flex items-center justify-center rounded-full transition-all ${
@@ -342,9 +329,6 @@ export default function SearchFilters({
                       <polyline points="4,10 8,14 16,6" />
                     </svg>
                   )}
-                </span>
-                <span className="text-[10px] font-mono text-gray-500">
-                  {COLOR_INITIAL[c]}
                 </span>
               </button>
             );
