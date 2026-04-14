@@ -35,6 +35,7 @@ from routers import (
     events,
     lpr,
     pipeline,
+    settings as settings_router,
     similarity,
     storage,
     streams,
@@ -141,6 +142,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(discovery.router)
     app.include_router(pipeline.router)
     app.include_router(storage.router)
+    app.include_router(settings_router.router)
 
     # Prometheus metrics
     metrics_app = make_asgi_app()
