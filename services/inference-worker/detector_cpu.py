@@ -48,7 +48,7 @@ class CpuDetectorClient:
 
     def __init__(
         self,
-        confidence_threshold: float = 0.40,
+        confidence_threshold: float = 0.65,
         nms_iou_threshold: float = 0.45,
         model_name: str = "yolov8n.pt",
     ) -> None:

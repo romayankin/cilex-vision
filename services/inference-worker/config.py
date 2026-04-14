@@ -59,7 +59,7 @@ class TrackerConfig(BaseModel):
 
 
 class DetectorConfig(BaseModel):
-    confidence_threshold: float = 0.40
+    confidence_threshold: float = 0.65
     nms_iou_threshold: float = 0.45
     input_size: int = 640
     num_classes: int = 7
