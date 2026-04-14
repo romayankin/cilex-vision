@@ -81,19 +81,30 @@ class AddCameraRequest(BaseModel):
 
 
 async def _register_go2rtc(camera_id: str, rtsp_url: str) -> None:
-    # go2rtc PUT replaces the stream's sources. Use a single ffmpeg source that
-    # transcodes the RTSP feed to H.264 at 720p — needed because 1440p H.265
-    # can overwhelm browser MSE and strain the CPU.
-    src = f"ffmpeg:{rtsp_url}#video=h264#width=1280"
+    # Main: transcode to H.264 720p — 1440p H.265 overwhelms browser MSE.
+    # Sub: direct channel 102 (typically H.264 ~640×480) for low-latency view.
+    main_src = f"ffmpeg:{rtsp_url}#video=h264#width=1280"
+    sub_url = rtsp_url.replace("/Channels/101", "/Channels/102")
     async with httpx.AsyncClient(timeout=5.0) as client:
         resp = await client.put(
             f"{GO2RTC_INTERNAL}/api/streams",
-            params={"name": camera_id, "src": src},
+            params={"name": camera_id, "src": main_src},
         )
         # 400 appears when the mounted config is read-only, but the stream is
         # still registered in memory. Only log real failures.
         if resp.status_code >= 500:
             logger.warning("go2rtc PUT failed: %s %s", resp.status_code, resp.text)
+
+        resp_sub = await client.put(
+            f"{GO2RTC_INTERNAL}/api/streams",
+            params={"name": f"{camera_id}-sub", "src": sub_url},
+        )
+        if resp_sub.status_code >= 500:
+            logger.warning(
+                "go2rtc PUT (sub) failed: %s %s",
+                resp_sub.status_code,
+                resp_sub.text,
+            )
 
 
 async def sync_all_to_go2rtc(pool) -> int:
@@ -133,6 +144,10 @@ async def _unregister_go2rtc(camera_id: str) -> None:
         await client.delete(
             f"{GO2RTC_INTERNAL}/api/streams",
             params={"src": camera_id},
+        )
+        await client.delete(
+            f"{GO2RTC_INTERNAL}/api/streams",
+            params={"src": f"{camera_id}-sub"},
         )
 
 

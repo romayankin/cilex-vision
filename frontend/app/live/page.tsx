@@ -44,11 +44,14 @@ function slugifyCameraId(model: string | null, ip: string): string {
 }
 
 type PlayerMode = "mse" | "hls" | "snapshot";
+type StreamQuality = "hd" | "fast";
 
 function CameraPlayer({ stream, large = false }: { stream: StreamInfo; large?: boolean }) {
   const [mode, setMode] = useState<PlayerMode>("mse");
+  const [quality, setQuality] = useState<StreamQuality>("hd");
   const [refreshKey, setRefreshKey] = useState(0);
   const [reconnectKey, setReconnectKey] = useState(0);
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
   const urls = getStreamUrls(stream.camera_id);
 
   useEffect(() => {
@@ -57,9 +60,39 @@ function CameraPlayer({ stream, large = false }: { stream: StreamInfo; large?: b
     return () => clearInterval(id);
   }, [mode]);
 
+  useEffect(() => {
+    if (!fallbackNotice) return;
+    const t = setTimeout(() => setFallbackNotice(null), 3000);
+    return () => clearTimeout(t);
+  }, [fallbackNotice]);
+
+  const selectQuality = (q: StreamQuality) => {
+    setFallbackNotice(null);
+    setQuality(q);
+    setMode("mse");
+    setReconnectKey((k) => k + 1);
+  };
+
   const reconnect = () => {
     setMode("mse");
     setReconnectKey((k) => k + 1);
+  };
+
+  const handleError = () => {
+    if (mode === "mse") {
+      setMode("hls");
+      return;
+    }
+    // HLS also failed. If we were on the sub-stream, fall back to HD before
+    // giving up to a snapshot.
+    if (quality === "fast") {
+      setFallbackNotice("Sub-stream unavailable, using HD");
+      setQuality("hd");
+      setMode("mse");
+      setReconnectKey((k) => k + 1);
+      return;
+    }
+    setMode("snapshot");
   };
 
   if (!stream.has_rtsp) {
@@ -69,35 +102,97 @@ function CameraPlayer({ stream, large = false }: { stream: StreamInfo; large?: b
       </div>
     );
   }
-  if (mode === "snapshot") {
-    return (
-      <div className="relative">
-        <img
-          src={`${urls.snapshot_url}&t=${refreshKey}`}
-          alt={stream.name}
+
+  const videoSrc =
+    mode === "mse"
+      ? quality === "hd" ? urls.mse_url : urls.mse_sub_url
+      : quality === "hd" ? urls.hls_url : urls.hls_sub_url;
+  const snapshotSrc = quality === "hd" ? urls.snapshot_url : urls.snapshot_sub_url;
+
+  return (
+    <>
+      {mode === "snapshot" ? (
+        <div className="relative">
+          <img
+            src={`${snapshotSrc}&t=${refreshKey}`}
+            alt={stream.name}
+            className="w-full aspect-video bg-black object-cover"
+          />
+          <button
+            onClick={reconnect}
+            className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-black/80"
+            title="Reconnect live stream"
+          >
+            ↻ Reconnect
+          </button>
+        </div>
+      ) : (
+        <video
+          key={`${mode}-${quality}-${reconnectKey}`}
+          src={videoSrc}
+          autoPlay
+          muted
+          playsInline
+          onError={handleError}
           className="w-full aspect-video bg-black object-cover"
         />
-        <button
-          onClick={reconnect}
-          className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-black/80"
-          title="Reconnect live stream"
-        >
-          ↻ Reconnect
-        </button>
-      </div>
-    );
-  }
-  const src = mode === "mse" ? urls.mse_url : urls.hls_url;
+      )}
+      <QualityBar
+        quality={quality}
+        onChange={selectQuality}
+        notice={fallbackNotice}
+        large={large}
+      />
+    </>
+  );
+}
+
+function QualityBar({
+  quality,
+  onChange,
+  notice,
+  large,
+}: {
+  quality: StreamQuality;
+  onChange: (q: StreamQuality) => void;
+  notice: string | null;
+  large?: boolean;
+}) {
+  const tone = large ? "text-gray-300" : "text-gray-400";
   return (
-    <video
-      key={`${mode}-${reconnectKey}`}
-      src={src}
-      autoPlay
-      muted
-      playsInline
-      onError={() => setMode((m) => (m === "mse" ? "hls" : "snapshot"))}
-      className="w-full aspect-video bg-black object-cover"
-    />
+    <div
+      className={`flex items-center gap-1 px-3 py-1.5 ${
+        large ? "bg-black/60" : "border-t border-gray-100"
+      }`}
+    >
+      <span className={`text-[10px] mr-1 ${tone}`}>Quality:</span>
+      <button
+        type="button"
+        onClick={() => onChange("hd")}
+        className={`px-2 py-0.5 text-[11px] rounded transition ${
+          quality === "hd"
+            ? "bg-blue-600 text-white"
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+        }`}
+      >
+        HD
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("fast")}
+        className={`px-2 py-0.5 text-[11px] rounded transition ${
+          quality === "fast"
+            ? "bg-blue-600 text-white"
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+        }`}
+      >
+        Fast
+      </button>
+      <span className={`text-[10px] ml-auto ${tone}`}>
+        {notice ??
+          (quality === "hd" ? "1080p · 2-3s delay" : "Low-res · <1s delay")}
+      </span>
+    </div>
   );
 }
 
@@ -324,7 +419,8 @@ function AddCameraForm({
             className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono"
           />
           <p className="text-xs text-gray-400 mt-1">
-            HiWatch/Hikvision: rtsp://user:pass@IP:554/Streaming/Channels/101
+            Main stream URL (channel 101). The system automatically registers
+            channel 102 as the low-latency sub-stream for the HD/Fast toggle.
           </p>
         </div>
       </div>
