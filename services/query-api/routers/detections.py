@@ -85,6 +85,7 @@ async def list_detections(
     end: Optional[datetime] = Query(None, description="End time (exclusive)"),
     object_class: Optional[str] = Query(None, alias="class", description="Filter by object class"),
     min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0, description="Minimum confidence"),
+    has_thumbnail: Optional[bool] = Query(None, description="Filter to detections with (true) or without (false) thumbnails"),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
     user: UserClaims = Depends(get_current_user),
@@ -144,6 +145,11 @@ async def list_detections(
         conditions.append(f"confidence >= ${param_idx}")
         args.append(min_confidence)
 
+    if has_thumbnail is True:
+        conditions.append("thumbnail_uri IS NOT NULL")
+    elif has_thumbnail is False:
+        conditions.append("thumbnail_uri IS NULL")
+
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
     # Count query
@@ -186,7 +192,7 @@ async def list_detections(
             local_track_id=str(row["local_track_id"]) if row["local_track_id"] else None,
             model_version=row["model_version"],
             thumbnail_url=(
-                generate_signed_url(minio_client, row["thumbnail_uri"])
+                generate_signed_url(minio_client, row["thumbnail_uri"], request=request)
                 if row["thumbnail_uri"]
                 else None
             ),

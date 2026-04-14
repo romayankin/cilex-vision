@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import SearchFilters, { FilterState } from "@/components/SearchFilters";
 import ResultCard from "@/components/ResultCard";
@@ -51,6 +51,8 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [thumbOnly, setThumbOnly] = useState(false);
+  const thumbOnlyRef = useRef(thumbOnly);
+  thumbOnlyRef.current = thumbOnly;
 
   const doSearch = useCallback(
     async (newOffset = 0) => {
@@ -133,6 +135,7 @@ export default function SearchPage() {
             start: filters.start || undefined,
             end: filters.end || undefined,
             object_class: filters.object_class || undefined,
+            has_thumbnail: thumbOnlyRef.current || undefined,
             offset: newOffset,
             limit: PAGE_SIZE,
           });
@@ -194,23 +197,14 @@ export default function SearchPage() {
         <div className="text-center py-8 text-gray-400">Loading...</div>
       )}
 
-      {!loading && results.length > 0 && (() => {
-        const displayResults = thumbOnly
-          ? results.filter((r) => r.thumbnailUrl)
-          : results;
-        return (
+      {!loading && results.length > 0 && (
         <>
           <div className="text-sm text-gray-500">
             Showing {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} of {total} results
-            {thumbOnly && displayResults.length !== results.length && (
-              <span className="ml-2 text-gray-400">
-                ({displayResults.length} with thumbnails on this page)
-              </span>
-            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {displayResults.map((r) => (
+            {results.map((r) => (
               <ResultCard
                 key={r.id}
                 trackId={r.trackId}
@@ -243,8 +237,7 @@ export default function SearchPage() {
             </button>
           </div>
         </>
-        );
-      })()}
+      )}
 
       {!loading && results.length === 0 && !error && total === 0 && (
         <div className="text-center py-12 text-gray-400">

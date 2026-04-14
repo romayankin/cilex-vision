@@ -160,7 +160,7 @@ async def list_events(
             start_time=row["start_time"],
             end_time=row["end_time"],
             duration_ms=row["duration_ms"],
-            clip_url=generate_signed_url(minio_client, row["clip_uri"], expiry_s)
+            clip_url=generate_signed_url(minio_client, row["clip_uri"], expiry_s, request=request)
             if row["clip_uri"]
             else None,
             state=row["state"],

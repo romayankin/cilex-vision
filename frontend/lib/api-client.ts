@@ -184,6 +184,7 @@ export interface DetectionQuery {
   end?: string;
   object_class?: string;
   min_confidence?: number;
+  has_thumbnail?: boolean;
   offset?: number;
   limit?: number;
 }
@@ -266,6 +267,7 @@ export async function getDetections(q: DetectionQuery = {}): Promise<DetectionLi
     end: q.end,
     class: q.object_class,
     min_confidence: q.min_confidence,
+    has_thumbnail: q.has_thumbnail === undefined ? undefined : q.has_thumbnail ? "true" : "false",
     offset: q.offset,
     limit: q.limit,
   };
