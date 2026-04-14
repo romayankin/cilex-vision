@@ -50,6 +50,7 @@ export default function SearchPage() {
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [thumbOnly, setThumbOnly] = useState(false);
 
   const doSearch = useCallback(
     async (newOffset = 0) => {
@@ -145,6 +146,7 @@ export default function SearchPage() {
               objectClass: det.object_class,
               timestamp: det.time,
               confidence: det.confidence,
+              thumbnailUrl: det.thumbnail_url,
             });
           }
         }
@@ -174,7 +176,13 @@ export default function SearchPage() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Search</h1>
 
-      <SearchFilters filters={filters} onChange={setFilters} onSearch={() => doSearch(0)} />
+      <SearchFilters
+        filters={filters}
+        onChange={setFilters}
+        onSearch={() => doSearch(0)}
+        thumbOnly={thumbOnly}
+        onThumbOnlyChange={setThumbOnly}
+      />
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
@@ -186,14 +194,23 @@ export default function SearchPage() {
         <div className="text-center py-8 text-gray-400">Loading...</div>
       )}
 
-      {!loading && results.length > 0 && (
+      {!loading && results.length > 0 && (() => {
+        const displayResults = thumbOnly
+          ? results.filter((r) => r.thumbnailUrl)
+          : results;
+        return (
         <>
           <div className="text-sm text-gray-500">
             Showing {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} of {total} results
+            {thumbOnly && displayResults.length !== results.length && (
+              <span className="ml-2 text-gray-400">
+                ({displayResults.length} with thumbnails on this page)
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {results.map((r) => (
+            {displayResults.map((r) => (
               <ResultCard
                 key={r.id}
                 trackId={r.trackId}
@@ -226,7 +243,8 @@ export default function SearchPage() {
             </button>
           </div>
         </>
-      )}
+        );
+      })()}
 
       {!loading && results.length === 0 && !error && total === 0 && (
         <div className="text-center py-12 text-gray-400">

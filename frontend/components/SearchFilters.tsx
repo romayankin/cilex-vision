@@ -91,6 +91,8 @@ interface SearchFiltersProps {
   filters: FilterState;
   onChange: (filters: FilterState) => void;
   onSearch: () => void;
+  thumbOnly?: boolean;
+  onThumbOnlyChange?: (v: boolean) => void;
 }
 
 // Helpers for comma-separated multi-select
@@ -123,9 +125,28 @@ export default function SearchFilters({
   filters,
   onChange,
   onSearch,
+  thumbOnly,
+  onThumbOnlyChange,
 }: SearchFiltersProps) {
   const [streams, setStreams] = useState<StreamInfo[]>([]);
   const [streamsFailed, setStreamsFailed] = useState(false);
+  const [classCounts, setClassCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const url = filters.camera_id
+      ? `/api/detections/counts?camera_id=${encodeURIComponent(filters.camera_id)}`
+      : "/api/detections/counts";
+    fetch(url, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((d) => {
+        if (!cancelled) setClassCounts(d ?? {});
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [filters.camera_id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -344,6 +365,7 @@ export default function SearchFilters({
           items={OBJECT_CLASSES}
           selected={selectedClasses}
           icons={OBJECT_CLASS_ICONS}
+          counts={classCounts}
           onToggle={(v) => toggle("object_class", v)}
         />
 
@@ -367,7 +389,7 @@ export default function SearchFilters({
       </div>
 
       {/* Search + clear */}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-3 pt-1">
         <button
           onClick={onSearch}
           className="bg-blue-600 text-white rounded px-5 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
@@ -390,6 +412,17 @@ export default function SearchFilters({
         >
           Clear all
         </button>
+        {onThumbOnlyChange && (
+          <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer ml-auto">
+            <input
+              type="checkbox"
+              checked={!!thumbOnly}
+              onChange={(e) => onThumbOnlyChange(e.target.checked)}
+              className="rounded"
+            />
+            With thumbnails only
+          </label>
+        )}
       </div>
     </div>
   );
@@ -400,6 +433,7 @@ interface FilterTileGroupProps {
   items: string[];
   selected: Set<string>;
   icons: Record<string, (p: { className?: string }) => JSX.Element>;
+  counts?: Record<string, number>;
   onToggle: (value: string) => void;
 }
 
@@ -408,6 +442,7 @@ function FilterTileGroup({
   items,
   selected,
   icons,
+  counts,
   onToggle,
 }: FilterTileGroupProps) {
   return (
@@ -442,6 +477,11 @@ function FilterTileGroup({
                 }`}
               >
                 {LABELS[v] ?? v}
+                {counts && counts[v] != null && (
+                  <span className="ml-1 text-gray-400 font-normal">
+                    ({counts[v].toLocaleString()})
+                  </span>
+                )}
               </span>
             </button>
           );

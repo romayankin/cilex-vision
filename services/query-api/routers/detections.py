@@ -27,6 +27,53 @@ router = APIRouter(prefix="/detections", tags=["detections"])
 
 
 @router.get(
+    "/counts",
+    dependencies=[require_role("admin", "operator", "viewer", "engineering")],
+)
+async def detection_counts(
+    request: Request,
+    camera_id: Optional[str] = Query(None, description="Filter by camera ID (comma-separated for multiple)"),
+    user: UserClaims = Depends(get_current_user),
+) -> dict[str, int]:
+    """Return detection counts grouped by object_class for the current scope."""
+    request.state.audit_user_id = user.user_id
+    request.state.audit_username = user.username
+
+    pool = request.app.state.db_pool
+    camera_filter = get_camera_filter(user)
+
+    conditions: list[str] = []
+    args: list[object] = []
+    param_idx = 0
+
+    if camera_id:
+        cams = [c.strip() for c in camera_id.split(",") if c.strip()]
+        if len(cams) == 1:
+            param_idx += 1
+            conditions.append(f"camera_id = ${param_idx}")
+            args.append(cams[0])
+        elif len(cams) > 1:
+            param_idx += 1
+            conditions.append(f"camera_id = ANY(${param_idx})")
+            args.append(cams)
+
+    if camera_filter is not None:
+        param_idx += 1
+        conditions.append(f"camera_id = ANY(${param_idx})")
+        args.append(camera_filter)
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    rows = await fetch_rows(
+        pool,
+        f"SELECT object_class, COUNT(*) AS count FROM detections {where} GROUP BY object_class",
+        args,
+        query_type="detection_counts",
+    )
+    return {row["object_class"]: int(row["count"]) for row in rows}
+
+
+@router.get(
     "",
     response_model=DetectionListResponse,
     dependencies=[require_role("admin", "operator", "viewer", "engineering")],

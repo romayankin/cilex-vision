@@ -32,6 +32,7 @@ export interface DetectionResponse {
   bbox: BBox;
   local_track_id: string | null;
   model_version: string;
+  thumbnail_url: string | null;
 }
 
 export interface DetectionListResponse {
@@ -258,11 +259,31 @@ async function apiMutate<T>(path: string, method: string, body?: unknown): Promi
 // ---------------------------------------------------------------------------
 
 export async function getDetections(q: DetectionQuery = {}): Promise<DetectionListResponse> {
-  return apiFetch<DetectionListResponse>("/detections", q as Record<string, string | number | undefined>);
+  // Backend uses alias "class" for the object_class filter (FastAPI Query alias).
+  const params: Record<string, string | number | undefined> = {
+    camera_id: q.camera_id,
+    start: q.start,
+    end: q.end,
+    class: q.object_class,
+    min_confidence: q.min_confidence,
+    offset: q.offset,
+    limit: q.limit,
+  };
+  return apiFetch<DetectionListResponse>("/detections", params);
 }
 
 export async function getTracks(q: TrackQuery = {}): Promise<TrackListResponse> {
-  return apiFetch<TrackListResponse>("/tracks", q as Record<string, string | number | undefined>);
+  // Backend uses alias "class" for the object_class filter (FastAPI Query alias).
+  const params: Record<string, string | number | undefined> = {
+    camera_id: q.camera_id,
+    start: q.start,
+    end: q.end,
+    class: q.object_class,
+    state: q.state,
+    offset: q.offset,
+    limit: q.limit,
+  };
+  return apiFetch<TrackListResponse>("/tracks", params);
 }
 
 export async function getTrackDetail(localTrackId: string): Promise<TrackDetailResponse> {
