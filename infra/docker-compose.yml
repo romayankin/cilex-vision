@@ -585,6 +585,7 @@ services:
       QUERY_MINIO__SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
       QUERY_MINIO__SECURE: "false"
       QUERY_JWT__SECRET_KEY: "${JWT_SECRET:-pilot-jwt-secret-change-me}"
+      STORAGE_QUOTA_PERCENT: "${STORAGE_QUOTA_PERCENT:-50}"
       QUERY_LOG_LEVEL: INFO
     mem_limit: 512m
     restart: unless-stopped

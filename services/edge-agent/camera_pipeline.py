@@ -62,6 +62,9 @@ class CameraPipeline:
             scene_change_threshold=motion_cfg.scene_change_threshold,
             reference_update_interval_s=motion_cfg.reference_update_interval_s,
         )
+        self._max_fps = max(0.1, float(motion_cfg.max_fps))
+        self._min_frame_interval = 1.0 / self._max_fps
+        self._last_frame_time = 0.0
 
     async def run(self) -> None:
         """Main loop — runs until ``shutdown()`` is called."""
@@ -111,6 +114,13 @@ class CameraPipeline:
             if not has_motion:
                 STATIC_FILTERED.labels(camera_id=cam_id).inc()
                 continue
+
+            # Rate-limit accepted frames to cap MinIO write volume.
+            now_mono = time.monotonic()
+            if now_mono - self._last_frame_time < self._min_frame_interval:
+                STATIC_FILTERED.labels(camera_id=cam_id).inc()
+                continue
+            self._last_frame_time = now_mono
 
             MOTION_FRAMES.labels(camera_id=cam_id).inc()
 

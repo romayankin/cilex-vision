@@ -50,6 +50,7 @@ class MotionConfig(BaseModel):
     motion_threshold: float = 0.02
     scene_change_threshold: float = 0.80
     reference_update_interval_s: int = 300
+    max_fps: float = 2.0
 
 
 class BufferConfig(BaseModel):

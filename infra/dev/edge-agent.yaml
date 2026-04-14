@@ -16,9 +16,10 @@ minio:
 
 motion:
   pixel_threshold: 15
-  motion_threshold: 0.005
+  motion_threshold: 0.01
   scene_change_threshold: 0.80
   reference_update_interval_s: 60
+  max_fps: 2
 
 cameras:
   - camera_id: cam-1

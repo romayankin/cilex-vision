@@ -96,6 +96,67 @@ async def _fetch_minio_text(client: httpx.AsyncClient, url: str) -> str | None:
     return resp.text
 
 
+@router.get("")
+async def get_storage_status(
+    request: Request,
+    user: UserClaims = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Return the live storage watchdog stats + human-readable fields."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    watchdog = getattr(request.app.state, "storage_watchdog", None)
+    if watchdog is None:
+        raise HTTPException(status_code=503, detail="Watchdog not initialised")
+
+    stats = watchdog.stats
+    if not stats:
+        return {
+            "quota_percent": watchdog.quota_percent,
+            "ready": False,
+            "message": "Watchdog has not completed its first check yet",
+        }
+
+    bucket_sizes_human = {
+        name: _human_size(size) for name, size in stats["bucket_sizes"].items()
+    }
+    return {
+        **stats,
+        "disk_total_human": _human_size(stats["disk_total"]),
+        "disk_used_human": _human_size(stats["disk_used"]),
+        "disk_free_human": _human_size(stats["disk_free"]),
+        "non_video_used_human": _human_size(stats["non_video_used"]),
+        "assignable_human": _human_size(stats["assignable"]),
+        "video_bytes_human": _human_size(stats["video_bytes"]),
+        "quota_bytes_human": _human_size(stats["quota_bytes"]),
+        "bucket_sizes_human": bucket_sizes_human,
+        "ready": True,
+    }
+
+
+class QuotaUpdateRequest(BaseModel):
+    percent: int = Field(ge=10, le=90)
+
+
+@router.put("/quota")
+async def update_quota(
+    body: QuotaUpdateRequest,
+    request: Request,
+    user: UserClaims = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Change the video storage quota at runtime."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    watchdog = getattr(request.app.state, "storage_watchdog", None)
+    if watchdog is None:
+        raise HTTPException(status_code=503, detail="Watchdog not initialised")
+
+    new_percent = watchdog.set_quota_percent(body.percent)
+    logger.info("Storage quota updated to %d%% by %s", new_percent, user.username)
+    return {"quota_percent": new_percent}
+
+
 @router.get("/buckets")
 async def list_buckets(
     request: Request,

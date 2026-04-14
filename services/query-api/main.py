@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
@@ -25,6 +26,7 @@ from prometheus_client import make_asgi_app
 
 from auth.audit import AuditMiddleware
 from config import Settings
+from storage_watchdog import StorageWatchdog
 from routers import (
     auth,
     debug,
@@ -78,6 +80,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         secure=settings.minio.secure,
     )
 
+    # Storage quota watchdog
+    quota_percent = int(os.environ.get("STORAGE_QUOTA_PERCENT", "50"))
+    watchdog = StorageWatchdog(app.state.minio_client, quota_percent=quota_percent)
+    app.state.storage_watchdog = watchdog
+    await watchdog.start()
+
     # Register all DB cameras with go2rtc so streams survive a go2rtc restart.
     try:
         synced = await sync_all_to_go2rtc(pool)
@@ -88,6 +96,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     # Shutdown
+    await watchdog.stop()
     if pool is not None:
         await pool.close()
         logger.info("Database pool closed")
