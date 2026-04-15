@@ -49,7 +49,7 @@ type StreamQuality = "hd" | "fast";
 
 function CameraPlayer({ stream, large = false }: { stream: StreamInfo; large?: boolean }) {
   const [mode, setMode] = useState<PlayerMode>("mse");
-  const [quality, setQuality] = useState<StreamQuality>("hd");
+  const [quality, setQuality] = useState<StreamQuality>("fast");
   const [refreshKey, setRefreshKey] = useState(0);
   const [reconnectKey, setReconnectKey] = useState(0);
   const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
