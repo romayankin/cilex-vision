@@ -1,10 +1,15 @@
-"""Audit logging middleware.
+"""Audit + access logging middleware.
 
-Logs every API request to the audit_logs table with who/when/what.
-Per security-design.md: audit logging on every data access, 2yr retention.
+Splits per HTTP method:
+  - GET/HEAD/OPTIONS → ``access_log`` (hypertable, 90-day retention). Volume
+    is dominated by reads and compliance only needs "who looked at what,
+    when" for a bounded window.
+  - Mutating methods → ``audit_logs`` (permanent). Route handlers can emit
+    a rich audit entry themselves and set ``request.state.audit_written =
+    True`` to suppress the generic middleware fallback.
 
-Uses asyncpg directly (not SQLAlchemy) to avoid blocking the request path.
-Audit write failures are logged but never block the response.
+Health/metrics/docs paths are skipped. Writes are best-effort — a failure
+is logged but never blocks the response.
 """
 
 from __future__ import annotations
@@ -23,8 +28,12 @@ from metrics import AUDIT_ERRORS, AUDIT_WRITES
 logger = logging.getLogger(__name__)
 
 
+SKIP_PATHS = {"/health", "/ready", "/metrics", "/docs", "/openapi.json"}
+READ_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
 class AuditMiddleware(BaseHTTPMiddleware):
-    """Log every request to the audit_logs table."""
+    """Route each request to access_log (reads) or audit_logs (mutations)."""
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
@@ -33,39 +42,63 @@ class AuditMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         elapsed_ms = (time.monotonic() - start) * 1000
 
-        # Skip health/metrics endpoints to reduce noise
         path = request.url.path
-        if path in ("/health", "/ready", "/metrics", "/docs", "/openapi.json"):
+        if path in SKIP_PATHS:
             return response
 
-        # Extract user from request state (set by auth dependency)
         user_id = getattr(request.state, "audit_user_id", None)
         username = getattr(request.state, "audit_username", None)
-
-        # Fire-and-forget audit write
         pool = getattr(request.app.state, "db_pool", None)
-        if pool is not None:
+        if pool is None:
+            return response
+
+        ip_address = _client_ip(request)
+        hostname = _client_hostname(request)
+        method = request.method
+
+        if method in READ_METHODS:
             try:
-                await _write_audit_log(
+                await _write_access_log(
                     pool=pool,
                     user_id=user_id,
-                    action=request.method,
-                    resource_type=_resource_type(path),
-                    resource_id=_resource_id(path),
-                    details={
-                        "path": path,
-                        "query": str(request.url.query),
-                        "status": response.status_code,
-                        "latency_ms": round(elapsed_ms, 2),
-                        "username": username,
-                    },
-                    ip_address=_client_ip(request),
-                    hostname=_client_hostname(request),
+                    username=username,
+                    method=method,
+                    path=path,
+                    query_string=str(request.url.query),
+                    status_code=response.status_code,
+                    latency_ms=round(elapsed_ms, 2),
+                    ip_address=ip_address,
+                    hostname=hostname,
                 )
-                AUDIT_WRITES.inc()
             except Exception:
-                AUDIT_ERRORS.inc()
-                logger.warning("Audit log write failed", exc_info=True)
+                logger.warning("Access log write failed", exc_info=True)
+            return response
+
+        # Mutating request — skip if the route already wrote a rich audit entry.
+        if getattr(request.state, "audit_written", False):
+            return response
+
+        try:
+            await _write_audit_log(
+                pool=pool,
+                user_id=user_id,
+                action=method,
+                resource_type=_resource_type(path),
+                resource_id=_resource_id(path),
+                details={
+                    "path": path,
+                    "query": str(request.url.query),
+                    "status": response.status_code,
+                    "latency_ms": round(elapsed_ms, 2),
+                    "username": username,
+                },
+                ip_address=ip_address,
+                hostname=hostname,
+            )
+            AUDIT_WRITES.inc()
+        except Exception:
+            AUDIT_ERRORS.inc()
+            logger.warning("Audit log write failed", exc_info=True)
 
         return response
 
@@ -95,6 +128,39 @@ async def _write_audit_log(
             resource_type,
             resource_id,
             json.dumps(details),
+            ip_address,
+            hostname,
+        )
+
+
+async def _write_access_log(
+    pool: Any,
+    user_id: str | None,
+    username: str | None,
+    method: str,
+    path: str,
+    query_string: str,
+    status_code: int,
+    latency_ms: float,
+    ip_address: str | None,
+    hostname: str | None,
+) -> None:
+    """INSERT one access_log row."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO access_log
+                (user_id, username, method, path, query_string, status_code,
+                 latency_ms, ip_address, hostname)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            """,
+            uuid.UUID(user_id) if user_id else None,
+            username,
+            method,
+            path,
+            query_string,
+            status_code,
+            latency_ms,
             ip_address,
             hostname,
         )
@@ -131,4 +197,10 @@ def _client_hostname(request: Request) -> str | None:
     return request.headers.get("x-forwarded-host") or request.headers.get("host")
 
 
-__all__ = ["AuditMiddleware", "_write_audit_log", "_client_ip", "_client_hostname"]
+__all__ = [
+    "AuditMiddleware",
+    "_write_audit_log",
+    "_write_access_log",
+    "_client_ip",
+    "_client_hostname",
+]

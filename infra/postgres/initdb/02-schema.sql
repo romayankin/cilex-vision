@@ -203,6 +203,28 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created  ON audit_logs (created_at DES
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action   ON audit_logs (action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs (resource_type);
 
+-- Access log: one row per read-only API request. High-volume, auto-pruned
+-- after 90 days via TimescaleDB retention policy. No PK because hypertable
+-- rows cannot have a PK without the partition column.
+CREATE TABLE IF NOT EXISTS access_log (
+    id            BIGSERIAL,
+    user_id       UUID,
+    username      VARCHAR(100),
+    method        VARCHAR(10) NOT NULL,
+    path          TEXT NOT NULL,
+    query_string  TEXT,
+    status_code   SMALLINT,
+    latency_ms    REAL,
+    ip_address    VARCHAR(45),
+    hostname      VARCHAR(255),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+SELECT create_hypertable('access_log', 'created_at', if_not_exists => TRUE);
+SELECT add_retention_policy('access_log', INTERVAL '90 days', if_not_exists => TRUE);
+CREATE INDEX IF NOT EXISTS idx_access_log_created ON access_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_access_log_user    ON access_log (username, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_access_log_path    ON access_log (path, created_at DESC);
+
 -- Seed default site
 INSERT INTO sites (site_id, name, timezone)
 VALUES ('00000000-0000-0000-0000-000000000001', 'Default Site', 'UTC')

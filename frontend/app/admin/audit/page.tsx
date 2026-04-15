@@ -1,7 +1,102 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getUserRole, isAdmin } from "@/lib/auth";
+
+type TabId = "audit" | "access" | "stats";
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "audit", label: "Admin actions" },
+  { id: "access", label: "Access log" },
+  { id: "stats", label: "Stats" },
+];
+
+const PAGE_SIZE = 50;
+
+function formatTime(iso: string | null): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function StatusBadge({ code }: { code: number | null }) {
+  if (code == null) return <span className="text-gray-400">—</span>;
+  let cls = "bg-gray-100 text-gray-700";
+  if (code >= 200 && code < 300) cls = "bg-green-100 text-green-800";
+  else if (code >= 400 && code < 500) cls = "bg-amber-100 text-amber-800";
+  else if (code >= 500) cls = "bg-red-100 text-red-800";
+  return (
+    <span className={`inline-block rounded px-2 py-0.5 text-xs font-mono ${cls}`}>
+      {code}
+    </span>
+  );
+}
+
+export default function AuditLogPage() {
+  const role = getUserRole();
+  const admin = isAdmin(role);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab: TabId =
+    tabParam === "access" || tabParam === "stats" ? tabParam : "audit";
+
+  const setTab = (next: TabId) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "audit") params.delete("tab");
+    else params.set("tab", next);
+    const qs = params.toString();
+    router.replace(qs ? `/admin/audit?${qs}` : "/admin/audit");
+  };
+
+  if (!admin) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 text-sm">
+        This page is admin-only.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-xl font-semibold">Audit &amp; Access Logs</h1>
+
+      <div className="flex gap-1 border-b border-gray-200">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+              tab === t.id
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "audit" && <AuditTab />}
+      {tab === "access" && <AccessTab />}
+      {tab === "stats" && <StatsTab />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Audit tab (admin actions)
+// ---------------------------------------------------------------------------
 
 interface AuditLog {
   log_id: string;
@@ -24,26 +119,12 @@ interface AuditListResponse {
   limit: number;
 }
 
-interface FilterOptions {
+interface AuditFilterOptions {
   actions: string[];
   resource_types: string[];
 }
 
-const PAGE_SIZE = 50;
-
-function formatTime(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
-
-export default function AuditLogPage() {
-  const role = getUserRole();
-  const admin = isAdmin(role);
-
+function AuditTab() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -56,7 +137,7 @@ export default function AuditLogPage() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
-  const [options, setOptions] = useState<FilterOptions>({
+  const [options, setOptions] = useState<AuditFilterOptions>({
     actions: [],
     resource_types: [],
   });
@@ -91,27 +172,24 @@ export default function AuditLogPage() {
   );
 
   useEffect(() => {
-    if (!admin) return;
     load(0);
-  }, [admin, load]);
+  }, [load]);
 
   useEffect(() => {
-    if (!admin) return;
     (async () => {
       try {
         const res = await fetch("/api/audit/actions", { credentials: "include" });
         if (!res.ok) return;
-        const data = (await res.json()) as FilterOptions;
+        const data = (await res.json()) as AuditFilterOptions;
         setOptions(data);
       } catch {
         // silent
       }
     })();
-  }, [admin]);
+  }, []);
 
   const page = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
   const hasFilter = useMemo(
     () => action || resourceType || startDate || endDate,
     [action, resourceType, startDate, endDate],
@@ -122,32 +200,16 @@ export default function AuditLogPage() {
     setResourceType("");
     setStartDate("");
     setEndDate("");
+    setTimeout(() => load(0), 0);
   };
-
-  if (!admin) {
-    return (
-      <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 text-sm">
-        This page is admin-only.
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-xl font-semibold">Audit Log</h1>
-        <span className="text-xs text-gray-500">
-          {total.toLocaleString()} entries
-        </span>
-      </div>
-
       <p className="text-sm text-gray-600">
-        Every administrative action — manual purges, quota changes, settings
-        edits, and the storage watchdog&rsquo;s automatic cleanups — is recorded
-        here with who did it, when, and from where.
+        Manual purges, quota changes, settings edits, and the storage
+        watchdog&rsquo;s automatic cleanups. Retained indefinitely.
       </p>
 
-      {/* Filters */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-wrap gap-3 items-end">
         <div>
           <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
@@ -217,19 +279,17 @@ export default function AuditLogPage() {
         </button>
         {hasFilter && (
           <button
-            onClick={() => {
-              resetFilters();
-              // load on next effect isn't guaranteed synchronous; force
-              setTimeout(() => load(0), 0);
-            }}
+            onClick={resetFilters}
             className="text-sm px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50"
           >
             Clear
           </button>
         )}
+        <span className="ml-auto text-xs text-gray-500">
+          {total.toLocaleString()} entries
+        </span>
       </div>
 
-      {/* Table */}
       {error ? (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded p-3 text-sm">
           {error}
@@ -332,7 +392,6 @@ export default function AuditLogPage() {
         </div>
       )}
 
-      {/* Pagination */}
       <div className="flex items-center justify-between text-sm text-gray-600">
         <button
           onClick={() => load(Math.max(0, offset - PAGE_SIZE))}
@@ -351,6 +410,406 @@ export default function AuditLogPage() {
         >
           Next →
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Access log tab
+// ---------------------------------------------------------------------------
+
+interface AccessLog {
+  id: number;
+  user_id: string | null;
+  username: string | null;
+  method: string;
+  path: string;
+  query_string: string | null;
+  status_code: number | null;
+  latency_ms: number | null;
+  ip_address: string | null;
+  hostname: string | null;
+  created_at: string | null;
+}
+
+interface AccessListResponse {
+  logs: AccessLog[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+function AccessTab() {
+  const [logs, setLogs] = useState<AccessLog[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [username, setUsername] = useState("");
+  const [pathContains, setPathContains] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const load = useCallback(
+    async (nextOffset: number) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        params.set("offset", String(nextOffset));
+        params.set("limit", String(PAGE_SIZE));
+        if (username) params.set("username", username);
+        if (pathContains) params.set("path_contains", pathContains);
+        if (startDate) params.set("start", new Date(startDate).toISOString());
+        if (endDate) params.set("end", new Date(endDate).toISOString());
+        const res = await fetch(`/api/audit/access?${params.toString()}`, {
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as AccessListResponse;
+        setLogs(data.logs);
+        setTotal(data.total);
+        setOffset(data.offset);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load access log",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [username, pathContains, startDate, endDate],
+  );
+
+  useEffect(() => {
+    load(0);
+  }, [load]);
+
+  const page = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasFilter = username || pathContains || startDate || endDate;
+
+  const resetFilters = () => {
+    setUsername("");
+    setPathContains("");
+    setStartDate("");
+    setEndDate("");
+    setTimeout(() => load(0), 0);
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600">
+        Every API read — detections viewed, tracks queried, searches run.
+        Retained for 90 days for compliance (&ldquo;who viewed footage of X on
+        date Y&rdquo;), then auto-pruned.
+      </p>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+            User
+          </label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="e.g. admin"
+            className="text-sm border border-gray-300 rounded px-2 py-1 w-40"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+            Path contains
+          </label>
+          <input
+            type="text"
+            value={pathContains}
+            onChange={(e) => setPathContains(e.target.value)}
+            placeholder="e.g. detections"
+            className="text-sm border border-gray-300 rounded px-2 py-1 w-48"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+            From
+          </label>
+          <input
+            type="datetime-local"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+            To
+          </label>
+          <input
+            type="datetime-local"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1"
+          />
+        </div>
+
+        <button
+          onClick={() => load(0)}
+          className="text-sm px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded"
+        >
+          Apply
+        </button>
+        {hasFilter && (
+          <button
+            onClick={resetFilters}
+            className="text-sm px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50"
+          >
+            Clear
+          </button>
+        )}
+        <span className="ml-auto text-xs text-gray-500">
+          {total.toLocaleString()} entries
+        </span>
+      </div>
+
+      {error ? (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded p-3 text-sm">
+          {error}
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-3 py-2 text-left">Time</th>
+                  <th className="px-3 py-2 text-left">User</th>
+                  <th className="px-3 py-2 text-left">Method</th>
+                  <th className="px-3 py-2 text-left">Path</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-right">Latency</th>
+                  <th className="px-3 py-2 text-left">IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
+                      Loading…
+                    </td>
+                  </tr>
+                ) : logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
+                      No access log entries match the current filters.
+                    </td>
+                  </tr>
+                ) : (
+                  logs.map((log) => {
+                    const pathWithQuery = log.query_string
+                      ? `${log.path}?${log.query_string}`
+                      : log.path;
+                    return (
+                      <tr
+                        key={log.id}
+                        className="border-t border-gray-100 hover:bg-gray-50"
+                      >
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                          {formatTime(log.created_at)}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {log.username ?? (
+                            <span className="text-gray-400 italic">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-gray-600">
+                          {log.method}
+                        </td>
+                        <td
+                          className="px-3 py-2 font-mono text-xs text-gray-700 max-w-xl truncate"
+                          title={pathWithQuery}
+                        >
+                          {pathWithQuery}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <StatusBadge code={log.status_code} />
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-right text-gray-600 font-mono text-xs">
+                          {log.latency_ms != null
+                            ? `${log.latency_ms.toFixed(0)} ms`
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-gray-500">
+                          {log.ip_address ?? "—"}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between text-sm text-gray-600">
+        <button
+          onClick={() => load(Math.max(0, offset - PAGE_SIZE))}
+          disabled={offset === 0 || loading}
+          className="px-3 py-1 border border-gray-300 rounded disabled:opacity-40 hover:bg-gray-50"
+        >
+          ← Previous
+        </button>
+        <span>
+          Page {page} of {totalPages}
+        </span>
+        <button
+          onClick={() => load(offset + PAGE_SIZE)}
+          disabled={offset + PAGE_SIZE >= total || loading}
+          className="px-3 py-1 border border-gray-300 rounded disabled:opacity-40 hover:bg-gray-50"
+        >
+          Next →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stats tab
+// ---------------------------------------------------------------------------
+
+interface AccessStats {
+  total_entries: number;
+  today_entries: number;
+  retention_days: number;
+  top_paths_today: { path: string; hits: number }[];
+  top_users_today: { username: string; hits: number }[];
+}
+
+function StatsTab() {
+  const [stats, setStats] = useState<AccessStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/audit/access/stats", {
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setStats((await res.json()) as AccessStats);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load stats");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return <div className="text-sm text-gray-400">Loading…</div>;
+  if (error)
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 rounded p-3 text-sm">
+        {error}
+      </div>
+    );
+  if (!stats) return null;
+
+  const maxPathHits = Math.max(1, ...stats.top_paths_today.map((r) => r.hits));
+  const maxUserHits = Math.max(1, ...stats.top_users_today.map((r) => r.hits));
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-white border border-gray-200 rounded-lg p-5">
+          <div className="text-xs uppercase tracking-wide text-gray-500">
+            Total entries
+          </div>
+          <div className="mt-1 text-3xl font-semibold text-gray-900">
+            {stats.total_entries.toLocaleString()}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">across all time</div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-5">
+          <div className="text-xs uppercase tracking-wide text-gray-500">
+            Today
+          </div>
+          <div className="mt-1 text-3xl font-semibold text-blue-700">
+            {stats.today_entries.toLocaleString()}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">since midnight</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white border border-gray-200 rounded-lg p-5">
+          <h3 className="font-medium text-sm mb-3">Top paths today</h3>
+          {stats.top_paths_today.length === 0 ? (
+            <div className="text-sm text-gray-400">No activity yet.</div>
+          ) : (
+            <ul className="space-y-2">
+              {stats.top_paths_today.map((row) => (
+                <li key={row.path} className="text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span className="font-mono text-xs text-gray-700 truncate">
+                      {row.path}
+                    </span>
+                    <span className="font-mono text-xs text-gray-500">
+                      {row.hits.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="h-1 bg-gray-100 rounded mt-1">
+                    <div
+                      className="h-1 bg-blue-500 rounded"
+                      style={{ width: `${(row.hits / maxPathHits) * 100}%` }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg p-5">
+          <h3 className="font-medium text-sm mb-3">Top users today</h3>
+          {stats.top_users_today.length === 0 ? (
+            <div className="text-sm text-gray-400">No activity yet.</div>
+          ) : (
+            <ul className="space-y-2">
+              {stats.top_users_today.map((row) => (
+                <li key={row.username} className="text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-700">{row.username}</span>
+                    <span className="font-mono text-xs text-gray-500">
+                      {row.hits.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="h-1 bg-gray-100 rounded mt-1">
+                    <div
+                      className="h-1 bg-emerald-500 rounded"
+                      style={{ width: `${(row.hits / maxUserHits) * 100}%` }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded p-3">
+        ℹ Access logs are automatically pruned after {stats.retention_days} days
+        by the TimescaleDB retention policy. Admin actions in the Audit tab are
+        retained indefinitely.
       </div>
     </div>
   );

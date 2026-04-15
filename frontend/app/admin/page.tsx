@@ -22,7 +22,7 @@ const ADMIN_SECTIONS = [
   { href: "/admin/users", name: "Users", desc: "Role definitions and permissions" },
   { href: "/admin/health", name: "Health", desc: "Embedded Grafana monitoring panels" },
   { href: "/admin/calibration", name: "Calibration", desc: "Edge filter calibration status" },
-  { href: "/admin/audit", name: "Audit Log", desc: "View all administrative actions, purges, and configuration changes" },
+  { href: "/admin/audit", name: "Audit Log", desc: "Admin actions, data access history, and compliance reports" },
 ];
 
 export default function AdminPage() {

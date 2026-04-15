@@ -136,6 +136,7 @@ async def update_thumbnail_settings(
             ip_address=_client_ip(request),
             hostname=_client_hostname(request),
         )
+        request.state.audit_written = True
     except Exception:
         logger.warning("Audit write (settings) failed", exc_info=True)
 

@@ -215,6 +215,7 @@ async def update_quota(
                 ip_address=_client_ip(request),
                 hostname=_client_hostname(request),
             )
+            request.state.audit_written = True
         except Exception:
             logger.warning("Audit write (quota update) failed", exc_info=True)
 
@@ -438,6 +439,7 @@ async def purge_bucket(
                 ip_address=_client_ip(request),
                 hostname=hostname,
             )
+            request.state.audit_written = True
         except Exception:
             logger.warning("Audit write (purge) failed", exc_info=True)
 
