@@ -34,3 +34,14 @@ scrape_configs:
     static_configs:
       - targets:
           - minio:9000
+
+  - job_name: inference-worker
+    static_configs:
+      - targets:
+          - inference-worker:9090
+
+  - job_name: query-api
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - query-api:8000

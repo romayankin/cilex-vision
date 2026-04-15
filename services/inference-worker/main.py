@@ -100,6 +100,19 @@ class InferenceWorker:
         self._publisher = KafkaPublisher(settings.kafka)
         self._trackers: dict[str, ByteTracker] = {}
 
+        from settings_poller import _effective_values  # noqa: PLC0415
+        _effective_values["model_name"] = (
+            settings.triton.detector_model if settings.triton.url else "yolov8n"
+        )
+        _effective_values["confidence_threshold"] = (
+            settings.detector.confidence_threshold
+        )
+        _effective_values["nms_iou_threshold"] = settings.detector.nms_iou_threshold
+        _effective_values["inference_mode"] = (
+            "triton" if settings.triton.url else "cpu"
+        )
+        _effective_values["started_at"] = time.time()
+
         # MinIO client for frame download, debug traces, and thumbnails
         self._minio = None  # lazy init
         self._trace_collector = None  # lazy init
@@ -175,8 +188,77 @@ class InferenceWorker:
                 {"status": "ok", **get_effective_values()}
             )
 
+        async def metrics_json_handler(_request: Any) -> Any:
+            from prometheus_client import REGISTRY  # noqa: PLC0415
+
+            data: dict[str, Any] = {}
+            for metric in REGISTRY.collect():
+                for sample in metric.samples:
+                    name = sample.name
+                    labels = sample.labels
+                    value = sample.value
+
+                    if name == "inference_latency_ms_bucket":
+                        data.setdefault("latency_buckets", []).append(
+                            {"le": labels.get("le", ""), "count": value}
+                        )
+                    elif name == "inference_latency_ms_count":
+                        data["latency_count"] = value
+                    elif name == "inference_latency_ms_sum":
+                        data["latency_sum_ms"] = value
+                    elif name == "inference_detections_total":
+                        data.setdefault("detections_by_class", {})[
+                            labels.get("object_class", "unknown")
+                        ] = value
+                    elif name == "inference_frames_consumed_total":
+                        data["frames_consumed"] = value
+                    elif name == "inference_tracks_active":
+                        data.setdefault("tracks_active", {})[
+                            labels.get("camera_id", "unknown")
+                        ] = value
+                    elif name == "inference_tracks_closed_total":
+                        data.setdefault("tracks_closed", {})[
+                            labels.get("camera_id", "unknown")
+                        ] = value
+                    elif name == "inference_embedding_latency_ms_count":
+                        data["embedding_count"] = value
+                    elif name == "inference_embedding_latency_ms_sum":
+                        data["embedding_sum_ms"] = value
+                    elif name == "inference_publish_errors_total":
+                        data.setdefault("publish_errors", {})[
+                            labels.get("topic", "unknown")
+                        ] = value
+                    elif name == "inference_consumer_lag":
+                        data.setdefault("consumer_lag", []).append(
+                            {
+                                "topic": labels.get("topic", ""),
+                                "partition": labels.get("partition", ""),
+                                "lag": value,
+                            }
+                        )
+
+            lc = data.get("latency_count", 0) or 0
+            ls = data.get("latency_sum_ms", 0) or 0
+            data["latency_avg_ms"] = round(ls / lc, 2) if lc > 0 else 0
+            ec = data.get("embedding_count", 0) or 0
+            es = data.get("embedding_sum_ms", 0) or 0
+            data["embedding_avg_ms"] = round(es / ec, 2) if ec > 0 else 0
+
+            fc = data.get("frames_consumed", 0) or 0
+            data["detections_total"] = sum(
+                (data.get("detections_by_class") or {}).values()
+            )
+            data["avg_detections_per_frame"] = (
+                round(data["detections_total"] / fc, 2) if fc > 0 else 0
+            )
+
+            data.update(get_effective_values())
+
+            return web.json_response(data)
+
         app = web.Application()
         app.router.add_get("/health", health_handler)
+        app.router.add_get("/metrics/json", metrics_json_handler)
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, "0.0.0.0", self.settings.health_port)
