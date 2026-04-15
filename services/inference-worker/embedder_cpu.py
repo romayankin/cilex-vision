@@ -1,34 +1,158 @@
-"""CPU stub embedder that returns a zero 512-d vector.
+"""CPU Re-ID embedder using OSNet-x0.25 via torchreid.
 
-Re-ID embeddings are meaningless without a real model, but the downstream
-pipeline (publisher, MTMC consumer) expects a 512-d L2-compatible vector.
-A zero vector keeps schemas valid while producing zero-similarity matches,
-which effectively disables MTMC association in CPU-only deployments.
+Replaces the zero-vector stub. Produces real 512-d L2-normalised
+embeddings that enable cross-camera Re-ID, similarity search,
+MTMC association, and meaningful events.
+
+OSNet-x0.25: 0.5M params, ~5ms/crop on CPU, 90.8% Rank-1 on Market-1501.
+Preprocessing matches EmbedderClient (Triton) — ImageNet normalisation,
+bilinear resize to 256x128, NCHW float32.
+
+Per ADR-008, embeddings from different model versions MUST NOT be
+compared. The existing zero-vector embeddings in the database are
+incompatible with the real OSNet-x0.25 output.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 
 import numpy as np
+from PIL import Image
+
+from metrics import EMBEDDING_LATENCY
 
 logger = logging.getLogger(__name__)
 
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+EMBED_H = 256
+EMBED_W = 128
+EMBED_DIM = 512
+
 
 class CpuEmbedderClient:
-    EMBED_DIM = 512
+    """OSNet-x0.25 CPU embedder for person Re-ID."""
+
+    EMBED_DIM = EMBED_DIM
 
     def __init__(self) -> None:
-        self._warned = False
+        self._model = None  # lazy init
+
+    def _get_model(self):
+        if self._model is not None:
+            return self._model
+
+        try:
+            import torchreid  # noqa: PLC0415
+        except ImportError as exc:
+            logger.error(
+                "torchreid not installed — cannot load OSNet-x0.25. "
+                "Install with: pip install torchreid"
+            )
+            raise RuntimeError("torchreid required for CPU Re-ID embedder") from exc
+
+        model = torchreid.models.build_model(
+            name="osnet_x0_25",
+            num_classes=1,
+            loss="softmax",
+            pretrained=True,
+        )
+        model.eval()
+        feature_dim = getattr(model, "feature_dim", None)
+        logger.info(
+            "Loaded OSNet-x0.25 via torchreid (feature_dim=%s)",
+            feature_dim,
+        )
+
+        self._model = model
+
+        # Self-test: real embedding, L2-normalised, non-zero
+        test_input = np.random.randint(
+            0, 255, (EMBED_H, EMBED_W, 3), dtype=np.uint8
+        )
+        test_tensor = self._preprocess(test_input)
+        test_emb = self._infer(test_tensor)
+        assert test_emb.shape == (EMBED_DIM,), (
+            f"Expected ({EMBED_DIM},), got {test_emb.shape}"
+        )
+        test_norm = float(np.linalg.norm(test_emb))
+        assert test_norm > 0.99, (
+            f"Embedding must be L2-normalised (non-zero), got norm={test_norm:.4f}"
+        )
+        logger.info(
+            "OSNet-x0.25 self-test passed: %d-d embedding, norm=%.4f",
+            len(test_emb),
+            test_norm,
+        )
+        return model
 
     async def extract(
         self,
         frame: np.ndarray,
         bbox: tuple[float, float, float, float],
     ) -> np.ndarray:
-        if not self._warned:
-            logger.warning(
-                "CPU embedder stub in use — Re-ID embeddings are zero vectors"
-            )
-            self._warned = True
-        return np.zeros(self.EMBED_DIM, dtype=np.float32)
+        """Extract a 512-d L2-normalised embedding from a detection crop."""
+        # Ensure model loaded before timing the inference
+        self._get_model()
+
+        crop = self._crop(frame, bbox)
+        tensor = self._preprocess(crop)
+
+        t0 = time.monotonic()
+        embedding = await asyncio.to_thread(self._infer, tensor)
+        elapsed_ms = (time.monotonic() - t0) * 1000
+        EMBEDDING_LATENCY.observe(elapsed_ms)
+
+        return embedding
+
+    @staticmethod
+    def _crop(
+        frame: np.ndarray,
+        bbox: tuple[float, float, float, float],
+    ) -> np.ndarray:
+        """Crop detection region from frame (mirrors EmbedderClient)."""
+        h, w = frame.shape[:2]
+        x1 = max(0, int(bbox[0] * w))
+        y1 = max(0, int(bbox[1] * h))
+        x2 = min(w, int(bbox[2] * w))
+        y2 = min(h, int(bbox[3] * h))
+        if x2 <= x1 or y2 <= y1:
+            return np.zeros((EMBED_H, EMBED_W, 3), dtype=np.uint8)
+        return frame[y1:y2, x1:x2].copy()
+
+    @staticmethod
+    def _preprocess(crop: np.ndarray) -> np.ndarray:
+        """Resize + ImageNet normalise + NCHW batch (mirrors EmbedderClient)."""
+        pil_img = Image.fromarray(crop)
+        resized = pil_img.resize((EMBED_W, EMBED_H), Image.BILINEAR)
+        arr = np.array(resized, dtype=np.float32) / 255.0
+        arr = (arr - IMAGENET_MEAN) / IMAGENET_STD
+        tensor = arr.transpose(2, 0, 1)  # HWC → CHW
+        return np.expand_dims(tensor, axis=0).astype(np.float32)
+
+    def _infer(self, input_tensor: np.ndarray) -> np.ndarray:
+        """Run OSNet forward pass on CPU, return L2-normalised 512-d vector."""
+        import torch  # noqa: PLC0415
+
+        model = self._model
+        with torch.no_grad():
+            t = torch.from_numpy(input_tensor)
+            features = model(t)
+            if isinstance(features, (tuple, list)):
+                features = features[0]
+            embedding = features.cpu().numpy().flatten()
+
+        norm = float(np.linalg.norm(embedding))
+        if norm > 0:
+            embedding = embedding / norm
+
+        if len(embedding) < EMBED_DIM:
+            embedding = np.pad(embedding, (0, EMBED_DIM - len(embedding)))
+        elif len(embedding) > EMBED_DIM:
+            embedding = embedding[:EMBED_DIM]
+
+        return embedding.astype(np.float32)

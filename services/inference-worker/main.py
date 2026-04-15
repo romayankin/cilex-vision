@@ -95,6 +95,7 @@ class InferenceWorker:
             self._detector = CpuDetectorClient(
                 confidence_threshold=settings.detector.confidence_threshold,
                 nms_iou_threshold=settings.detector.nms_iou_threshold,
+                class_thresholds=settings.detector.class_thresholds,
             )
             self._embedder = CpuEmbedderClient()
         self._publisher = KafkaPublisher(settings.kafka)
@@ -102,7 +103,7 @@ class InferenceWorker:
 
         from settings_poller import _effective_values  # noqa: PLC0415
         _effective_values["model_name"] = (
-            settings.triton.detector_model if settings.triton.url else "yolov8n"
+            settings.triton.detector_model if settings.triton.url else "yolov8s"
         )
         _effective_values["confidence_threshold"] = (
             settings.detector.confidence_threshold
@@ -110,6 +111,15 @@ class InferenceWorker:
         _effective_values["nms_iou_threshold"] = settings.detector.nms_iou_threshold
         _effective_values["inference_mode"] = (
             "triton" if settings.triton.url else "cpu"
+        )
+        _effective_values["embedder_model"] = (
+            settings.triton.embedder_model if settings.triton.url else "osnet_x0_25"
+        )
+        _effective_values["embedder_mode"] = (
+            "triton" if settings.triton.url else "cpu"
+        )
+        _effective_values["class_thresholds"] = dict(
+            settings.detector.class_thresholds
         )
         _effective_values["started_at"] = time.time()
 

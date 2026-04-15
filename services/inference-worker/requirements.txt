@@ -3,6 +3,10 @@ cramjam>=2.8.0
 tritonclient[grpc]>=2.42.0
 opencv-python-headless>=4.8.0
 ultralytics>=8.1.0
+# torchreid is installed from GitHub (KaiyangZhou/deep-person-reid).
+# PyPI only hosts an old 0.2.x series; the maintained fork with OSNet
+# lives on GitHub. See services/inference-worker/Dockerfile.
+gdown>=5.1.0
 protobuf>=4.25.0
 grpcio-tools>=1.60.0
 pydantic>=2.5.0

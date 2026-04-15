@@ -59,10 +59,24 @@ class TrackerConfig(BaseModel):
 
 
 class DetectorConfig(BaseModel):
-    confidence_threshold: float = 0.65
+    # Base confidence threshold passed to YOLO. Class-specific thresholds
+    # in `class_thresholds` are applied in post-processing and should be
+    # >= this base value (YOLO filters below this, then classes re-filter).
+    confidence_threshold: float = 0.40
     nms_iou_threshold: float = 0.45
     input_size: int = 640
     num_classes: int = 7
+    class_thresholds: dict[str, float] = Field(
+        default_factory=lambda: {
+            "person": 0.50,
+            "car": 0.50,
+            "truck": 0.60,
+            "bus": 0.60,
+            "bicycle": 0.50,
+            "motorcycle": 0.50,
+            "animal": 0.85,
+        }
+    )
 
 
 class DebugConfig(BaseModel):

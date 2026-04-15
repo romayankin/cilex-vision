@@ -1,8 +1,13 @@
-"""CPU-only YOLOv8n detector using ultralytics.
+"""CPU-only YOLOv8s detector using ultralytics.
 
 Drop-in replacement for DetectorClient (Triton gRPC) when Triton/GPU
 is not available. Outputs RawDetection objects with the same normalised
 [0,1] bbox layout so downstream code (tracker, publisher) is unchanged.
+
+YOLOv8s is the 11.2M-param "small" model — 44.9% mAP on COCO, ~70ms/frame
+on i5-13500 CPU. A base confidence of 0.40 is used to pull in more
+candidates, with class-specific thresholds applied in post-processing
+(e.g., animal=0.85 to filter false positives, person=0.50 for recall).
 """
 
 from __future__ import annotations
@@ -42,20 +47,56 @@ COCO_TO_CILEX: dict[int, int] = {
     23: 6,  # giraffe
 }
 
+# Default class-specific confidence thresholds (Cilex class indices).
+# Rationale: persons benefit from lower thresholds (partial views, distance);
+# animals need very high thresholds because YOLOv8 frequently misclassifies
+# partial-body persons as animals at 0.65-0.75 confidence.
+DEFAULT_CLASS_THRESHOLDS: dict[int, float] = {
+    0: 0.50,   # person
+    1: 0.50,   # car
+    2: 0.60,   # truck
+    3: 0.60,   # bus
+    4: 0.50,   # bicycle
+    5: 0.50,   # motorcycle
+    6: 0.85,   # animal
+}
+
+# Cilex class name → index (inverse of CLASS_INDEX_TO_NAME, used when
+# converting config dict-of-names to dict-of-indices).
+CILEX_NAME_TO_INDEX: dict[str, int] = {
+    "person": 0,
+    "car": 1,
+    "truck": 2,
+    "bus": 3,
+    "bicycle": 4,
+    "motorcycle": 5,
+    "animal": 6,
+}
+
 
 class CpuDetectorClient:
-    """Ultralytics YOLOv8n CPU detector with the DetectorClient interface."""
+    """Ultralytics YOLOv8s CPU detector with the DetectorClient interface."""
 
     def __init__(
         self,
-        confidence_threshold: float = 0.65,
+        confidence_threshold: float = 0.40,
         nms_iou_threshold: float = 0.45,
-        model_name: str = "yolov8n.pt",
+        model_name: str = "yolov8s.pt",
+        class_thresholds: dict[str, float] | None = None,
     ) -> None:
         self._confidence = confidence_threshold
         self._iou = nms_iou_threshold
         self._model_name = model_name
         self._model = None  # lazy init
+
+        # Resolve class-name keyed thresholds into class-index keyed dict.
+        resolved: dict[int, float] = dict(DEFAULT_CLASS_THRESHOLDS)
+        if class_thresholds:
+            for name, thr in class_thresholds.items():
+                idx = CILEX_NAME_TO_INDEX.get(name)
+                if idx is not None:
+                    resolved[idx] = float(thr)
+        self._class_thresholds = resolved
 
     def _get_model(self) -> object:
         if self._model is None:
@@ -66,7 +107,7 @@ class CpuDetectorClient:
         return self._model
 
     async def detect(self, frame: np.ndarray) -> list[RawDetection]:
-        """Run YOLOv8n CPU inference on a single RGB frame (H, W, 3) uint8."""
+        """Run YOLOv8s CPU inference on a single RGB frame (H, W, 3) uint8."""
         t0 = time.monotonic()
         results = await asyncio.to_thread(self._infer, frame)
         elapsed_ms = (time.monotonic() - t0) * 1000
@@ -109,6 +150,12 @@ class CpuDetectorClient:
                 continue
             cilex_cls = COCO_TO_CILEX[coco_cls]
             if cilex_cls not in CLASS_INDEX_TO_NAME:
+                continue
+
+            # Apply class-specific confidence threshold. The base conf=0.40
+            # passed to YOLO is a floor; each class then has its own gate.
+            class_threshold = self._class_thresholds.get(cilex_cls, self._confidence)
+            if float(confs[i]) < class_threshold:
                 continue
 
             x1, y1, x2, y2 = (float(v) for v in xyxy[i])

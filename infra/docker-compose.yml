@@ -450,7 +450,7 @@ services:
       INFERENCE_HEALTH_PORT: "9091"
       INFERENCE_DB_URL: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
       INFERENCE_LOG_LEVEL: INFO
-    mem_limit: 512m
+    mem_limit: 1g
     restart: unless-stopped
 
   attribute-service:
