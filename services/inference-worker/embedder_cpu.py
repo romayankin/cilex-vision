@@ -55,16 +55,51 @@ class CpuEmbedderClient:
             )
             raise RuntimeError("torchreid required for CPU Re-ID embedder") from exc
 
+        # Build model with 751 classes (Market-1501 training identities) and
+        # pretrained=False so torchreid does NOT download the ImageNet backbone.
+        # We load Market-1501 Re-ID weights manually below.
         model = torchreid.models.build_model(
             name="osnet_x0_25",
-            num_classes=1,
+            num_classes=751,
             loss="softmax",
-            pretrained=True,
+            pretrained=False,
         )
+
+        # Download Market-1501 trained weights from the torchreid Model Zoo.
+        # osnet_x0_25 on Market-1501: 91.2% Rank-1, 75.0% mAP.
+        import os  # noqa: PLC0415
+
+        import gdown  # noqa: PLC0415
+
+        cache_dir = os.path.join(
+            os.path.expanduser(os.environ.get("TORCH_HOME", "~/.cache/torch")),
+            "checkpoints",
+        )
+        os.makedirs(cache_dir, exist_ok=True)
+        weight_path = os.path.join(cache_dir, "osnet_x0_25_market1501.pth.tar")
+
+        if not os.path.exists(weight_path):
+            logger.info("Downloading OSNet-x0.25 Market-1501 weights...")
+            gdown.download(
+                "https://drive.google.com/uc?id=1z1UghYvOTtjx7kEoRfmqSMu-z62J6MAj",
+                weight_path,
+                quiet=False,
+            )
+
+        torchreid.utils.load_pretrained_weights(model, weight_path)
         model.eval()
+
+        # Remove stale ImageNet cache from the previous implementation.
+        imagenet_cache = os.path.join(cache_dir, "osnet_x0_25_imagenet.pth")
+        if os.path.exists(imagenet_cache):
+            os.remove(imagenet_cache)
+            logger.info("Removed stale ImageNet weights: %s", imagenet_cache)
+
         feature_dim = getattr(model, "feature_dim", None)
         logger.info(
-            "Loaded OSNet-x0.25 via torchreid (feature_dim=%s)",
+            "Loaded OSNet-x0.25 Market-1501 Re-ID weights (91.2%% Rank-1) "
+            "from %s (feature_dim=%s)",
+            weight_path,
             feature_dim,
         )
 
