@@ -29,6 +29,30 @@ function formatTime(iso: string | null): string {
   }
 }
 
+function useAccessLogEnabled(): boolean | null {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    fetch("/api/settings/access-log", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { enabled: false }))
+      .then((d) => setEnabled(Boolean(d.enabled)))
+      .catch(() => setEnabled(false));
+  }, []);
+  return enabled;
+}
+
+function AccessLogDisabledBanner() {
+  return (
+    <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm">
+      Access logging is currently <strong>disabled</strong>. No new entries are
+      being recorded. Enable it in{" "}
+      <a href="/admin/settings" className="underline">
+        Settings
+      </a>{" "}
+      if you need compliance tracking of who accessed which data.
+    </div>
+  );
+}
+
 function StatusBadge({ code }: { code: number | null }) {
   if (code == null) return <span className="text-gray-400">—</span>;
   let cls = "bg-gray-100 text-gray-700";
@@ -441,6 +465,7 @@ interface AccessListResponse {
 }
 
 function AccessTab() {
+  const accessLogEnabled = useAccessLogEnabled();
   const [logs, setLogs] = useState<AccessLog[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -506,6 +531,8 @@ function AccessTab() {
         Retained for 90 days for compliance (&ldquo;who viewed footage of X on
         date Y&rdquo;), then auto-pruned.
       </p>
+
+      {accessLogEnabled === false && <AccessLogDisabledBanner />}
 
       <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-wrap gap-3 items-end">
         <div>
@@ -693,6 +720,7 @@ interface AccessStats {
 }
 
 function StatsTab() {
+  const accessLogEnabled = useAccessLogEnabled();
   const [stats, setStats] = useState<AccessStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -729,6 +757,8 @@ function StatsTab() {
 
   return (
     <div className="space-y-5">
+      {accessLogEnabled === false && <AccessLogDisabledBanner />}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white border border-gray-200 rounded-lg p-5">
           <div className="text-xs uppercase tracking-wide text-gray-500">

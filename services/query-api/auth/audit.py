@@ -31,6 +31,33 @@ logger = logging.getLogger(__name__)
 SKIP_PATHS = {"/health", "/ready", "/metrics", "/docs", "/openapi.json"}
 READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 
+_access_log_enabled: bool = False
+_access_log_checked_at: float = 0.0
+_ACCESS_LOG_CACHE_TTL = 30.0  # seconds — re-check DB every 30s
+
+
+async def _is_access_log_enabled(pool: Any) -> bool:
+    """Check settings table with a TTL cache so we don't hit the DB per request."""
+    global _access_log_enabled, _access_log_checked_at
+
+    now = time.monotonic()
+    if now - _access_log_checked_at < _ACCESS_LOG_CACHE_TTL:
+        return _access_log_enabled
+
+    try:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT value FROM settings WHERE key = 'access_log_enabled'"
+            )
+        _access_log_enabled = (
+            row is not None and str(row["value"]).lower() in ("true", "1", "yes")
+        )
+    except Exception:
+        pass  # keep previous value on error
+
+    _access_log_checked_at = now
+    return _access_log_enabled
+
 
 class AuditMiddleware(BaseHTTPMiddleware):
     """Route each request to access_log (reads) or audit_logs (mutations)."""
@@ -57,21 +84,22 @@ class AuditMiddleware(BaseHTTPMiddleware):
         method = request.method
 
         if method in READ_METHODS:
-            try:
-                await _write_access_log(
-                    pool=pool,
-                    user_id=user_id,
-                    username=username,
-                    method=method,
-                    path=path,
-                    query_string=str(request.url.query),
-                    status_code=response.status_code,
-                    latency_ms=round(elapsed_ms, 2),
-                    ip_address=ip_address,
-                    hostname=hostname,
-                )
-            except Exception:
-                logger.warning("Access log write failed", exc_info=True)
+            if await _is_access_log_enabled(pool):
+                try:
+                    await _write_access_log(
+                        pool=pool,
+                        user_id=user_id,
+                        username=username,
+                        method=method,
+                        path=path,
+                        query_string=str(request.url.query),
+                        status_code=response.status_code,
+                        latency_ms=round(elapsed_ms, 2),
+                        ip_address=ip_address,
+                        hostname=hostname,
+                    )
+                except Exception:
+                    logger.warning("Access log write failed", exc_info=True)
             return response
 
         # Mutating request — skip if the route already wrote a rich audit entry.

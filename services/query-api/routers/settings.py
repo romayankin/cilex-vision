@@ -144,3 +144,85 @@ async def update_thumbnail_settings(
         "max_per_track": body.max_per_track,
         "note": "Setting saved. Takes effect on next inference-worker restart.",
     }
+
+
+@router.get("/access-log")
+async def get_access_log_settings(
+    request: Request,
+    user: UserClaims = Depends(get_current_user),
+) -> dict[str, Any]:
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    pool = request.app.state.db_pool
+    await _ensure_settings_table(pool)
+
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT value FROM settings WHERE key = 'access_log_enabled'"
+        )
+
+    enabled = row is not None and str(row["value"]).lower() in ("true", "1", "yes")
+    return {"enabled": enabled}
+
+
+class AccessLogSettingsRequest(BaseModel):
+    enabled: bool
+
+
+@router.put("/access-log")
+async def update_access_log_settings(
+    body: AccessLogSettingsRequest,
+    request: Request,
+    user: UserClaims = Depends(get_current_user),
+) -> dict[str, Any]:
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    pool = request.app.state.db_pool
+    await _ensure_settings_table(pool)
+
+    async with pool.acquire() as conn:
+        prev = await conn.fetchrow(
+            "SELECT value FROM settings WHERE key = 'access_log_enabled'"
+        )
+        await conn.execute(
+            """
+            INSERT INTO settings (key, value, updated_at)
+            VALUES ('access_log_enabled', $1, now())
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+            """,
+            "true" if body.enabled else "false",
+        )
+
+    old_enabled = (
+        prev is not None and str(prev["value"]).lower() in ("true", "1", "yes")
+    )
+
+    logger.info(
+        "access_log_enabled set to %s by %s", body.enabled, user.username
+    )
+
+    try:
+        await _write_audit_log(
+            pool=pool,
+            user_id=user.user_id,
+            action="UPDATE",
+            resource_type="settings",
+            resource_id="access_log_enabled",
+            details={
+                "description": (
+                    f"Access log {'enabled' if body.enabled else 'disabled'}"
+                ),
+                "username": user.username,
+                "old_value": old_enabled,
+                "new_value": body.enabled,
+            },
+            ip_address=_client_ip(request),
+            hostname=_client_hostname(request),
+        )
+        request.state.audit_written = True
+    except Exception:
+        logger.warning("Audit write (access-log setting) failed", exc_info=True)
+
+    return {"enabled": body.enabled}

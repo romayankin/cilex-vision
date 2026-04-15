@@ -8,6 +8,34 @@ interface ThumbnailSettings {
   options: number[];
 }
 
+function ToggleSwitch({
+  enabled,
+  onChange,
+  saving,
+}: {
+  enabled: boolean;
+  onChange: (v: boolean) => void;
+  saving: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!enabled)}
+      disabled={saving}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+        enabled ? "bg-blue-600" : "bg-gray-300"
+      } ${saving ? "opacity-50 cursor-not-allowed" : ""}`}
+      aria-pressed={enabled}
+    >
+      <span
+        className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+          enabled ? "translate-x-6" : "translate-x-1"
+        }`}
+      />
+    </button>
+  );
+}
+
 export default function SettingsPage() {
   const role = getUserRole();
   const admin = isAdmin(role);
@@ -18,6 +46,39 @@ export default function SettingsPage() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [accessLogEnabled, setAccessLogEnabled] = useState(false);
+  const [savingAccessLog, setSavingAccessLog] = useState(false);
+  const [accessLogError, setAccessLogError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings/access-log", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { enabled: false }))
+      .then((d) => setAccessLogEnabled(Boolean(d.enabled)))
+      .catch(() => {});
+  }, []);
+
+  const toggleAccessLog = async (enabled: boolean) => {
+    setSavingAccessLog(true);
+    setAccessLogError(null);
+    try {
+      const res = await fetch("/api/settings/access-log", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setAccessLogEnabled(Boolean(data.enabled));
+    } catch (err) {
+      setAccessLogError(
+        err instanceof Error ? err.message : "Failed to save",
+      );
+    } finally {
+      setSavingAccessLog(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -188,6 +249,114 @@ export default function SettingsPage() {
             ℹ Changes take effect when the detection service restarts (usually
             within a few minutes).
           </div>
+        </div>
+      </section>
+
+      {/* Access log toggle */}
+      <section className="bg-white border border-gray-200 rounded-lg p-5 space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="font-semibold text-base">Access Log</h2>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 uppercase tracking-wide">
+              {accessLogEnabled ? "Enabled" : "Disabled"}
+            </span>
+            <ToggleSwitch
+              enabled={accessLogEnabled}
+              onChange={toggleAccessLog}
+              saving={savingAccessLog}
+            />
+          </div>
+        </div>
+
+        {accessLogError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded p-2 text-sm">
+            {accessLogError}
+          </div>
+        )}
+
+        <div className="text-sm text-gray-600 space-y-3 leading-relaxed">
+          <p>
+            <strong>What it does:</strong> When enabled, every API read request
+            is recorded in a separate database table — who viewed which data,
+            when, and from which IP address. This creates a complete trail of
+            &ldquo;User X viewed detections from Camera 2 at 14:32 on April
+            14th&rdquo; entries.
+          </p>
+
+          <p>
+            <strong>Who needs it:</strong> This is a compliance feature.
+            Organisations subject to data protection regulations (GDPR, 152-FZ,
+            PCI DSS) may need to prove who accessed surveillance footage and
+            when. If you don&rsquo;t have a compliance requirement, you
+            probably don&rsquo;t need this.
+          </p>
+
+          <p>
+            <strong>Impact on storage:</strong> Each logged request adds ~200
+            bytes to the database. With the current 2 cameras, normal usage
+            generates roughly 2,000–5,000 entries per day (~1 MB/day). The
+            data is automatically deleted after 90 days by a TimescaleDB
+            retention policy, so maximum storage is roughly 90 MB.
+          </p>
+
+          <div className="bg-gray-50 border border-gray-200 rounded p-3">
+            <p className="font-medium text-gray-700 text-xs uppercase tracking-wide mb-2">
+              Scaling estimate per additional camera
+            </p>
+            <table className="w-full text-xs">
+              <tbody>
+                <tr className="border-b border-gray-200">
+                  <td className="py-1 text-gray-500">Additional DB writes</td>
+                  <td className="py-1 text-right font-mono">
+                    ~500–1,000/day per camera
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-200">
+                  <td className="py-1 text-gray-500">
+                    Additional storage (90-day window)
+                  </td>
+                  <td className="py-1 text-right font-mono">
+                    ~15–30 MB per camera
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-200">
+                  <td className="py-1 text-gray-500">At 8 cameras (90 days)</td>
+                  <td className="py-1 text-right font-mono">~200 MB total</td>
+                </tr>
+                <tr className="border-b border-gray-200">
+                  <td className="py-1 text-gray-500">At 32 cameras (90 days)</td>
+                  <td className="py-1 text-right font-mono">~800 MB total</td>
+                </tr>
+                <tr>
+                  <td className="py-1 text-gray-500">At 128 cameras (90 days)</td>
+                  <td className="py-1 text-right font-mono">~3 GB total</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            <strong>Impact on detection processing:</strong> None. The access
+            log only records API reads (search queries, page views, dashboard
+            refreshes). It does not affect the camera pipeline, object
+            detection, tracking, or any inference workload. Frame processing
+            speed, detection latency, and thumbnail generation are completely
+            unaffected regardless of whether this is on or off.
+          </p>
+
+          <p>
+            <strong>Impact on API response time:</strong> Minimal. Each logged
+            request adds one asynchronous database INSERT (~0.5ms). The write
+            is fire-and-forget — it never blocks the API response. In
+            practice, you won&rsquo;t notice any difference.
+          </p>
+
+          <p className="text-gray-500 text-xs">
+            Admin actions (purges, settings changes, quota adjustments) are
+            always logged in the Audit Log regardless of this setting. This
+            toggle only controls the high-volume read-access tracking.
+            Changes take effect within 30 seconds (middleware cache TTL).
+          </p>
         </div>
       </section>
 
