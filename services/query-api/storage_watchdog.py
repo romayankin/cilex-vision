@@ -41,9 +41,15 @@ def _human(n: float) -> str:
 class StorageWatchdog:
     """Periodically enforces a video-bucket quota against disk capacity."""
 
-    def __init__(self, minio_client: Any, quota_percent: int = 50) -> None:
+    def __init__(
+        self,
+        minio_client: Any,
+        quota_percent: int = 50,
+        db_pool: Any = None,
+    ) -> None:
         self.minio = minio_client
         self.quota_percent = max(10, min(90, int(quota_percent)))
+        self.db_pool = db_pool
         self._task: asyncio.Task[None] | None = None
         self._stats: dict[str, Any] = {}
         self._shutdown = asyncio.Event()
@@ -75,7 +81,9 @@ class StorageWatchdog:
     async def _loop(self) -> None:
         while not self._shutdown.is_set():
             try:
-                await asyncio.to_thread(self._check)
+                purge_summary = await asyncio.to_thread(self._check)
+                if purge_summary is not None:
+                    await self._audit_auto_purge(purge_summary)
             except Exception:
                 logger.exception("Watchdog iteration failed")
             try:
@@ -85,7 +93,41 @@ class StorageWatchdog:
             except asyncio.TimeoutError:
                 continue
 
-    def _check(self) -> None:
+    async def _audit_auto_purge(self, summary: dict[str, Any]) -> None:
+        if self.db_pool is None:
+            return
+        try:
+            from auth.audit import _write_audit_log  # noqa: PLC0415
+
+            await _write_audit_log(
+                pool=self.db_pool,
+                user_id=None,
+                action="AUTO_PURGE",
+                resource_type="storage",
+                resource_id=summary["bucket"],
+                details={
+                    "description": (
+                        f"Watchdog auto-purge: video usage "
+                        f"{_human(summary['video_bytes'])} exceeded quota "
+                        f"{_human(summary['quota_bytes'])} "
+                        f"({summary['quota_percent']}%)"
+                    ),
+                    "username": "system/watchdog",
+                    "bucket": summary["bucket"],
+                    "deleted_objects": summary["deleted"],
+                    "freed_bytes": summary["freed"],
+                    "freed_human": _human(summary["freed"]),
+                    "quota_percent": summary["quota_percent"],
+                    "video_bytes": summary["video_bytes"],
+                    "quota_bytes": summary["quota_bytes"],
+                },
+                ip_address="127.0.0.1",
+                hostname="localhost",
+            )
+        except Exception:
+            logger.warning("Watchdog audit write failed", exc_info=True)
+
+    def _check(self) -> dict[str, Any] | None:
         disk = shutil.disk_usage("/")
         bucket_sizes = {b: self._bucket_size(b) for b in MONITORED_BUCKETS}
         video_bytes = sum(bucket_sizes.values())
@@ -137,6 +179,15 @@ class StorageWatchdog:
                     "freed_human": self._stats.get("purge_freed_human", ""),
                     "completed_at": datetime.now(timezone.utc).isoformat(),
                 }
+            return {
+                "bucket": "frame-blobs",
+                "deleted": int(self._stats.get("purge_deleted", 0)),
+                "freed": int(self._stats.get("purge_freed", 0)),
+                "video_bytes": video_bytes,
+                "quota_bytes": quota_bytes,
+                "quota_percent": self.quota_percent,
+            }
+        return None
 
     def _bucket_size(self, bucket: str) -> int:
         if self.minio is None:

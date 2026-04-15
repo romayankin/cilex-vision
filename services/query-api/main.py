@@ -28,6 +28,7 @@ from auth.audit import AuditMiddleware
 from config import Settings
 from storage_watchdog import StorageWatchdog
 from routers import (
+    audit as audit_router,
     auth,
     debug,
     detections,
@@ -83,7 +84,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Storage quota watchdog
     quota_percent = int(os.environ.get("STORAGE_QUOTA_PERCENT", "50"))
-    watchdog = StorageWatchdog(app.state.minio_client, quota_percent=quota_percent)
+    watchdog = StorageWatchdog(
+        app.state.minio_client,
+        quota_percent=quota_percent,
+        db_pool=pool,
+    )
     app.state.storage_watchdog = watchdog
     await watchdog.start()
 
@@ -143,6 +148,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(pipeline.router)
     app.include_router(storage.router)
     app.include_router(settings_router.router)
+    app.include_router(audit_router.router)
 
     # Prometheus metrics
     metrics_app = make_asgi_app()

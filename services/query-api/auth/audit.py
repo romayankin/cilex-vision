@@ -60,6 +60,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                         "username": username,
                     },
                     ip_address=_client_ip(request),
+                    hostname=_client_hostname(request),
                 )
                 AUDIT_WRITES.inc()
             except Exception:
@@ -77,6 +78,7 @@ async def _write_audit_log(
     resource_id: str | None,
     details: dict,
     ip_address: str | None,
+    hostname: str | None = None,
 ) -> None:
     """INSERT one audit_logs row."""
     import json  # noqa: PLC0415
@@ -84,8 +86,8 @@ async def _write_audit_log(
     async with pool.acquire() as conn:
         await conn.execute(
             """
-            INSERT INTO audit_logs (log_id, user_id, action, resource_type, resource_id, details_jsonb, ip_address)
-            VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+            INSERT INTO audit_logs (log_id, user_id, action, resource_type, resource_id, details_jsonb, ip_address, hostname)
+            VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
             """,
             uuid.uuid4(),
             uuid.UUID(user_id) if user_id else None,
@@ -94,6 +96,7 @@ async def _write_audit_log(
             resource_id,
             json.dumps(details),
             ip_address,
+            hostname,
         )
 
 
@@ -121,3 +124,11 @@ def _client_ip(request: Request) -> str | None:
     if request.client:
         return request.client.host
     return None
+
+
+def _client_hostname(request: Request) -> str | None:
+    """Extract the Host header (how the client reached us)."""
+    return request.headers.get("x-forwarded-host") or request.headers.get("host")
+
+
+__all__ = ["AuditMiddleware", "_write_audit_log", "_client_ip", "_client_hostname"]

@@ -21,6 +21,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from auth.audit import _client_hostname, _client_ip, _write_audit_log
 from auth.jwt import get_current_user
 from schemas import UserClaims
 
@@ -192,8 +193,31 @@ async def update_quota(
     if watchdog is None:
         raise HTTPException(status_code=503, detail="Watchdog not initialised")
 
+    old_percent = watchdog.quota_percent
     new_percent = watchdog.set_quota_percent(body.percent)
     logger.info("Storage quota updated to %d%% by %s", new_percent, user.username)
+
+    pool = getattr(request.app.state, "db_pool", None)
+    if pool is not None:
+        try:
+            await _write_audit_log(
+                pool=pool,
+                user_id=user.user_id,
+                action="UPDATE",
+                resource_type="storage_quota",
+                resource_id="quota_percent",
+                details={
+                    "description": f"Storage quota changed from {old_percent}% to {new_percent}%",
+                    "username": user.username,
+                    "old_value": old_percent,
+                    "new_value": new_percent,
+                },
+                ip_address=_client_ip(request),
+                hostname=_client_hostname(request),
+            )
+        except Exception:
+            logger.warning("Audit write (quota update) failed", exc_info=True)
+
     return {"quota_percent": new_percent}
 
 
@@ -382,6 +406,40 @@ async def purge_bucket(
         "Purge on bucket=%s older_than_hours=%d: deleted=%d freed=%s",
         body.bucket, body.older_than_hours, deleted, _human_size(freed),
     )
+
+    pool = getattr(request.app.state, "db_pool", None)
+    if pool is not None:
+        hostname = _client_hostname(request)
+        if body.older_than_hours == 0:
+            description = f"Purge ALL objects from bucket '{body.bucket}'"
+        else:
+            description = (
+                f"Purge objects older than {body.older_than_hours}h "
+                f"from bucket '{body.bucket}'"
+            )
+        try:
+            await _write_audit_log(
+                pool=pool,
+                user_id=user.user_id,
+                action="PURGE",
+                resource_type="storage",
+                resource_id=body.bucket,
+                details={
+                    "description": description,
+                    "username": user.username,
+                    "bucket": body.bucket,
+                    "older_than_hours": body.older_than_hours,
+                    "cutoff": cutoff.isoformat(),
+                    "deleted_objects": deleted,
+                    "freed_bytes": freed,
+                    "freed_human": _human_size(freed),
+                    "client_hostname": hostname,
+                },
+                ip_address=_client_ip(request),
+                hostname=hostname,
+            )
+        except Exception:
+            logger.warning("Audit write (purge) failed", exc_info=True)
 
     return {
         "bucket": body.bucket,

@@ -14,6 +14,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from auth.audit import _client_hostname, _client_ip, _write_audit_log
 from auth.jwt import get_current_user
 from schemas import UserClaims
 
@@ -92,6 +93,9 @@ async def update_thumbnail_settings(
     await _ensure_settings_table(pool)
 
     async with pool.acquire() as conn:
+        prev = await conn.fetchrow(
+            "SELECT value FROM settings WHERE key = 'thumbnail_max_per_track'"
+        )
         await conn.execute(
             """
             INSERT INTO settings (key, value, updated_at)
@@ -101,11 +105,40 @@ async def update_thumbnail_settings(
             str(body.max_per_track),
         )
 
+    old_value: int | None = None
+    if prev is not None:
+        try:
+            old_value = int(prev["value"])
+        except ValueError:
+            old_value = None
+
     logger.info(
         "thumbnail_max_per_track set to %d by %s",
         body.max_per_track,
         user.username,
     )
+
+    try:
+        await _write_audit_log(
+            pool=pool,
+            user_id=user.user_id,
+            action="UPDATE",
+            resource_type="settings",
+            resource_id="thumbnail_max_per_track",
+            details={
+                "description": (
+                    f"Thumbnail setting changed to {body.max_per_track} per track"
+                ),
+                "username": user.username,
+                "old_value": old_value,
+                "new_value": body.max_per_track,
+            },
+            ip_address=_client_ip(request),
+            hostname=_client_hostname(request),
+        )
+    except Exception:
+        logger.warning("Audit write (settings) failed", exc_info=True)
+
     return {
         "max_per_track": body.max_per_track,
         "note": "Setting saved. Takes effect on next inference-worker restart.",
