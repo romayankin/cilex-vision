@@ -17,6 +17,7 @@ const ADMIN_SECTIONS = [
   { href: "/admin/cameras", name: "Cameras", desc: "Add, edit, and manage camera feeds" },
   { href: "/admin/pipeline", name: "Pipeline", desc: "Real-time data flow monitoring" },
   { href: "/admin/inference", name: "Model Performance", desc: "Real-time detection latency, throughput, and class distribution" },
+  { href: "/admin/planner", name: "Use Case Planner", desc: "Select AI models and see which surveillance use cases become feasible" },
   { href: "/admin/storage", name: "Storage", desc: "MinIO bucket sizes, purge old data, storage configuration" },
   { href: "/admin/settings", name: "Settings", desc: "Thumbnail quality, frame rate, detection parameters" },
   { href: "/admin/topology", name: "Topology", desc: "Edit camera graph, edges, and transit times" },
