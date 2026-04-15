@@ -445,7 +445,7 @@ export default function PlannerPage() {
             return (
               <div
                 key={cap.id}
-                className={`flex items-center gap-2 py-1.5 px-2 rounded ${ringClass}`}
+                className={`flex items-center gap-2 py-1.5 px-2 rounded min-w-0 ${ringClass}`}
               >
                 <div className="w-40 text-xs text-gray-700 shrink-0">
                   {cap.name}
@@ -458,7 +458,7 @@ export default function PlannerPage() {
                   onChange={(e) =>
                     setSelection((s) => ({ ...s, [cap.id]: parseInt(e.target.value, 10) }))
                   }
-                  className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 bg-white font-mono"
+                  className="flex-1 min-w-0 text-xs border border-gray-200 rounded px-2 py-1 bg-white font-mono"
                 >
                   {MODELS[cap.id].map((m, i) => {
                     const disabled = hardware === "cpu" && m.status === "gpu_only";
@@ -473,7 +473,7 @@ export default function PlannerPage() {
                     );
                   })}
                 </select>
-                <div className="w-10 shrink-0 flex justify-center">
+                <div className="w-6 shrink-0 flex justify-center">
                   <StatusDot status={model.status} />
                 </div>
               </div>
