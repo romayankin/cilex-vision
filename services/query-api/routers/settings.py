@@ -11,6 +11,7 @@ import logging
 import os
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
@@ -25,6 +26,10 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 THUMBNAIL_MAX_OPTIONS = [1, 5, 10, 20, 50, 100]
 THUMBNAIL_ENV_VAR = "INFERENCE_THUMBNAIL__MAX_PER_TRACK"
 THUMBNAIL_DEFAULT = 50
+
+INFERENCE_HEALTH_URL = os.environ.get(
+    "INFERENCE_HEALTH_URL", "http://inference-worker:9091/health"
+)
 
 
 async def _ensure_settings_table(pool: Any) -> None:
@@ -142,7 +147,63 @@ async def update_thumbnail_settings(
 
     return {
         "max_per_track": body.max_per_track,
-        "note": "Setting saved. Takes effect on next inference-worker restart.",
+        "note": "Setting saved. The detection service will pick it up within 30 seconds.",
+    }
+
+
+@router.get("/thumbnails/status")
+async def thumbnail_setting_status(
+    request: Request,
+    user: UserClaims = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Check whether the inference worker has picked up the current setting."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    pool = request.app.state.db_pool
+    await _ensure_settings_table(pool)
+
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT value FROM settings WHERE key = 'thumbnail_max_per_track'"
+        )
+    db_value: int | None
+    if row is not None:
+        try:
+            db_value = int(row["value"])
+        except (ValueError, TypeError):
+            db_value = None
+    else:
+        db_value = None
+
+    worker_value: int | None = None
+    worker_reachable = False
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(INFERENCE_HEALTH_URL)
+            if resp.status_code == 200:
+                data = resp.json()
+                raw = data.get("thumbnail_max_per_track")
+                if raw is not None:
+                    try:
+                        worker_value = int(raw)
+                    except (ValueError, TypeError):
+                        worker_value = None
+                worker_reachable = True
+    except Exception:
+        pass
+
+    synced = (
+        worker_reachable
+        and db_value is not None
+        and worker_value == db_value
+    )
+
+    return {
+        "db_value": db_value,
+        "worker_value": worker_value,
+        "worker_reachable": worker_reachable,
+        "synced": synced,
     }
 
 

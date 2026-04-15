@@ -39,6 +39,7 @@ from metrics import (
     TRACKS_CLOSED,
 )
 from publisher import KafkaPublisher
+from settings_poller import get_effective_values, start_polling
 from thumbnail_writer import ThumbnailWriter
 from tracker import ByteTracker, TrackState
 
@@ -103,6 +104,8 @@ class InferenceWorker:
         self._minio = None  # lazy init
         self._trace_collector = None  # lazy init
         self._thumbnail_writer: ThumbnailWriter | None = None
+        self._settings_task: asyncio.Task | None = None
+        self._health_runner: Any = None
 
     async def start(self) -> None:
         """Connect to Kafka, MinIO, and start the consumer loop."""
@@ -131,11 +134,55 @@ class InferenceWorker:
         start_http_server(self.settings.metrics_port)
         logger.info("Metrics server on port %d", self.settings.metrics_port)
 
+        # Start settings poller (runtime-adjustable config)
+        self._settings_task = await start_polling(
+            self.settings.db_url, self._thumbnail_writer
+        )
+        logger.info("Settings poller started")
+
+        # Start health HTTP endpoint on a separate port
+        await self._start_health_server()
+
         await self._consume_loop()
 
     async def shutdown(self) -> None:
         self._shutdown.set()
+        if self._settings_task is not None:
+            self._settings_task.cancel()
+            try:
+                await self._settings_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        if self._health_runner is not None:
+            try:
+                await self._health_runner.cleanup()
+            except Exception:
+                pass
         await self._publisher.close()
+
+    async def _start_health_server(self) -> None:
+        """Expose /health on ``health_port`` with effective runtime config."""
+        try:
+            from aiohttp import web  # noqa: PLC0415
+        except ImportError:
+            logger.warning(
+                "aiohttp not installed — /health endpoint disabled"
+            )
+            return
+
+        async def health_handler(_request: Any) -> Any:
+            return web.json_response(
+                {"status": "ok", **get_effective_values()}
+            )
+
+        app = web.Application()
+        app.router.add_get("/health", health_handler)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", self.settings.health_port)
+        await site.start()
+        self._health_runner = runner
+        logger.info("Health server on port %d", self.settings.health_port)
 
     # ------------------------------------------------------------------
     # Kafka consumer loop

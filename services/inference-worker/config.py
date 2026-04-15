@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     debug: DebugConfig = Field(default_factory=DebugConfig)
     thumbnail: ThumbnailConfig = Field(default_factory=ThumbnailConfig)
     metrics_port: int = 9090
+    health_port: int = 9091
+    db_url: str = (
+        "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+    )
     log_level: str = "INFO"
 
     @classmethod

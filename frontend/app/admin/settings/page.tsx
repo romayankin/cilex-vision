@@ -47,6 +47,13 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [syncStatus, setSyncStatus] = useState<
+    "idle" | "waiting" | "synced" | "timeout"
+  >("idle");
+  const syncTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncDismiss = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [accessLogEnabled, setAccessLogEnabled] = useState(false);
   const [savingAccessLog, setSavingAccessLog] = useState(false);
   const [accessLogError, setAccessLogError] = useState<string | null>(null);
@@ -102,8 +109,57 @@ export default function SettingsPage() {
   useEffect(() => {
     return () => {
       if (savedTimer.current) clearTimeout(savedTimer.current);
+      if (syncTimer.current) clearInterval(syncTimer.current);
+      if (syncTimeout.current) clearTimeout(syncTimeout.current);
+      if (syncDismiss.current) clearTimeout(syncDismiss.current);
     };
   }, []);
+
+  const clearSyncTimers = () => {
+    if (syncTimer.current) {
+      clearInterval(syncTimer.current);
+      syncTimer.current = null;
+    }
+    if (syncTimeout.current) {
+      clearTimeout(syncTimeout.current);
+      syncTimeout.current = null;
+    }
+  };
+
+  const startSyncPoll = (expected: number) => {
+    clearSyncTimers();
+    if (syncDismiss.current) {
+      clearTimeout(syncDismiss.current);
+      syncDismiss.current = null;
+    }
+    setSyncStatus("waiting");
+
+    syncTimer.current = setInterval(async () => {
+      try {
+        const res = await fetch("/api/settings/thumbnails/status", {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          synced: boolean;
+          worker_value: number | null;
+          db_value: number | null;
+        };
+        if (data.synced && data.worker_value === expected) {
+          clearSyncTimers();
+          setSyncStatus("synced");
+          syncDismiss.current = setTimeout(() => setSyncStatus("idle"), 5000);
+        }
+      } catch {
+        // transient — keep polling
+      }
+    }, 2000);
+
+    syncTimeout.current = setTimeout(() => {
+      clearSyncTimers();
+      setSyncStatus("timeout");
+    }, 60000);
+  };
 
   const handleSelect = async (n: number) => {
     if (!settings || n === settings.max_per_track || saving) return;
@@ -127,6 +183,7 @@ export default function SettingsPage() {
       setSavedAt(Date.now());
       if (savedTimer.current) clearTimeout(savedTimer.current);
       savedTimer.current = setTimeout(() => setSavedAt(null), 3000);
+      startSyncPoll(data.max_per_track);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -246,9 +303,60 @@ export default function SettingsPage() {
           ) : null}
 
           <div className="mt-4 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded p-2">
-            ℹ Changes take effect when the detection service restarts (usually
-            within a few minutes).
+            ℹ Changes take effect within 30 seconds — the detection service
+            polls for updates live.
           </div>
+
+          {syncStatus === "waiting" && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded p-3">
+              <svg
+                className="animate-spin h-4 w-4"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  fill="none"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              Applying to detection service…
+            </div>
+          )}
+
+          {syncStatus === "synced" && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded p-3">
+              <span aria-hidden="true">✓</span>
+              Detection service updated successfully
+            </div>
+          )}
+
+          {syncStatus === "timeout" && (
+            <div className="mt-3 flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
+              <span aria-hidden="true">⚠</span>
+              <div>
+                <p className="font-medium">
+                  Detection service did not confirm the change within 60
+                  seconds.
+                </p>
+                <p className="text-xs mt-1">
+                  The service may need a manual restart:
+                  <code className="bg-amber-100 px-1 rounded ml-1">
+                    docker compose restart inference-worker
+                  </code>
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

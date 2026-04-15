@@ -422,6 +422,10 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    ports:
+      - "9091:9091"
     environment:
       # No Triton in dev compose — worker will log warnings and retry.
       INFERENCE_TRITON__URL: ""
@@ -443,6 +447,8 @@ services:
       INFERENCE_THUMBNAIL__MAX_WIDTH: "224"
       INFERENCE_THUMBNAIL__QUALITY: "80"
       INFERENCE_METRICS_PORT: "9090"
+      INFERENCE_HEALTH_PORT: "9091"
+      INFERENCE_DB_URL: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
       INFERENCE_LOG_LEVEL: INFO
     mem_limit: 512m
     restart: unless-stopped
