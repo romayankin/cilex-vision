@@ -493,6 +493,7 @@ services:
       EVENT_KAFKA_INPUT_TOPIC: tracklets.local
       EVENT_KAFKA_OUTPUT_TOPIC: events.raw
       EVENT_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+      EVENT_MOTION_EVENTS_ENABLED: "false"
       EVENT_LOG_LEVEL: INFO
     mem_limit: 512m
     restart: unless-stopped

@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -101,18 +104,30 @@ class ClipMinioClient:
         frames: list[SourceFrame],
         destination_dir: Path,
     ) -> list[Path]:
-        """Download ordered frame objects into a temp directory."""
+        """Download ordered frame objects into a temp directory.
+
+        Frames that are missing or unreadable (e.g. purged by bucket
+        lifecycle before the clip job runs) are logged and skipped — the
+        caller decides what to do with a partial or empty result.
+        """
         destination_dir.mkdir(parents=True, exist_ok=True)
         output_paths: list[Path] = []
         for index, frame in enumerate(frames):
             destination = destination_dir / f"{index:06d}.jpg"
-            await asyncio.to_thread(
-                self._client.fget_object,
-                self.source_bucket,
-                frame.object_name,
-                str(destination),
-            )
-            output_paths.append(destination)
+            try:
+                await asyncio.to_thread(
+                    self._client.fget_object,
+                    self.source_bucket,
+                    frame.object_name,
+                    str(destination),
+                )
+                output_paths.append(destination)
+            except Exception as exc:
+                logger.warning(
+                    "Frame %s missing or unavailable, skipping: %s",
+                    frame.object_name,
+                    exc,
+                )
         return output_paths
 
     async def upload_clip(

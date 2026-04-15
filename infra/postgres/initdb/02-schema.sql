@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS track_attributes (
 CREATE TABLE IF NOT EXISTS events (
     event_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_type       VARCHAR(30) NOT NULL,
-    track_id         UUID REFERENCES local_tracks(local_track_id),
+    track_id         UUID,  -- FK dropped: events must survive track purge
     camera_id        TEXT NOT NULL REFERENCES cameras(camera_id),
     start_time       TIMESTAMPTZ NOT NULL,
     end_time         TIMESTAMPTZ,

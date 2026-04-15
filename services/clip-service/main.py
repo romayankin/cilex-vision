@@ -242,6 +242,13 @@ class ClipService:
 
         try:
             frame_paths = await self._minio.download_frames(frames, frames_dir)
+            if not frame_paths:
+                logger.warning(
+                    "No frames available for event %s (all source frames missing) — skipping clip",
+                    event_id,
+                )
+                CLIP_EVENTS_SKIPPED_TOTAL.labels(reason="frames_unavailable").inc()
+                return
             await extract_clip(
                 frame_paths=frame_paths,
                 output_path=clip_path,

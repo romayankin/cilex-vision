@@ -45,6 +45,7 @@ from routers import (
     streams,
     topology,
     tracks,
+    zones,
 )
 from routers.streams import sync_all_to_go2rtc
 from utils.db import create_pool
@@ -173,6 +174,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(settings_router.router)
     app.include_router(audit_router.router)
     app.include_router(inference.router)
+    app.include_router(zones.router)
 
     # Prometheus metrics
     metrics_app = make_asgi_app()

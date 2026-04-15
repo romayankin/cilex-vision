@@ -295,6 +295,8 @@ class EventEngineService:
                 await self._emitter.emit_many(triggers)
 
     def _update_camera_motion(self, tracklet: Any) -> list[EventTrigger]:
+        if not self.settings.motion_events_enabled:
+            return []
         state = getattr(tracklet, "state", None)
         if state not in {TRACKLET_STATE_NEW, TRACKLET_STATE_ACTIVE}:
             return []
@@ -330,6 +332,8 @@ class EventEngineService:
         return triggers
 
     def _check_camera_motion(self, now: float) -> list[EventTrigger]:
+        if not self.settings.motion_events_enabled:
+            return []
         triggers: list[EventTrigger] = []
         for camera_id, motion_state in self._camera_motion.items():
             if (

@@ -31,6 +31,7 @@ class EventEngineSettings(BaseSettings):
     tick_interval_s: float = 1.0
     motion_stillness_ms: int = 500
     motion_end_duration_s: float = 2.0
+    motion_events_enabled: bool = False
 
     metrics_port: int = 8080
     log_level: str = "INFO"
