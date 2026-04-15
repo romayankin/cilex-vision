@@ -14,6 +14,7 @@ and events stored in TimescaleDB / PostgreSQL.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -26,6 +27,7 @@ from prometheus_client import make_asgi_app
 
 from auth.audit import AuditMiddleware
 from config import Settings
+from metrics import CONCURRENT_REQUESTS, CONCURRENT_REQUESTS_HIGH_WATER
 from storage_watchdog import StorageWatchdog
 from routers import (
     audit as audit_router,
@@ -50,6 +52,17 @@ from utils.minio_urls import create_minio_client
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent / "config.yaml"
+
+CONCURRENCY_WARNING_THRESHOLD = 15
+CONCURRENCY_CRITICAL_THRESHOLD = 25
+HIGH_WATER_RESET_INTERVAL_S = 300
+
+
+async def _reset_high_water() -> None:
+    """Reset the high-water mark periodically so it reflects recent peaks."""
+    while True:
+        await asyncio.sleep(HIGH_WATER_RESET_INTERVAL_S)
+        CONCURRENT_REQUESTS_HIGH_WATER.set(0)
 
 
 def setup_logging(level: str) -> None:
@@ -92,6 +105,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.storage_watchdog = watchdog
     await watchdog.start()
 
+    # Periodic reset of the concurrency high-water mark
+    high_water_task = asyncio.create_task(_reset_high_water())
+    app.state.high_water_task = high_water_task
+
     # Register all DB cameras with go2rtc so streams survive a go2rtc restart.
     try:
         synced = await sync_all_to_go2rtc(pool)
@@ -102,6 +119,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     # Shutdown
+    high_water_task.cancel()
+    try:
+        await high_water_task
+    except (asyncio.CancelledError, Exception):
+        pass
     await watchdog.stop()
     if pool is not None:
         await pool.close()
@@ -169,6 +191,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return {"status": "ready"}
         except Exception:
             return {"status": "not_ready", "reason": "db_unreachable"}
+
+    @app.get("/health/concurrency")
+    async def concurrency_stats() -> dict:
+        """Current and peak concurrent request stats. No auth required."""
+        current = CONCURRENT_REQUESTS._value.get()
+        peak = CONCURRENT_REQUESTS_HIGH_WATER._value.get()
+
+        level = "ok"
+        message: str | None = None
+        if peak >= CONCURRENCY_CRITICAL_THRESHOLD:
+            level = "critical"
+            message = (
+                f"Peak concurrent requests ({peak}) exceeded {CONCURRENCY_CRITICAL_THRESHOLD}. "
+                "The server is likely struggling. Scale to multiple uvicorn workers "
+                "and switch access-log cache to Redis or shared memory."
+            )
+        elif peak >= CONCURRENCY_WARNING_THRESHOLD:
+            level = "warning"
+            message = (
+                f"Peak concurrent requests ({peak}) approaching single-worker capacity. "
+                "If response times are degrading, consider scaling to multiple uvicorn workers."
+            )
+
+        return {
+            "concurrent_now": current,
+            "concurrent_peak_5m": peak,
+            "level": level,
+            "message": message,
+            "workers": 1,
+            "warning_threshold": CONCURRENCY_WARNING_THRESHOLD,
+            "critical_threshold": CONCURRENCY_CRITICAL_THRESHOLD,
+        }
 
     return app
 

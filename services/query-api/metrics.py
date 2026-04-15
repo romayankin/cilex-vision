@@ -1,6 +1,16 @@
 """Prometheus metrics for the Query API."""
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
+
+CONCURRENT_REQUESTS = Gauge(
+    "query_concurrent_requests",
+    "Number of API requests currently being processed",
+)
+
+CONCURRENT_REQUESTS_HIGH_WATER = Gauge(
+    "query_concurrent_requests_high_water",
+    "Peak concurrent requests since last reset (resets every 5 minutes)",
+)
 
 QUERY_REQUESTS = Counter(
     "query_requests_total",

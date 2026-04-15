@@ -23,12 +23,24 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
-from metrics import AUDIT_ERRORS, AUDIT_WRITES
+from metrics import (
+    AUDIT_ERRORS,
+    AUDIT_WRITES,
+    CONCURRENT_REQUESTS,
+    CONCURRENT_REQUESTS_HIGH_WATER,
+)
 
 logger = logging.getLogger(__name__)
 
 
-SKIP_PATHS = {"/health", "/ready", "/metrics", "/docs", "/openapi.json"}
+SKIP_PATHS = {
+    "/health",
+    "/health/concurrency",
+    "/ready",
+    "/metrics",
+    "/docs",
+    "/openapi.json",
+}
 READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 _access_log_enabled: bool = False
@@ -65,70 +77,79 @@ class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        start = time.monotonic()
-        response = await call_next(request)
-        elapsed_ms = (time.monotonic() - start) * 1000
-
-        path = request.url.path
-        if path in SKIP_PATHS:
-            return response
-
-        user_id = getattr(request.state, "audit_user_id", None)
-        username = getattr(request.state, "audit_username", None)
-        pool = getattr(request.app.state, "db_pool", None)
-        if pool is None:
-            return response
-
-        ip_address = _client_ip(request)
-        hostname = _client_hostname(request)
-        method = request.method
-
-        if method in READ_METHODS:
-            if await _is_access_log_enabled(pool):
-                try:
-                    await _write_access_log(
-                        pool=pool,
-                        user_id=user_id,
-                        username=username,
-                        method=method,
-                        path=path,
-                        query_string=str(request.url.query),
-                        status_code=response.status_code,
-                        latency_ms=round(elapsed_ms, 2),
-                        ip_address=ip_address,
-                        hostname=hostname,
-                    )
-                except Exception:
-                    logger.warning("Access log write failed", exc_info=True)
-            return response
-
-        # Mutating request — skip if the route already wrote a rich audit entry.
-        if getattr(request.state, "audit_written", False):
-            return response
+        CONCURRENT_REQUESTS.inc()
+        current = CONCURRENT_REQUESTS._value.get()
+        hw = CONCURRENT_REQUESTS_HIGH_WATER._value.get()
+        if current > hw:
+            CONCURRENT_REQUESTS_HIGH_WATER.set(current)
 
         try:
-            await _write_audit_log(
-                pool=pool,
-                user_id=user_id,
-                action=method,
-                resource_type=_resource_type(path),
-                resource_id=_resource_id(path),
-                details={
-                    "path": path,
-                    "query": str(request.url.query),
-                    "status": response.status_code,
-                    "latency_ms": round(elapsed_ms, 2),
-                    "username": username,
-                },
-                ip_address=ip_address,
-                hostname=hostname,
-            )
-            AUDIT_WRITES.inc()
-        except Exception:
-            AUDIT_ERRORS.inc()
-            logger.warning("Audit log write failed", exc_info=True)
+            start = time.monotonic()
+            response = await call_next(request)
+            elapsed_ms = (time.monotonic() - start) * 1000
 
-        return response
+            path = request.url.path
+            if path in SKIP_PATHS:
+                return response
+
+            user_id = getattr(request.state, "audit_user_id", None)
+            username = getattr(request.state, "audit_username", None)
+            pool = getattr(request.app.state, "db_pool", None)
+            if pool is None:
+                return response
+
+            ip_address = _client_ip(request)
+            hostname = _client_hostname(request)
+            method = request.method
+
+            if method in READ_METHODS:
+                if await _is_access_log_enabled(pool):
+                    try:
+                        await _write_access_log(
+                            pool=pool,
+                            user_id=user_id,
+                            username=username,
+                            method=method,
+                            path=path,
+                            query_string=str(request.url.query),
+                            status_code=response.status_code,
+                            latency_ms=round(elapsed_ms, 2),
+                            ip_address=ip_address,
+                            hostname=hostname,
+                        )
+                    except Exception:
+                        logger.warning("Access log write failed", exc_info=True)
+                return response
+
+            # Mutating request — skip if the route already wrote a rich audit entry.
+            if getattr(request.state, "audit_written", False):
+                return response
+
+            try:
+                await _write_audit_log(
+                    pool=pool,
+                    user_id=user_id,
+                    action=method,
+                    resource_type=_resource_type(path),
+                    resource_id=_resource_id(path),
+                    details={
+                        "path": path,
+                        "query": str(request.url.query),
+                        "status": response.status_code,
+                        "latency_ms": round(elapsed_ms, 2),
+                        "username": username,
+                    },
+                    ip_address=ip_address,
+                    hostname=hostname,
+                )
+                AUDIT_WRITES.inc()
+            except Exception:
+                AUDIT_ERRORS.inc()
+                logger.warning("Audit log write failed", exc_info=True)
+
+            return response
+        finally:
+            CONCURRENT_REQUESTS.dec()
 
 
 async def _write_audit_log(

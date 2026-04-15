@@ -1,7 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getUserRole, isAdmin } from "@/lib/auth";
+
+interface ConcurrencyStats {
+  concurrent_now: number;
+  concurrent_peak_5m: number;
+  level: "ok" | "warning" | "critical";
+  message: string | null;
+  workers: number;
+  warning_threshold: number;
+  critical_threshold: number;
+}
 
 const GRAFANA_URL = process.env.NEXT_PUBLIC_GRAFANA_URL || "http://localhost:3001";
 
@@ -18,10 +28,18 @@ const PANELS = [
 export default function HealthPage() {
   const role = getUserRole();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [concurrency, setConcurrency] = useState<ConcurrencyStats | null>(null);
 
   const refresh = useCallback(() => {
     setRefreshKey((k) => k + 1);
   }, []);
+
+  useEffect(() => {
+    fetch("/api/health/concurrency")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setConcurrency(d))
+      .catch(() => {});
+  }, [refreshKey]);
 
   if (!isAdmin(role)) {
     return <p className="text-sm text-red-600">Admin access required.</p>;
@@ -38,6 +56,28 @@ export default function HealthPage() {
           Refresh
         </button>
       </div>
+
+      {concurrency && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-600">API Concurrency</span>
+            <span
+              className={`font-mono text-xs px-2 py-0.5 rounded ${
+                concurrency.level === "ok"
+                  ? "bg-green-100 text-green-700"
+                  : concurrency.level === "warning"
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-red-100 text-red-700"
+              }`}
+            >
+              {concurrency.concurrent_now} now / {concurrency.concurrent_peak_5m} peak (5m)
+            </span>
+          </div>
+          {concurrency.message && (
+            <p className="mt-2 text-xs text-gray-500">{concurrency.message}</p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {PANELS.map((panel) => (
