@@ -434,7 +434,7 @@ export default function PlannerPage() {
       <section className="bg-white border border-gray-200 rounded-lg p-4">
         <h2 className="font-medium text-sm mb-3">Model Selection</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-          {perCap.map(({ cap, model, ms }) => {
+          {perCap.map(({ cap, model }) => {
             const needed = highlightedCaps?.[cap.id];
             const ringClass =
               needed === "required"
@@ -442,7 +442,6 @@ export default function PlannerPage() {
                 : needed === "optional"
                   ? "ring-1 ring-blue-200"
                   : "";
-            const active = !isNone(model);
             return (
               <div
                 key={cap.id}
@@ -476,11 +475,6 @@ export default function PlannerPage() {
                 </select>
                 <div className="w-10 shrink-0 flex justify-center">
                   <StatusDot status={model.status} />
-                </div>
-                <div
-                  className={`w-16 shrink-0 text-right text-xs font-mono ${active ? "text-gray-700" : "text-gray-300"}`}
-                >
-                  {ms > 0 ? `${ms.toFixed(1)}ms` : "—"}
                 </div>
               </div>
             );
