@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -93,6 +95,23 @@ BUCKET_CATALOG = [
         "planned": False,
     },
 ]
+
+
+@dataclass
+class PurgeState:
+    active: bool = False
+    bucket: str = ""
+    started_by: str = ""
+    started_at: str = ""
+    older_than_hours: int = 0
+    deleted: int = 0
+    freed: int = 0
+    initial_size: int = 0
+    cancel_requested: threading.Event = field(default_factory=threading.Event)
+
+
+_purge_state = PurgeState()
+_purge_lock = threading.Lock()
 
 
 def _human_size(size_bytes: float) -> str:
@@ -338,18 +357,23 @@ class PurgeRequest(BaseModel):
     older_than_hours: int = Field(ge=0, le=24 * 365)
 
 
-def _do_purge(minio_client: Any, bucket: str, cutoff: datetime) -> tuple[int, int]:
-    """Blocking purge loop — call via asyncio.to_thread.
+def _do_purge(
+    minio_client: Any,
+    bucket: str,
+    cutoff: datetime,
+    state: PurgeState,
+) -> tuple[int, int, bool]:
+    """Blocking purge loop with progress reporting and cancellation.
 
-    Returns (deleted_count, freed_bytes). Batches DeleteObject lists of 1000
-    since remove_objects streams errors only when the returned generator is
-    consumed, which we force here via list().
+    Returns (deleted_count, freed_bytes, cancelled). Progress is written
+    to ``state`` after each 1000-object batch so pollers see it in real time.
     """
     from minio.deleteobjects import DeleteObject  # noqa: PLC0415
 
     deleted = 0
     freed = 0
     pending: list[DeleteObject] = []
+    cancelled = False
 
     def flush(batch: list[DeleteObject]) -> None:
         errors = list(minio_client.remove_objects(bucket, batch))
@@ -357,19 +381,30 @@ def _do_purge(minio_client: Any, bucket: str, cutoff: datetime) -> tuple[int, in
             logger.warning("purge delete error in %s: %s", bucket, err)
 
     for obj in minio_client.list_objects(bucket, recursive=True):
+        if state.cancel_requested.is_set():
+            cancelled = True
+            break
+
         if obj.last_modified is None or obj.last_modified >= cutoff:
             continue
+
         pending.append(DeleteObject(obj.object_name))
         freed += obj.size or 0
         deleted += 1
+
         if len(pending) >= 1000:
             flush(pending)
             pending = []
+            state.deleted = deleted
+            state.freed = freed
 
-    if pending:
+    if pending and not cancelled:
         flush(pending)
 
-    return deleted, freed
+    state.deleted = deleted
+    state.freed = freed
+
+    return deleted, freed, cancelled
 
 
 @router.post("/purge")
@@ -397,21 +432,66 @@ async def purge_bucket(
     if minio_client is None:
         raise HTTPException(status_code=503, detail="MinIO client not initialised")
 
+    with _purge_lock:
+        if _purge_state.active:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "purge_in_progress",
+                    "message": (
+                        f"A purge is already running on bucket '{_purge_state.bucket}' "
+                        f"(started by {_purge_state.started_by}). "
+                        f"Wait for it to complete or cancel it first."
+                    ),
+                    "bucket": _purge_state.bucket,
+                    "started_by": _purge_state.started_by,
+                    "started_at": _purge_state.started_at,
+                    "deleted": _purge_state.deleted,
+                    "freed": _purge_state.freed,
+                },
+            )
+
+        initial_size = 0
+        watchdog = getattr(request.app.state, "storage_watchdog", None)
+        if watchdog is not None and watchdog.stats:
+            initial_size = int(
+                watchdog.stats.get("bucket_sizes", {}).get(body.bucket, 0)
+            )
+
+        _purge_state.active = True
+        _purge_state.bucket = body.bucket
+        _purge_state.started_by = user.username
+        _purge_state.started_at = datetime.now(timezone.utc).isoformat()
+        _purge_state.older_than_hours = body.older_than_hours
+        _purge_state.deleted = 0
+        _purge_state.freed = 0
+        _purge_state.initial_size = initial_size
+        _purge_state.cancel_requested.clear()
+
     cutoff = datetime.now(timezone.utc) - timedelta(hours=body.older_than_hours)
 
-    deleted, freed = await asyncio.to_thread(
-        _do_purge, minio_client, body.bucket, cutoff
-    )
+    try:
+        deleted, freed, cancelled = await asyncio.to_thread(
+            _do_purge, minio_client, body.bucket, cutoff, _purge_state
+        )
+    finally:
+        with _purge_lock:
+            _purge_state.active = False
 
     logger.info(
-        "Purge on bucket=%s older_than_hours=%d: deleted=%d freed=%s",
-        body.bucket, body.older_than_hours, deleted, _human_size(freed),
+        "Purge on bucket=%s older_than_hours=%d: deleted=%d freed=%s cancelled=%s",
+        body.bucket, body.older_than_hours, deleted, _human_size(freed), cancelled,
     )
 
     pool = getattr(request.app.state, "db_pool", None)
     if pool is not None:
         hostname = _client_hostname(request)
-        if body.older_than_hours == 0:
+        if cancelled:
+            description = (
+                f"Purge CANCELLED on bucket '{body.bucket}' "
+                f"after deleting {deleted} objects"
+            )
+        elif body.older_than_hours == 0:
             description = f"Purge ALL objects from bucket '{body.bucket}'"
         else:
             description = (
@@ -434,6 +514,7 @@ async def purge_bucket(
                     "deleted_objects": deleted,
                     "freed_bytes": freed,
                     "freed_human": _human_size(freed),
+                    "cancelled": cancelled,
                     "client_hostname": hostname,
                 },
                 ip_address=_client_ip(request),
@@ -450,4 +531,103 @@ async def purge_bucket(
         "freed_bytes": freed,
         "freed_human": _human_size(freed),
         "cutoff": cutoff.isoformat(),
+        "cancelled": cancelled,
+    }
+
+
+@router.get("/purge/status")
+async def purge_status(
+    request: Request,
+    user: UserClaims = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Return progress for the currently-running purge, if any."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    if not _purge_state.active:
+        return {"active": False}
+
+    elapsed = 0.0
+    try:
+        started = datetime.fromisoformat(_purge_state.started_at)
+        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+    except Exception:
+        pass
+
+    progress_pct = 0.0
+    if _purge_state.initial_size > 0:
+        progress_pct = min(
+            99.0, (_purge_state.freed / _purge_state.initial_size) * 100
+        )
+
+    return {
+        "active": True,
+        "bucket": _purge_state.bucket,
+        "started_by": _purge_state.started_by,
+        "started_at": _purge_state.started_at,
+        "older_than_hours": _purge_state.older_than_hours,
+        "deleted": _purge_state.deleted,
+        "freed": _purge_state.freed,
+        "freed_human": _human_size(_purge_state.freed),
+        "initial_size": _purge_state.initial_size,
+        "initial_size_human": _human_size(_purge_state.initial_size),
+        "progress_pct": round(progress_pct, 1),
+        "elapsed_seconds": round(elapsed, 1),
+        "cancel_requested": _purge_state.cancel_requested.is_set(),
+    }
+
+
+@router.post("/purge/cancel")
+async def cancel_purge(
+    request: Request,
+    user: UserClaims = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Request cancellation of the running purge. Already-deleted data is lost."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    if not _purge_state.active:
+        raise HTTPException(status_code=400, detail="No purge is currently running")
+
+    bucket = _purge_state.bucket
+    deleted_so_far = _purge_state.deleted
+    freed_so_far = _purge_state.freed
+
+    _purge_state.cancel_requested.set()
+
+    logger.info(
+        "Purge cancel requested by %s for bucket=%s (deleted_so_far=%d)",
+        user.username, bucket, deleted_so_far,
+    )
+
+    pool = getattr(request.app.state, "db_pool", None)
+    if pool is not None:
+        try:
+            await _write_audit_log(
+                pool=pool,
+                user_id=user.user_id,
+                action="CANCEL_PURGE",
+                resource_type="storage",
+                resource_id=bucket,
+                details={
+                    "description": (
+                        f"Purge cancel requested for bucket '{bucket}'"
+                    ),
+                    "username": user.username,
+                    "deleted_so_far": deleted_so_far,
+                    "freed_so_far": freed_so_far,
+                    "freed_human": _human_size(freed_so_far),
+                },
+                ip_address=_client_ip(request),
+                hostname=_client_hostname(request),
+            )
+            request.state.audit_written = True
+        except Exception:
+            logger.warning("Audit write (purge cancel) failed", exc_info=True)
+
+    return {
+        "message": "Cancel requested. The purge will stop after the current batch.",
+        "bucket": bucket,
+        "deleted_so_far": deleted_so_far,
+        "freed_so_far": freed_so_far,
     }

@@ -46,6 +46,23 @@ interface PurgeResult {
   freed_bytes: number;
   freed_human: string;
   cutoff: string;
+  cancelled?: boolean;
+}
+
+interface PurgeProgress {
+  active: boolean;
+  bucket: string;
+  started_by: string;
+  started_at: string;
+  older_than_hours: number;
+  deleted: number;
+  freed: number;
+  freed_human: string;
+  initial_size: number;
+  initial_size_human: string;
+  progress_pct: number;
+  elapsed_seconds: number;
+  cancel_requested: boolean;
 }
 
 interface WatchdogStats {
@@ -278,12 +295,46 @@ export default function StoragePage() {
   const [purgingBucket, setPurgingBucket] = useState<string | null>(null);
   const [purgeInitialSize, setPurgeInitialSize] = useState<number | null>(null);
   const [purgeJustCompleted, setPurgeJustCompleted] = useState<string | null>(null);
+  const [purgeProgress, setPurgeProgress] = useState<PurgeProgress | null>(null);
   const [lastPurge, setLastPurge] = useState<PurgeResult | null>(null);
   const [host, setHost] = useState<string>("localhost");
 
   useEffect(() => {
     if (typeof window !== "undefined") setHost(window.location.hostname);
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin(role)) return;
+    fetch("/api/storage/purge/status", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: PurgeProgress | null) => {
+        if (data?.active) {
+          setPurgingBucket(data.bucket);
+          setPurgeInitialSize(data.initial_size || null);
+          setPurgeProgress(data);
+        }
+      })
+      .catch(() => {});
+  }, [role]);
+
+  useEffect(() => {
+    if (!purgingBucket) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch("/api/storage/purge/status", {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const data: PurgeProgress = await res.json();
+        if (data.active) {
+          setPurgeProgress(data);
+        } else {
+          setPurgeProgress(null);
+        }
+      } catch {}
+    }, 2000);
+    return () => clearInterval(id);
+  }, [purgingBucket]);
 
   const loadAll = useCallback(async () => {
     try {
@@ -385,6 +436,7 @@ export default function StoragePage() {
     setPurgeInitialSize(bucketData?.size_bytes ?? null);
     setPurgingBucket(bucket);
     setLastPurge(null);
+    let adoptedRunningPurge = false;
     try {
       const res = await fetch("/api/storage/purge", {
         method: "POST",
@@ -392,6 +444,26 @@ export default function StoragePage() {
         credentials: "include",
         body: JSON.stringify({ bucket, older_than_hours: hours }),
       });
+      if (res.status === 409) {
+        const payload = await res.json().catch(() => null);
+        const msg =
+          payload?.detail?.message ??
+          "A purge is already running. Wait or cancel it.";
+        setError(msg);
+        const statusRes = await fetch("/api/storage/purge/status", {
+          credentials: "include",
+        });
+        if (statusRes.ok) {
+          const status: PurgeProgress = await statusRes.json();
+          if (status.active) {
+            setPurgingBucket(status.bucket);
+            setPurgeInitialSize(status.initial_size || null);
+            setPurgeProgress(status);
+            adoptedRunningPurge = true;
+          }
+        }
+        return;
+      }
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`HTTP ${res.status}: ${text}`);
@@ -402,12 +474,38 @@ export default function StoragePage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Purge failed");
     } finally {
-      setPurgingBucket(null);
-      setPurgeInitialSize(null);
-      setPurgeJustCompleted(bucket);
-      window.setTimeout(() => {
-        setPurgeJustCompleted((cur) => (cur === bucket ? null : cur));
-      }, 2000);
+      if (!adoptedRunningPurge) {
+        setPurgingBucket(null);
+        setPurgeInitialSize(null);
+        setPurgeProgress(null);
+        setPurgeJustCompleted(bucket);
+        window.setTimeout(() => {
+          setPurgeJustCompleted((cur) => (cur === bucket ? null : cur));
+        }, 2000);
+      }
+    }
+  }
+
+  async function cancelPurge() {
+    if (
+      !window.confirm(
+        "Cancel the running purge?\n\n" +
+          "⚠ Data already deleted during this purge is gone permanently. " +
+          "Cancel will only stop further deletion.",
+      )
+    )
+      return;
+    try {
+      const res = await fetch("/api/storage/purge/cancel", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        setError(`Cancel failed: ${text}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cancel failed");
     }
   }
 
@@ -579,6 +677,74 @@ export default function StoragePage() {
         </div>
       )}
 
+      {/* Live manual purge progress + cancel */}
+      {purgingBucket && purgeProgress && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-blue-400 border-t-blue-600 rounded-full animate-spin" />
+              <span className="text-sm font-medium text-blue-800">
+                Purging {purgeProgress.bucket}…
+              </span>
+              {purgeProgress.started_by && (
+                <span className="text-xs text-blue-700">
+                  (started by{" "}
+                  <span className="font-mono">{purgeProgress.started_by}</span>)
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={cancelPurge}
+              disabled={purgeProgress.cancel_requested}
+              className={`text-xs px-3 py-1 rounded border ${
+                purgeProgress.cancel_requested
+                  ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                  : "border-red-300 text-red-700 hover:bg-red-50"
+              }`}
+            >
+              {purgeProgress.cancel_requested ? "Cancelling…" : "Cancel purge"}
+            </button>
+          </div>
+
+          <div className="text-sm text-blue-700">
+            Deleted{" "}
+            <span className="font-mono">
+              {purgeProgress.deleted.toLocaleString()}
+            </span>{" "}
+            objects · Freed{" "}
+            <span className="font-mono">{purgeProgress.freed_human}</span>
+            {purgeProgress.initial_size > 0 && (
+              <>
+                {" "}of{" "}
+                <span className="font-mono">
+                  {purgeProgress.initial_size_human}
+                </span>
+              </>
+            )}{" "}
+            ·{" "}
+            <span className="font-mono">
+              {purgeProgress.elapsed_seconds.toFixed(0)}s
+            </span>{" "}
+            elapsed
+          </div>
+
+          <div className="w-full h-1.5 bg-blue-100 rounded overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded transition-all duration-1000 ease-linear"
+              style={{ width: `${purgeProgress.progress_pct}%` }}
+            />
+          </div>
+
+          {purgeProgress.cancel_requested && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+              ⚠ Cancel requested — purge will stop after the current batch.
+              Data already deleted cannot be recovered.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Manual purge result */}
       {lastPurge && (
         <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded p-3 text-sm">
@@ -618,19 +784,23 @@ export default function StoragePage() {
                     </td>
                     <td className="px-3 py-2 text-right font-mono align-top relative">
                       {purgingBucket === b.name &&
-                        purgeInitialSize !== null &&
-                        purgeInitialSize > 0 && (
+                        (purgeProgress?.progress_pct !== undefined ||
+                          (purgeInitialSize !== null && purgeInitialSize > 0)) && (
                           <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gray-100 overflow-hidden">
                             <div
                               className="h-full bg-blue-500 transition-all duration-1000 ease-linear"
                               style={{
-                                width: `${Math.min(
-                                  100,
-                                  ((purgeInitialSize -
-                                    (b.size_bytes ?? purgeInitialSize)) /
-                                    purgeInitialSize) *
-                                    100,
-                                )}%`,
+                                width: `${
+                                  purgeProgress?.progress_pct !== undefined
+                                    ? purgeProgress.progress_pct
+                                    : Math.min(
+                                        100,
+                                        ((purgeInitialSize! -
+                                          (b.size_bytes ?? purgeInitialSize!)) /
+                                          purgeInitialSize!) *
+                                          100,
+                                      )
+                                }%`,
                               }}
                             />
                           </div>
@@ -659,7 +829,7 @@ export default function StoragePage() {
                       {b.purgeable ? (
                         <PurgeMenu
                           bucket={b.name}
-                          busy={purgingBucket === b.name}
+                          busy={purgingBucket !== null}
                           onPurge={(hours, label) => onPurge(b.name, hours, label)}
                         />
                       ) : (
