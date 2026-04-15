@@ -198,17 +198,6 @@ function QualityBar({
       <span className={`text-[10px] mr-1 ${tone}`}>Quality:</span>
       <button
         type="button"
-        onClick={() => onChange("hd")}
-        className={`px-2 py-0.5 text-[11px] rounded transition ${
-          quality === "hd"
-            ? "bg-blue-600 text-white"
-            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-        }`}
-      >
-        HD
-      </button>
-      <button
-        type="button"
         onClick={() => onChange("fast")}
         className={`px-2 py-0.5 text-[11px] rounded transition ${
           quality === "fast"
@@ -217,6 +206,17 @@ function QualityBar({
         }`}
       >
         Fast
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("hd")}
+        className={`px-2 py-0.5 text-[11px] rounded transition ${
+          quality === "hd"
+            ? "bg-blue-600 text-white"
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+        }`}
+      >
+        HD
       </button>
       <span className={`text-[10px] ml-auto ${tone}`}>
         {notice ??
