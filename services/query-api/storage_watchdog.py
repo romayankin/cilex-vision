@@ -74,6 +74,15 @@ class StorageWatchdog:
         self.quota_percent = max(10, min(90, int(percent)))
         return self.quota_percent
 
+    def force_check(self) -> None:
+        """Run a full scan immediately. Safe to call from outside the loop.
+
+        Used after a manual purge so both the watchdog stats and the bucket
+        table (which prefers watchdog sizes) reflect the new state before
+        the UI reloads — Prometheus metrics can lag minutes behind deletes.
+        """
+        self._check()
+
     @property
     def stats(self) -> dict[str, Any]:
         return dict(self._stats)

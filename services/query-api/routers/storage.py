@@ -285,6 +285,14 @@ async def list_buckets(
             elif name == "minio_bucket_usage_object_total":
                 bucket_objects[bucket] = value
 
+    # Prefer watchdog-scanned sizes over Prometheus metrics for monitored
+    # buckets — Prometheus lags minutes behind deletes, the watchdog walks
+    # the objects directly so it reflects state immediately after a purge.
+    watchdog = getattr(request.app.state, "storage_watchdog", None)
+    if watchdog is not None and watchdog.stats:
+        for bname, bsize in watchdog.stats.get("bucket_sizes", {}).items():
+            bucket_sizes[bname] = float(bsize)
+
     if cluster_text:
         for line in cluster_text.splitlines():
             if not line or line.startswith("#"):
@@ -477,6 +485,13 @@ async def purge_bucket(
     finally:
         with _purge_lock:
             _purge_state.active = False
+
+    watchdog = getattr(request.app.state, "storage_watchdog", None)
+    if watchdog is not None:
+        try:
+            await asyncio.to_thread(watchdog.force_check)
+        except Exception:
+            logger.warning("Post-purge watchdog refresh failed", exc_info=True)
 
     logger.info(
         "Purge on bucket=%s older_than_hours=%d: deleted=%d freed=%s cancelled=%s",

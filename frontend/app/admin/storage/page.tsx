@@ -470,6 +470,7 @@ export default function StoragePage() {
       }
       const result: PurgeResult = await res.json();
       setLastPurge(result);
+      await new Promise((r) => setTimeout(r, 1500));
       await loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Purge failed");
