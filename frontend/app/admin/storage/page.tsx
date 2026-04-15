@@ -85,6 +85,7 @@ interface WatchdogStats {
 
 const REFRESH_MS = 30_000;
 const REFRESH_MS_ACTIVE = 3_000;
+const REFRESH_MS_PURGE = 2_000;
 const QUOTA_DEBOUNCE_MS = 500;
 
 const PURGE_OPTIONS: { label: string; hours: number }[] = [
@@ -275,6 +276,8 @@ export default function StoragePage() {
   const [error, setError] = useState<string | null>(null);
   const [lastFetch, setLastFetch] = useState<number>(Date.now());
   const [purgingBucket, setPurgingBucket] = useState<string | null>(null);
+  const [purgeInitialSize, setPurgeInitialSize] = useState<number | null>(null);
+  const [purgeJustCompleted, setPurgeJustCompleted] = useState<string | null>(null);
   const [lastPurge, setLastPurge] = useState<PurgeResult | null>(null);
   const [host, setHost] = useState<string>("localhost");
 
@@ -309,7 +312,11 @@ export default function StoragePage() {
       .catch(() => {});
   }, [role]);
 
-  const pollInterval = stats?.purging ? REFRESH_MS_ACTIVE : REFRESH_MS;
+  const pollInterval = purgingBucket
+    ? REFRESH_MS_PURGE
+    : stats?.purging
+    ? REFRESH_MS_ACTIVE
+    : REFRESH_MS;
   useEffect(() => {
     if (!isAdmin(role)) return;
     loadAll();
@@ -374,6 +381,8 @@ export default function StoragePage() {
         : `Delete all objects in "${bucket}" ${label}? This cannot be undone.`;
     if (!window.confirm(confirmMsg)) return;
 
+    const bucketData = data?.buckets?.find((x) => x.name === bucket);
+    setPurgeInitialSize(bucketData?.size_bytes ?? null);
     setPurgingBucket(bucket);
     setLastPurge(null);
     try {
@@ -394,6 +403,11 @@ export default function StoragePage() {
       setError(err instanceof Error ? err.message : "Purge failed");
     } finally {
       setPurgingBucket(null);
+      setPurgeInitialSize(null);
+      setPurgeJustCompleted(bucket);
+      window.setTimeout(() => {
+        setPurgeJustCompleted((cur) => (cur === bucket ? null : cur));
+      }, 2000);
     }
   }
 
@@ -602,7 +616,37 @@ export default function StoragePage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono align-top">{b.size_human}</td>
+                    <td className="px-3 py-2 text-right font-mono align-top relative">
+                      {purgingBucket === b.name &&
+                        purgeInitialSize !== null &&
+                        purgeInitialSize > 0 && (
+                          <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gray-100 overflow-hidden">
+                            <div
+                              className="h-full bg-blue-500 transition-all duration-1000 ease-linear"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  ((purgeInitialSize -
+                                    (b.size_bytes ?? purgeInitialSize)) /
+                                    purgeInitialSize) *
+                                    100,
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        )}
+                      <span
+                        className={
+                          purgingBucket === b.name
+                            ? "text-blue-600 transition-colors"
+                            : purgeJustCompleted === b.name
+                            ? "text-green-600 transition-colors"
+                            : ""
+                        }
+                      >
+                        {b.size_human}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-right font-mono align-top">
                       {b.object_count.toLocaleString()}
                     </td>
