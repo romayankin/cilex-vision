@@ -40,6 +40,7 @@ from routers import (
     inference,
     lpr,
     pipeline,
+    pipeline_metrics,
     services as services_router,
     settings as settings_router,
     similarity,
@@ -184,6 +185,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(streams.router)
     app.include_router(discovery.router)
     app.include_router(pipeline.router)
+    app.include_router(pipeline_metrics.router)
     app.include_router(storage.router)
     app.include_router(settings_router.router)
     app.include_router(audit_router.router)
