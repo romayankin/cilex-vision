@@ -85,6 +85,10 @@ class DecodeWorker:
         self._sampler = FrameSampler(target_fps=settings.sampler.target_fps)
         self._publisher = KafkaPublisher(settings.kafka)
         self._minio = None  # lazy init
+        self._started_at: float = time.time()
+        self._last_decode_ts: float = 0.0
+        self._consumer_connected: bool = False
+        self._health_runner: Any = None
 
     async def start(self) -> None:
         """Connect to Kafka, MinIO, and start the consumer loop."""
@@ -97,11 +101,67 @@ class DecodeWorker:
         start_http_server(self.settings.metrics_port)
         logger.info("Metrics server on port %d", self.settings.metrics_port)
 
+        await self._start_health_server()
+
         await self._consume_loop()
 
     async def shutdown(self) -> None:
         self._shutdown.set()
+        if self._health_runner is not None:
+            try:
+                await self._health_runner.cleanup()
+            except Exception:
+                pass
         await self._publisher.close()
+
+    async def _start_health_server(self) -> None:
+        try:
+            from aiohttp import web  # noqa: PLC0415
+        except ImportError:
+            logger.warning("aiohttp not installed — /health endpoint disabled")
+            return
+
+        async def health_handler(_request: Any) -> Any:
+            now = time.time()
+            uptime = now - self._started_at
+            checks: dict[str, str] = {}
+            healthy = True
+
+            if not self._consumer_connected:
+                checks["consumer"] = "disconnected"
+                healthy = False
+            else:
+                checks["consumer"] = "connected"
+
+            if self._last_decode_ts == 0:
+                if uptime > 120:
+                    checks["decoding"] = "no frames decoded after 2 minutes"
+                    healthy = False
+                else:
+                    checks["decoding"] = "warming up"
+            else:
+                age = now - self._last_decode_ts
+                if age > 120:
+                    checks["decoding"] = f"stale — last frame {int(age)}s ago"
+                    healthy = False
+                else:
+                    checks["decoding"] = f"active — last frame {int(age)}s ago"
+
+            body = {
+                "status": "ok" if healthy else "unhealthy",
+                "uptime_seconds": int(uptime),
+                "checks": checks,
+            }
+            return web.json_response(body, status=200 if healthy else 503)
+
+        app = web.Application()
+        app.router.add_get("/health", health_handler)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", self.settings.health_port)
+        await site.start()
+        self._health_runner = runner
+        logger.info("Health server on port %d", self.settings.health_port)
 
     # ------------------------------------------------------------------
     # Kafka consumer loop
@@ -131,6 +191,7 @@ class DecodeWorker:
             auto_offset_reset=cfg.auto_offset_reset,
         )
         await consumer.start()
+        self._consumer_connected = True
         logger.info(
             "Consuming from %s (group=%s)", cfg.input_topic, cfg.consumer_group
         )
@@ -169,6 +230,7 @@ class DecodeWorker:
                     except Exception:
                         pass
         finally:
+            self._consumer_connected = False
             await consumer.stop()
 
     # ------------------------------------------------------------------
@@ -245,6 +307,7 @@ class DecodeWorker:
             edge_receive_ts=edge_ts,
             core_ingest_ts=core_ingest_ts,
         )
+        self._last_decode_ts = time.time()
 
     # ------------------------------------------------------------------
     # Helpers

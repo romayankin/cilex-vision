@@ -84,6 +84,9 @@ class MTMCService:
         self._matcher: Matcher | None = None
         self._db_writer: DBWriter | None = None
         self._cleanup_task: asyncio.Task[None] | None = None
+        self._started_at: float = time.time()
+        self._consumer_subscribed: bool = False
+        self._health_runner: Any = None
 
     async def start(self) -> None:
         """Initialise all subsystems and start the consumer loop."""
@@ -140,11 +143,66 @@ class MTMCService:
         start_http_server(self.settings.metrics_port)
         logger.info("Metrics server on port %d", self.settings.metrics_port)
 
+        # Health server
+        await self._start_health_server()
+
         # Background tasks
         self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
 
         # Start consuming
         await self._consume_loop()
+
+    async def _start_health_server(self) -> None:
+        try:
+            from aiohttp import web  # noqa: PLC0415
+        except ImportError:
+            logger.warning("aiohttp not installed — /health endpoint disabled")
+            return
+
+        async def health_handler(_request: Any) -> Any:
+            now = time.time()
+            uptime = now - self._started_at
+            checks: dict[str, str] = {}
+            healthy = True
+
+            if self._consumer_subscribed:
+                checks["consumer"] = "connected"
+            else:
+                checks["consumer"] = "disconnected"
+                healthy = False
+
+            if self._pool is not None:
+                try:
+                    async with self._pool.acquire() as conn:
+                        await conn.fetchval("SELECT 1")
+                    checks["database"] = "connected"
+                except Exception as exc:
+                    checks["database"] = f"error: {type(exc).__name__}"
+                    healthy = False
+            else:
+                checks["database"] = "not initialised"
+                healthy = False
+
+            if self._index is not None:
+                checks["faiss_size"] = str(self._index.size())
+            else:
+                checks["faiss_size"] = "0"
+
+            body = {
+                "status": "ok" if healthy else "unhealthy",
+                "uptime_seconds": int(uptime),
+                "checks": checks,
+            }
+            return web.json_response(body, status=200 if healthy else 503)
+
+        app = web.Application()
+        app.router.add_get("/health", health_handler)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", self.settings.health_port)
+        await site.start()
+        self._health_runner = runner
+        logger.info("Health server on port %d", self.settings.health_port)
 
     async def shutdown(self) -> None:
         """Graceful shutdown: flush checkpoint, close connections."""
@@ -155,6 +213,12 @@ class MTMCService:
         # Final checkpoint
         if self._index is not None and self._checkpoint_mgr is not None:
             await self._do_checkpoint(force=True)
+
+        if self._health_runner is not None:
+            try:
+                await self._health_runner.cleanup()
+            except Exception:
+                pass
 
         if self._pool is not None:
             await self._pool.close()
@@ -198,6 +262,7 @@ class MTMCService:
             on_assign=on_assign,
             on_revoke=on_revoke,
         )
+        self._consumer_subscribed = True
 
         EmbeddingType = _load_embedding_type()
         logger.info(
@@ -290,6 +355,7 @@ class MTMCService:
                 await self._maybe_refresh_topology()
 
         finally:
+            self._consumer_subscribed = False
             consumer.close()
 
     # ------------------------------------------------------------------

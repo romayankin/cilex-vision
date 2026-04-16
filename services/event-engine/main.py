@@ -141,6 +141,10 @@ class EventEngineService:
         self._state_machines: dict[str, TrackStateMachine] = {}
         self._camera_motion: dict[str, CameraMotionState] = {}
         self._tick_task: asyncio.Task[None] | None = None
+        self._started_at: float = time.time()
+        self._last_tracklet_ts: float = 0.0
+        self._consumer_subscribed: bool = False
+        self._health_runner: Any = None
 
     async def start(self) -> None:
         """Initialise dependencies and start the main consumer loop."""
@@ -175,6 +179,7 @@ class EventEngineService:
 
         self._consumer = Consumer(consumer_config)
         self._consumer.subscribe([self.settings.kafka_input_topic])
+        self._consumer_subscribed = True
 
         self._producer = Producer(producer_config)
         self._emitter = EventEmitter(
@@ -186,8 +191,58 @@ class EventEngineService:
         start_http_server(self.settings.metrics_port)
         logger.info("Metrics server listening on port %d", self.settings.metrics_port)
 
+        await self._start_health_server()
+
         self._tick_task = asyncio.create_task(self._tick_loop())
         await self._consume_loop()
+
+    async def _start_health_server(self) -> None:
+        try:
+            from aiohttp import web  # noqa: PLC0415
+        except ImportError:
+            logger.warning("aiohttp not installed — /health endpoint disabled")
+            return
+
+        async def health_handler(_request: Any) -> Any:
+            now = time.time()
+            uptime = now - self._started_at
+            checks: dict[str, str] = {}
+            healthy = True
+
+            if self._consumer_subscribed:
+                checks["consumer"] = "connected"
+            else:
+                checks["consumer"] = "disconnected"
+                healthy = False
+
+            if self._last_tracklet_ts == 0:
+                if uptime > 120:
+                    checks["processing"] = "no tracklets processed after 2 minutes"
+                    healthy = False
+                else:
+                    checks["processing"] = "warming up"
+            else:
+                age = now - self._last_tracklet_ts
+                checks["processing"] = f"last tracklet {int(age)}s ago"
+                if age > 120:
+                    checks["processing"] += " (STALE)"
+                    healthy = False
+
+            body = {
+                "status": "ok" if healthy else "unhealthy",
+                "uptime_seconds": int(uptime),
+                "checks": checks,
+            }
+            return web.json_response(body, status=200 if healthy else 503)
+
+        app = web.Application()
+        app.router.add_get("/health", health_handler)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", self.settings.health_port)
+        await site.start()
+        self._health_runner = runner
+        logger.info("Health server on port %d", self.settings.health_port)
 
     async def shutdown(self) -> None:
         """Flush Kafka, stop background tasks, and close connections."""
@@ -197,7 +252,13 @@ class EventEngineService:
         if self._emitter is not None:
             await self._emitter.flush()
         if self._consumer is not None:
+            self._consumer_subscribed = False
             self._consumer.close()
+        if self._health_runner is not None:
+            try:
+                await self._health_runner.cleanup()
+            except Exception:
+                pass
         if self._pool is not None:
             await self._pool.close()
         logger.info("Event engine shut down")
@@ -227,6 +288,7 @@ class EventEngineService:
                 continue
 
             EVENT_TRACKLETS_CONSUMED_TOTAL.inc()
+            self._last_tracklet_ts = time.time()
 
             try:
                 tracklet = TrackletType()

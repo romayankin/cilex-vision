@@ -10,6 +10,8 @@ import asyncio
 import logging
 import os
 import signal
+import time
+from typing import Any
 
 from minio import Minio
 from prometheus_client import start_http_server
@@ -22,8 +24,74 @@ from nats_publisher import NatsPublisher
 logger = logging.getLogger(__name__)
 
 
+async def _start_health_server(
+    port: int,
+    started_at: float,
+    nats_pub: NatsPublisher,
+    pipelines: list[CameraPipeline],
+) -> Any:
+    try:
+        from aiohttp import web  # noqa: PLC0415
+    except ImportError:
+        logger.warning("aiohttp not installed — /health endpoint disabled")
+        return None
+
+    async def health_handler(_request: Any) -> Any:
+        now = time.time()
+        now_mono = time.monotonic()
+        uptime = now - started_at
+        checks: dict[str, Any] = {}
+        healthy = True
+
+        if nats_pub.is_connected:
+            checks["nats"] = "connected"
+        else:
+            checks["nats"] = "disconnected"
+            healthy = False
+
+        active = 0
+        stale: list[str] = []
+        for p in pipelines:
+            last = getattr(p, "_last_frame_time", 0.0)
+            if last == 0.0:
+                continue
+            age = now_mono - last
+            if age < 60:
+                active += 1
+            else:
+                stale.append(f"{p._camera.camera_id} ({int(age)}s)")
+
+        if pipelines and active > 0:
+            checks["cameras"] = f"{active}/{len(pipelines)} active"
+        elif pipelines and uptime > 120:
+            checks["cameras"] = (
+                f"all stale: {', '.join(stale)}" if stale else "no frames yet"
+            )
+            healthy = False
+        else:
+            checks["cameras"] = "warming up"
+
+        body = {
+            "status": "ok" if healthy else "unhealthy",
+            "uptime_seconds": int(uptime),
+            "checks": checks,
+        }
+        return web.json_response(body, status=200 if healthy else 503)
+
+    app = web.Application()
+    app.router.add_get("/health", health_handler)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logger.info("Health server on port %d", port)
+    return runner
+
+
 async def run(settings: Settings) -> None:
     """Async entry point — sets up all components and runs pipelines."""
+
+    started_at = time.time()
 
     # --- Prometheus metrics server ---
     start_http_server(settings.metrics_port)
@@ -80,6 +148,11 @@ async def run(settings: Settings) -> None:
 
     logger.info("Started %d camera pipeline(s)", len(tasks))
 
+    # --- Health server ---
+    health_runner = await _start_health_server(
+        settings.health_port, started_at, nats_pub, pipelines
+    )
+
     # --- Graceful shutdown ---
     shutdown_event = asyncio.Event()
 
@@ -95,6 +168,11 @@ async def run(settings: Settings) -> None:
 
     await shutdown_event.wait()
     await asyncio.gather(*tasks, return_exceptions=True)
+    if health_runner is not None:
+        try:
+            await health_runner.cleanup()
+        except Exception:
+            pass
     await nats_pub.close()
     logger.info("Edge agent stopped")
 

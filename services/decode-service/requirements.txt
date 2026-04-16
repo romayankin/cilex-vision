@@ -1,4 +1,5 @@
 aiokafka>=0.10.0
+aiohttp>=3.9.0
 cramjam>=2.8.0
 protobuf>=4.25.0
 grpcio-tools>=1.60.0

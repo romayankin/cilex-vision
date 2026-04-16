@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     sampler: SamplerConfig = Field(default_factory=SamplerConfig)
     num_workers: int = 4
     metrics_port: int = 9090
+    health_port: int = 8081
     log_level: str = "INFO"
 
     @classmethod

@@ -95,6 +95,10 @@ class ClipService:
         self._minio: ClipMinioClient | None = None
         self._consumer: Any = None
         self._producer: Any = None
+        self._started_at: float = time.time()
+        self._consumer_subscribed: bool = False
+        self._clips_generated: int = 0
+        self._health_runner: Any = None
 
     async def start(self) -> None:
         """Initialise dependencies and start the Kafka loop."""
@@ -137,11 +141,50 @@ class ClipService:
 
         self._consumer = Consumer(consumer_config)
         self._consumer.subscribe([self.settings.kafka_input_topic])
+        self._consumer_subscribed = True
         self._producer = Producer(producer_config)
 
         start_http_server(self.settings.metrics_port)
         logger.info("Metrics server listening on port %d", self.settings.metrics_port)
+        await self._start_health_server()
         await self._consume_loop()
+
+    async def _start_health_server(self) -> None:
+        try:
+            from aiohttp import web  # noqa: PLC0415
+        except ImportError:
+            logger.warning("aiohttp not installed — /health endpoint disabled")
+            return
+
+        async def health_handler(_request: Any) -> Any:
+            now = time.time()
+            uptime = now - self._started_at
+            checks: dict[str, str] = {}
+            healthy = True
+
+            if self._consumer_subscribed:
+                checks["consumer"] = "connected"
+            else:
+                checks["consumer"] = "disconnected"
+                healthy = False
+
+            checks["clips_generated"] = str(self._clips_generated)
+
+            body = {
+                "status": "ok" if healthy else "unhealthy",
+                "uptime_seconds": int(uptime),
+                "checks": checks,
+            }
+            return web.json_response(body, status=200 if healthy else 503)
+
+        app = web.Application()
+        app.router.add_get("/health", health_handler)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", self.settings.health_port)
+        await site.start()
+        self._health_runner = runner
+        logger.info("Health server on port %d", self.settings.health_port)
 
     async def shutdown(self) -> None:
         """Flush and close all external resources."""
@@ -149,7 +192,13 @@ class ClipService:
         if self._producer is not None:
             await asyncio.to_thread(self._producer.flush, 5.0)
         if self._consumer is not None:
+            self._consumer_subscribed = False
             self._consumer.close()
+        if self._health_runner is not None:
+            try:
+                await self._health_runner.cleanup()
+            except Exception:
+                pass
         if self._pool is not None:
             await self._pool.close()
         logger.info("Clip service shut down")
@@ -300,6 +349,7 @@ class ClipService:
         CLIP_THUMBNAILS_GENERATED_TOTAL.inc()
         CLIP_SIZE_BYTES.observe(clip_size)
         CLIP_EXTRACTION_LATENCY_MS.observe((time.perf_counter() - started_at) * 1000.0)
+        self._clips_generated += 1
 
     def _publish_completion(self, event: Any, clip_uri: str) -> None:
         frame_payload = build_completion_frame_ref(event, clip_uri)

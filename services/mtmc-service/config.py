@@ -48,6 +48,7 @@ class MTMCSettings(BaseSettings):
     cross_zone_batch_interval_s: float = 5.0
 
     metrics_port: int = 8080
+    health_port: int = 8081
     log_level: str = "INFO"
 
     @classmethod

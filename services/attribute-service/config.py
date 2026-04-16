@@ -49,6 +49,7 @@ class AttributeSettings(BaseSettings):
     model_version: str = "1.0.0"
 
     metrics_port: int = 8080
+    health_port: int = 8081
     log_level: str = "INFO"
 
     @classmethod

@@ -304,6 +304,14 @@ services:
       - "host.docker.internal:host-gateway"
     mem_limit: 256m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://localhost:1984/api/config || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   mlflow:
     image: python:3.11-slim
@@ -364,6 +372,14 @@ services:
       - "host.docker.internal:host-gateway"
     mem_limit: 512m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:8081/health'); assert r.status==200"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   ingress-bridge:
     build:
@@ -384,6 +400,14 @@ services:
       - ./dev/ingress-bridge.yaml:/app/config.yaml:ro
     mem_limit: 512m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:8080/ready'); assert r.status==200"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   decode-service:
     build:
@@ -408,9 +432,18 @@ services:
       DECODE_MINIO__DECODED_BUCKET: decoded-frames
       DECODE_SAMPLER__TARGET_FPS: "5.0"
       DECODE_METRICS_PORT: "9090"
+      DECODE_HEALTH_PORT: "8081"
       DECODE_LOG_LEVEL: INFO
     mem_limit: 512m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:8081/health'); assert r.status==200"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   inference-worker:
     build:
@@ -452,6 +485,14 @@ services:
       INFERENCE_LOG_LEVEL: INFO
     mem_limit: 1g
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:9091/health'); assert r.status==200"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   attribute-service:
     build:
@@ -473,9 +514,18 @@ services:
       ATTR_MINIO_SECURE: "false"
       ATTR_MINIO_FRAME_BUCKET: frame-blobs
       ATTR_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+      ATTR_HEALTH_PORT: "8081"
       ATTR_LOG_LEVEL: INFO
     mem_limit: 512m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:8081/health'); assert r.status==200"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   event-engine:
     build:
@@ -494,9 +544,18 @@ services:
       EVENT_KAFKA_OUTPUT_TOPIC: events.raw
       EVENT_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
       EVENT_MOTION_EVENTS_ENABLED: "false"
+      EVENT_HEALTH_PORT: "8081"
       EVENT_LOG_LEVEL: INFO
     mem_limit: 512m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:8081/health'); assert r.status==200"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   clip-service:
     build:
@@ -519,9 +578,18 @@ services:
       CLIP_MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
       CLIP_MINIO_SECURE: "false"
       CLIP_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
+      CLIP_HEALTH_PORT: "8081"
       CLIP_LOG_LEVEL: INFO
     mem_limit: 512m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:8081/health'); assert r.status==200"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   mtmc-service:
     build:
@@ -546,9 +614,18 @@ services:
       MTMC_MINIO_BUCKET: mtmc-checkpoints
       MTMC_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
       MTMC_SITE_ID: "00000000-0000-0000-0000-000000000001"
+      MTMC_HEALTH_PORT: "8081"
       MTMC_LOG_LEVEL: INFO
     mem_limit: 1024m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:8081/health'); assert r.status==200"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   bulk-collector:
     build:
@@ -572,6 +649,14 @@ services:
       BULK_LOG_LEVEL: INFO
     mem_limit: 512m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:8080/ready'); assert r.status==200"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   query-api:
     build:
@@ -602,6 +687,14 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     mem_limit: 512m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; r=urllib.request.urlopen('http://localhost:8000/health'); assert r.status==200"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   frontend:
     build:
@@ -618,6 +711,14 @@ services:
       API_URL: "http://query-api:8000"
     mem_limit: 256m
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   kafka_0_data:

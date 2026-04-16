@@ -40,6 +40,7 @@ class ClipServiceSettings(BaseSettings):
 
     temp_dir: str = "/tmp/clip-service"
     metrics_port: int = 8080
+    health_port: int = 8081
     log_level: str = "INFO"
 
     @classmethod

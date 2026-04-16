@@ -19,6 +19,7 @@ import asyncio
 import logging
 import signal
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -102,6 +103,9 @@ class AttributeService:
         self._aggregator = TrackAggregator()
         self._minio: Any = None
         self._flush_task: asyncio.Task[None] | None = None
+        self._started_at: float = time.time()
+        self._consumer_subscribed: bool = False
+        self._health_runner: Any = None
 
     async def start(self) -> None:
         """Initialise subsystems and start consuming."""
@@ -124,9 +128,46 @@ class AttributeService:
         start_http_server(self.settings.metrics_port)
         logger.info("Metrics server on port %d", self.settings.metrics_port)
 
+        await self._start_health_server()
+
         self._flush_task = asyncio.create_task(self._periodic_flush())
 
         await self._consume_loop()
+
+    async def _start_health_server(self) -> None:
+        try:
+            from aiohttp import web  # noqa: PLC0415
+        except ImportError:
+            logger.warning("aiohttp not installed — /health endpoint disabled")
+            return
+
+        async def health_handler(_request: Any) -> Any:
+            now = time.time()
+            uptime = now - self._started_at
+            checks: dict[str, str] = {}
+            healthy = True
+
+            if self._consumer_subscribed:
+                checks["consumer"] = "connected"
+            else:
+                checks["consumer"] = "disconnected"
+                healthy = False
+
+            body = {
+                "status": "ok" if healthy else "unhealthy",
+                "uptime_seconds": int(uptime),
+                "checks": checks,
+            }
+            return web.json_response(body, status=200 if healthy else 503)
+
+        app = web.Application()
+        app.router.add_get("/health", health_handler)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", self.settings.health_port)
+        await site.start()
+        self._health_runner = runner
+        logger.info("Health server on port %d", self.settings.health_port)
 
     async def shutdown(self) -> None:
         """Graceful shutdown."""
@@ -135,6 +176,11 @@ class AttributeService:
             self._flush_task.cancel()
         if self._db is not None:
             await self._db.flush_buffer()
+        if self._health_runner is not None:
+            try:
+                await self._health_runner.cleanup()
+            except Exception:
+                pass
         if self._pool is not None:
             await self._pool.close()
         logger.info("Attribute service shut down")
@@ -158,6 +204,7 @@ class AttributeService:
 
         consumer = Consumer(consumer_config)
         consumer.subscribe([cfg.kafka_topic])
+        self._consumer_subscribed = True
 
         TrackletType = _load_tracklet_type()
         logger.info(
@@ -197,6 +244,7 @@ class AttributeService:
                 if self._db is not None and self._db.buffer_size >= cfg.flush_batch_size:
                     await self._db.flush_buffer()
         finally:
+            self._consumer_subscribed = False
             consumer.close()
 
     # ------------------------------------------------------------------

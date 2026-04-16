@@ -34,6 +34,7 @@ class EventEngineSettings(BaseSettings):
     motion_events_enabled: bool = False
 
     metrics_port: int = 8080
+    health_port: int = 8081
     log_level: str = "INFO"
 
     @classmethod
