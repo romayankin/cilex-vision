@@ -594,6 +594,12 @@ services:
       QUERY_JWT__SECRET_KEY: "${JWT_SECRET:-pilot-jwt-secret-change-me}"
       STORAGE_QUOTA_PERCENT: "${STORAGE_QUOTA_PERCENT:-50}"
       QUERY_LOG_LEVEL: INFO
+    volumes:
+      # Docker socket for ServiceWatchdog (container list / restart / logs).
+      # ":ro" only protects the socket file from being replaced — Docker API
+      # commands sent over the socket still execute. Container runs as root
+      # (image default), so no group_add gymnastics needed.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     mem_limit: 512m
     restart: unless-stopped
 

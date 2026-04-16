@@ -28,6 +28,7 @@ from prometheus_client import make_asgi_app
 from auth.audit import AuditMiddleware
 from config import Settings
 from metrics import CONCURRENT_REQUESTS, CONCURRENT_REQUESTS_HIGH_WATER
+from service_watchdog import ServiceWatchdog
 from storage_watchdog import StorageWatchdog
 from routers import (
     audit as audit_router,
@@ -39,6 +40,7 @@ from routers import (
     inference,
     lpr,
     pipeline,
+    services as services_router,
     settings as settings_router,
     similarity,
     storage,
@@ -107,6 +109,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.storage_watchdog = watchdog
     await watchdog.start()
 
+    # Microservice health watchdog (auto-restart with backoff)
+    service_watchdog = ServiceWatchdog(db_pool=pool)
+    app.state.service_watchdog = service_watchdog
+    try:
+        await service_watchdog.start()
+    except Exception as exc:  # noqa: BLE001 — Docker socket may be unavailable in some envs
+        logger.warning("ServiceWatchdog start failed (Docker socket missing?): %s", exc)
+        app.state.service_watchdog = None
+
     # Periodic reset of the concurrency high-water mark
     high_water_task = asyncio.create_task(_reset_high_water())
     app.state.high_water_task = high_water_task
@@ -127,6 +138,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except (asyncio.CancelledError, Exception):
         pass
     await watchdog.stop()
+    sw = getattr(app.state, "service_watchdog", None)
+    if sw is not None:
+        await sw.stop()
     if pool is not None:
         await pool.close()
         logger.info("Database pool closed")
@@ -175,6 +189,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(audit_router.router)
     app.include_router(inference.router)
     app.include_router(zones.router)
+    app.include_router(services_router.router)
 
     # Prometheus metrics
     metrics_app = make_asgi_app()
