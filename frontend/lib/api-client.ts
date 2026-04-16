@@ -206,6 +206,7 @@ export interface EventQuery {
   end?: string;
   event_type?: string;
   state?: string;
+  has_clip?: boolean;
   offset?: number;
   limit?: number;
 }
@@ -293,7 +294,18 @@ export async function getTrackDetail(localTrackId: string): Promise<TrackDetailR
 }
 
 export async function getEvents(q: EventQuery = {}): Promise<EventListResponse> {
-  return apiFetch<EventListResponse>("/events", q as Record<string, string | number | undefined>);
+  const params: Record<string, string | number | undefined> = {
+    site_id: q.site_id,
+    camera_id: q.camera_id,
+    start: q.start,
+    end: q.end,
+    event_type: q.event_type,
+    state: q.state,
+    has_clip: q.has_clip === undefined ? undefined : q.has_clip ? "true" : "false",
+    offset: q.offset,
+    limit: q.limit,
+  };
+  return apiFetch<EventListResponse>("/events", params);
 }
 
 export async function getTopology(siteId: string): Promise<TopologyResponse> {

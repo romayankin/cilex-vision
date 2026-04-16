@@ -49,6 +49,9 @@ async def list_events(
     end: Optional[datetime] = Query(None, description="Events starting before this time"),
     event_type: Optional[str] = Query(None, description="Filter by event type"),
     state: Optional[str] = Query(None, description="Filter by event state"),
+    has_clip: Optional[bool] = Query(
+        None, description="Filter to events with (true) or without (false) clips"
+    ),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
     user: UserClaims = Depends(get_current_user),
@@ -116,6 +119,12 @@ async def list_events(
             param_idx += 1
             conditions.append(f"e.state = ANY(${param_idx})")
             args.append(states)
+
+    if has_clip is not None:
+        if has_clip:
+            conditions.append("e.clip_uri IS NOT NULL")
+        else:
+            conditions.append("e.clip_uri IS NULL")
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 

@@ -34,6 +34,8 @@ interface ResultCardProps {
   thumbnailUrl?: string | null;
   clipUrl?: string | null;
   attributes?: { attribute_type: string; color_value: string; confidence: number }[];
+  metadata?: Record<string, unknown> | null;
+  durationMs?: number | null;
 }
 
 export default function ResultCard({
@@ -45,19 +47,39 @@ export default function ResultCard({
   thumbnailUrl,
   clipUrl,
   attributes,
+  metadata,
+  durationMs,
 }: ResultCardProps) {
   const badgeClass = CLASS_COLORS[objectClass] ?? "bg-gray-100 text-gray-800";
   const ts = new Date(timestamp);
   const timeStr = ts.toLocaleString();
+  const zoneName =
+    metadata && typeof metadata.zone_name === "string" ? (metadata.zone_name as string) : null;
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-      {/* Thumbnail or placeholder */}
-      <div className="h-32 bg-gray-100 flex items-center justify-center">
-        {thumbnailUrl ? (
+      {/* Media — video clip, thumbnail, or placeholder */}
+      <div className="h-40 bg-gray-100 flex items-center justify-center relative">
+        {clipUrl ? (
+          <video
+            src={clipUrl}
+            controls
+            preload="metadata"
+            className="h-full w-full object-cover"
+            playsInline
+            muted
+          >
+            <source src={clipUrl} type="video/mp4" />
+          </video>
+        ) : thumbnailUrl ? (
           <img src={thumbnailUrl} alt="Thumbnail" className="h-full w-full object-cover" />
         ) : (
-          <span className="text-gray-400 text-sm">No thumbnail</span>
+          <span className="text-gray-400 text-sm">No media</span>
+        )}
+        {clipUrl && (
+          <span className="absolute top-1.5 right-1.5 bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+            CLIP
+          </span>
         )}
       </div>
 
@@ -76,6 +98,16 @@ export default function ResultCard({
           <span>{(confidence * 100).toFixed(0)}%</span>
         </div>
 
+        {zoneName && (
+          <div className="text-[10px] text-purple-600 truncate">📍 {zoneName}</div>
+        )}
+
+        {durationMs != null && (
+          <div className="text-[10px] text-gray-500">
+            Duration: {(durationMs / 1000).toFixed(1)}s
+          </div>
+        )}
+
         {/* Color attributes */}
         {attributes && attributes.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -89,28 +121,16 @@ export default function ResultCard({
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-1">
-          {trackId && (
+        {trackId && (
+          <div className="flex items-center gap-2 pt-1">
             <Link
               href={`/timeline/${cameraId}?track=${trackId}`}
               className="text-xs text-blue-600 hover:underline"
             >
               View timeline
             </Link>
-          )}
-          {clipUrl ? (
-            <a
-              href={clipUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-blue-600 hover:underline"
-            >
-              View clip
-            </a>
-          ) : (
-            <span className="text-xs text-gray-400">No clip</span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

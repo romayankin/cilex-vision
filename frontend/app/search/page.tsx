@@ -26,6 +26,8 @@ type ResultItem = {
   thumbnailUrl?: string | null;
   clipUrl?: string | null;
   attributes?: { attribute_type: string; color_value: string; confidence: number }[];
+  metadata?: Record<string, unknown> | null;
+  durationMs?: number | null;
 };
 
 function parseFiltersFromParams(params: URLSearchParams): FilterState {
@@ -65,7 +67,17 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [thumbOnly, setThumbOnly] = useState(true);
+  const [clipsOnly, setClipsOnly] = useState(false);
   const requestIdRef = useRef(0);
+
+  const handleThumbOnlyChange = (v: boolean) => {
+    setThumbOnly(v);
+    if (v) setClipsOnly(false);
+  };
+  const handleClipsOnlyChange = (v: boolean) => {
+    setClipsOnly(v);
+    if (v) setThumbOnly(false);
+  };
 
   const [nlpQuery, setNlpQuery] = useState("");
   const [nlpLoading, setNlpLoading] = useState(false);
@@ -138,7 +150,12 @@ export default function SearchPage() {
   }, [filters]);
 
   const doSearch = useCallback(
-    async (currentFilters: FilterState, currentThumbOnly: boolean, newOffset: number) => {
+    async (
+      currentFilters: FilterState,
+      currentThumbOnly: boolean,
+      currentClipsOnly: boolean,
+      newOffset: number,
+    ) => {
       setLoading(true);
       setError(null);
 
@@ -155,7 +172,34 @@ export default function SearchPage() {
         const items: ResultItem[] = [];
         let fetchedTotal = 0;
 
-        if (currentFilters.event_type) {
+        if (currentClipsOnly) {
+          const res = await getEvents({
+            camera_id: currentFilters.camera_id || undefined,
+            start: currentFilters.start || undefined,
+            end: currentFilters.end || undefined,
+            event_type: currentFilters.event_type || undefined,
+            state: currentFilters.state || undefined,
+            has_clip: true,
+            offset: newOffset,
+            limit: PAGE_SIZE,
+          });
+          fetchedTotal = res.total;
+          for (const ev of res.events) {
+            items.push({
+              kind: "event",
+              id: ev.event_id,
+              trackId: ev.track_id,
+              cameraId: ev.camera_id,
+              objectClass: ev.event_type,
+              timestamp: ev.start_time,
+              confidence: 1.0,
+              clipUrl: ev.clip_url,
+              thumbnailUrl: null,
+              metadata: ev.metadata,
+              durationMs: ev.duration_ms,
+            });
+          }
+        } else if (currentFilters.event_type) {
           const res = await getEvents({
             camera_id: currentFilters.camera_id || undefined,
             start: currentFilters.start || undefined,
@@ -176,6 +220,8 @@ export default function SearchPage() {
               timestamp: ev.start_time,
               confidence: 1.0,
               clipUrl: ev.clip_url,
+              metadata: ev.metadata,
+              durationMs: ev.duration_ms,
             });
           }
         } else if (currentFilters.state) {
@@ -249,8 +295,8 @@ export default function SearchPage() {
   );
 
   useEffect(() => {
-    doSearch(debouncedFilters, thumbOnly, 0);
-  }, [debouncedFilters, thumbOnly, doSearch]);
+    doSearch(debouncedFilters, thumbOnly, clipsOnly, 0);
+  }, [debouncedFilters, thumbOnly, clipsOnly, doSearch]);
 
   const clearAll = () =>
     setFilters({
@@ -377,6 +423,8 @@ export default function SearchPage() {
                 thumbnailUrl={r.thumbnailUrl}
                 clipUrl={r.clipUrl}
                 attributes={r.attributes}
+                metadata={r.metadata}
+                durationMs={r.durationMs}
               />
             ))}
           </div>
@@ -384,7 +432,12 @@ export default function SearchPage() {
           <div className="flex items-center justify-center gap-4 pt-4">
             <button
               onClick={() =>
-                doSearch(debouncedFilters, thumbOnly, Math.max(0, offset - PAGE_SIZE))
+                doSearch(
+                  debouncedFilters,
+                  thumbOnly,
+                  clipsOnly,
+                  Math.max(0, offset - PAGE_SIZE),
+                )
               }
               disabled={offset === 0}
               className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -392,7 +445,9 @@ export default function SearchPage() {
               Previous
             </button>
             <button
-              onClick={() => doSearch(debouncedFilters, thumbOnly, offset + PAGE_SIZE)}
+              onClick={() =>
+                doSearch(debouncedFilters, thumbOnly, clipsOnly, offset + PAGE_SIZE)
+              }
               disabled={offset + PAGE_SIZE >= total}
               className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -412,7 +467,9 @@ export default function SearchPage() {
         filters={filters}
         onChange={setFilters}
         thumbOnly={thumbOnly}
-        onThumbOnlyChange={setThumbOnly}
+        onThumbOnlyChange={handleThumbOnlyChange}
+        clipsOnly={clipsOnly}
+        onClipsOnlyChange={handleClipsOnlyChange}
       />
     </div>
   );

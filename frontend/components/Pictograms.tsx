@@ -521,3 +521,20 @@ export function ThumbnailIcon({ className = "" }: IconProps) {
     </svg>
   );
 }
+
+export function ClipIcon({ className = "" }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`${base} ${className}`}
+    >
+      <rect x="6" y="10" width="28" height="22" rx="2" />
+      <polygon points="17,16 17,28 27,22" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

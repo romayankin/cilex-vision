@@ -13,6 +13,7 @@ import {
   TrackStateGroupIcon,
   TimeGroupIcon,
   ThumbnailIcon,
+  ClipIcon,
 } from "./Pictograms";
 
 const OBJECT_CLASSES = [
@@ -92,6 +93,8 @@ interface FilterSidebarProps {
   onChange: (filters: FilterState) => void;
   thumbOnly: boolean;
   onThumbOnlyChange: (v: boolean) => void;
+  clipsOnly: boolean;
+  onClipsOnlyChange: (v: boolean) => void;
 }
 
 function toSet(csv: string): Set<string> {
@@ -200,6 +203,8 @@ export default function FilterSidebar({
   onChange,
   thumbOnly,
   onThumbOnlyChange,
+  clipsOnly,
+  onClipsOnlyChange,
 }: FilterSidebarProps) {
   const [open, setOpen] = useState<GroupId | null>(null);
   const [streams, setStreams] = useState<StreamInfo[]>([]);
@@ -721,6 +726,21 @@ export default function FilterSidebar({
             }`}
           >
             <ThumbnailIcon className="w-6 h-6" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onClipsOnlyChange(!clipsOnly)}
+            title={clipsOnly ? "Clips only — ON" : "Clips only — OFF"}
+            aria-label="Toggle clips only"
+            aria-pressed={clipsOnly}
+            className={`relative w-9 h-9 rounded flex items-center justify-center transition ${
+              clipsOnly
+                ? "bg-purple-600 text-white"
+                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            }`}
+          >
+            <ClipIcon className="w-6 h-6" />
           </button>
         </div>
       </div>
