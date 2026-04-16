@@ -74,6 +74,64 @@ async def detection_counts(
 
 
 @router.get(
+    "/color-counts",
+    dependencies=[require_role("admin", "operator", "viewer", "engineering")],
+)
+async def detection_color_counts(
+    request: Request,
+    camera_id: Optional[str] = Query(None, description="Filter by camera ID (comma-separated for multiple)"),
+    user: UserClaims = Depends(get_current_user),
+) -> dict[str, int]:
+    """Return count of distinct tracks grouped by color attribute value.
+
+    Colors come from ``track_attributes`` (vehicle_color, person_upper_color,
+    person_lower_color). A track contributes once per distinct color it has
+    — so a red car with a red person_upper counts as 1 red, not 2.
+    """
+    request.state.audit_user_id = user.user_id
+    request.state.audit_username = user.username
+
+    pool = request.app.state.db_pool
+    camera_filter = get_camera_filter(user)
+
+    conditions: list[str] = []
+    args: list[object] = []
+    param_idx = 0
+
+    if camera_id:
+        cams = [c.strip() for c in camera_id.split(",") if c.strip()]
+        if len(cams) == 1:
+            param_idx += 1
+            conditions.append(f"lt.camera_id = ${param_idx}")
+            args.append(cams[0])
+        elif len(cams) > 1:
+            param_idx += 1
+            conditions.append(f"lt.camera_id = ANY(${param_idx})")
+            args.append(cams)
+
+    if camera_filter is not None:
+        param_idx += 1
+        conditions.append(f"lt.camera_id = ANY(${param_idx})")
+        args.append(camera_filter)
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    rows = await fetch_rows(
+        pool,
+        f"""
+        SELECT ta.color_value, COUNT(DISTINCT ta.local_track_id) AS count
+        FROM track_attributes ta
+        JOIN local_tracks lt ON lt.local_track_id = ta.local_track_id
+        {where}
+        GROUP BY ta.color_value
+        """,
+        args,
+        query_type="detection_color_counts",
+    )
+    return {row["color_value"]: int(row["count"]) for row in rows}
+
+
+@router.get(
     "",
     response_model=DetectionListResponse,
     dependencies=[require_role("admin", "operator", "viewer", "engineering")],

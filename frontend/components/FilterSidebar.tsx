@@ -167,6 +167,21 @@ function clampToViewport(pos: { x: number; y: number }): { x: number; y: number 
   };
 }
 
+function formatCount(n: number | undefined): string {
+  if (n == null) return "—";
+  if (n < 1000) return n.toLocaleString();
+  if (n < 10_000) {
+    return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  }
+  if (n < 1_000_000) {
+    return `${Math.round(n / 1000)}k`;
+  }
+  if (n < 10_000_000) {
+    return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  return `${Math.round(n / 1_000_000)}M`;
+}
+
 function GripHandleIcon() {
   return (
     <svg width="20" height="10" viewBox="0 0 20 10" fill="none" className="text-gray-400">
@@ -190,6 +205,7 @@ export default function FilterSidebar({
   const [streams, setStreams] = useState<StreamInfo[]>([]);
   const [streamsFailed, setStreamsFailed] = useState(false);
   const [classCounts, setClassCounts] = useState<Record<string, number>>({});
+  const [colorCounts, setColorCounts] = useState<Record<string, number>>({});
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 80 });
   const [mounted, setMounted] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -279,6 +295,22 @@ export default function FilterSidebar({
       .then((r) => (r.ok ? r.json() : {}))
       .then((d) => {
         if (!cancelled) setClassCounts(d ?? {});
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [filters.camera_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const url = filters.camera_id
+      ? `/api/detections/color-counts?camera_id=${encodeURIComponent(filters.camera_id)}`
+      : "/api/detections/color-counts";
+    fetch(url, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((d) => {
+        if (!cancelled) setColorCounts(d ?? {});
       })
       .catch(() => {});
     return () => {
@@ -461,6 +493,7 @@ export default function FilterSidebar({
                 const bg = COLOR_MAP[c];
                 const isLight =
                   c === "white" || c === "silver" || c === "yellow" || c === "unknown";
+                const count = colorCounts[c];
                 return (
                   <button
                     key={c}
@@ -497,7 +530,9 @@ export default function FilterSidebar({
                         </svg>
                       )}
                     </span>
-                    <span className="text-[9px] text-gray-600 capitalize">{c}</span>
+                    <span className="text-[9px] font-mono text-gray-500 tabular-nums">
+                      {formatCount(count)}
+                    </span>
                   </button>
                 );
               })}
