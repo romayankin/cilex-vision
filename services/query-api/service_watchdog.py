@@ -32,9 +32,9 @@ POLL_INTERVAL_S = 30
 BACKOFF_SCHEDULE = [30, 60, 300]  # seconds — wait AFTER each attempt before re-checking
 
 # Containers we should never auto-restart (one-shot init jobs).
-IGNORE_CONTAINERS: set[str] = {"minio-init"}
+IGNORE_CONTAINERS: set[str] = {"minio-init", "ollama-init"}
 # Containers that are expected to exit cleanly after their work is done.
-ONESHOT_CONTAINERS: set[str] = {"minio-init"}
+ONESHOT_CONTAINERS: set[str] = {"minio-init", "ollama-init"}
 
 
 @dataclass

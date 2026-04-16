@@ -292,6 +292,45 @@ services:
       retries: 10
       start_period: 30s
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: "5m"
+    mem_limit: 2g
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -sf http://localhost:11434/api/tags || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        echo "Checking if gemma2:2b is already pulled...";
+        if OLLAMA_HOST=http://ollama:11434 ollama show gemma2:2b > /dev/null 2>&1; then
+          echo "Model already present.";
+        else
+          echo "Pulling gemma2:2b (~1.5 GB, one-time download)...";
+          OLLAMA_HOST=http://ollama:11434 ollama pull gemma2:2b;
+        fi;
+        echo "Model ready.";
+    restart: "no"
+
   go2rtc:
     image: alexxit/go2rtc:latest
     container_name: go2rtc
@@ -668,6 +707,8 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
@@ -678,6 +719,9 @@ services:
       QUERY_MINIO__SECURE: "false"
       QUERY_JWT__SECRET_KEY: "${JWT_SECRET:-pilot-jwt-secret-change-me}"
       STORAGE_QUOTA_PERCENT: "${STORAGE_QUOTA_PERCENT:-50}"
+      OLLAMA_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "gemma2:2b"
+      OLLAMA_TIMEOUT: "60"
       QUERY_LOG_LEVEL: INFO
     volumes:
       # Docker socket for ServiceWatchdog (container list / restart / logs).
@@ -730,3 +774,4 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+  ollama_data:

@@ -92,6 +92,7 @@ DEPENDENCY_MAP: dict[str, list[str]] = {
     "kafka-ui": ["kafka-0"],
     "grafana": ["prometheus"],
     "minio-init": ["minio"],
+    "ollama-init": ["ollama"],
 }
 
 

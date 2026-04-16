@@ -39,6 +39,7 @@ from routers import (
     events,
     inference,
     lpr,
+    nlp_search,
     pipeline,
     pipeline_metrics,
     services as services_router,
@@ -192,6 +193,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(inference.router)
     app.include_router(zones.router)
     app.include_router(services_router.router)
+    app.include_router(nlp_search.router)
 
     # Prometheus metrics
     metrics_app = make_asgi_app()

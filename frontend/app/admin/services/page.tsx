@@ -103,6 +103,12 @@ const SERVICE_CATALOG: Record<string, ServiceMeta> = {
   },
 
   // P2 — degraded but system runs
+  ollama: {
+    description:
+      "Local AI model server (Ollama). Runs Gemma 2 2B for natural language search query parsing. Model loaded into RAM on demand, unloaded after 5 min idle.",
+    priority: "P2",
+    priorityLabel: "If this stops, AI search returns to manual filters only",
+  },
   "attribute-service": {
     description:
       "Classifies track attributes (vehicle color, person clothing color). Enriches detections with metadata for filtering. Pipeline works without it but color filters are empty.",
@@ -165,6 +171,12 @@ const SERVICE_CATALOG: Record<string, ServiceMeta> = {
     priority: "P3",
     priorityLabel: "Runs once at startup to create storage buckets, then exits — this is normal",
   },
+  "ollama-init": {
+    description:
+      "One-shot container that pulls the Gemma 2 2B model on first startup (~1.5 GB download). Expected to exit after completing its job.",
+    priority: "P3",
+    priorityLabel: "Runs once to download AI model, then exits — this is normal",
+  },
 };
 
 const UNKNOWN_SERVICE: ServiceMeta = {
@@ -188,9 +200,10 @@ function metaFor(name: string): ServiceMeta {
   return SERVICE_CATALOG[name] ?? UNKNOWN_SERVICE;
 }
 
-// minio-init exits cleanly by design — don't count it as down.
+// One-shot init containers exit cleanly by design — don't count them as down.
+const ONESHOT_CONTAINERS = new Set(["minio-init", "ollama-init"]);
 function isDown(svc: Service): boolean {
-  if (svc.name === "minio-init" && svc.status === "exited" && svc.exit_code === 0) {
+  if (ONESHOT_CONTAINERS.has(svc.name) && svc.status === "exited" && svc.exit_code === 0) {
     return false;
   }
   return svc.status !== "running";

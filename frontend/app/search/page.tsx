@@ -67,6 +67,69 @@ export default function SearchPage() {
   const [thumbOnly, setThumbOnly] = useState(true);
   const requestIdRef = useRef(0);
 
+  const [nlpQuery, setNlpQuery] = useState("");
+  const [nlpLoading, setNlpLoading] = useState(false);
+  const [nlpExplanation, setNlpExplanation] = useState<string | null>(null);
+  const [nlpError, setNlpError] = useState<string | null>(null);
+  const [nlpAvailable, setNlpAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/search/nlp/status", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setNlpAvailable(d.available === true))
+      .catch(() => setNlpAvailable(false));
+  }, []);
+
+  async function handleNlpSearch() {
+    if (!nlpQuery.trim() || !nlpAvailable) return;
+    setNlpLoading(true);
+    setNlpError(null);
+    setNlpExplanation(null);
+
+    try {
+      const res = await fetch("/api/search/nlp", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: nlpQuery }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setNlpError(body.detail || `HTTP ${res.status}`);
+        return;
+      }
+
+      const data = await res.json();
+
+      if (data.parse_error) {
+        setNlpError(data.explanation);
+        return;
+      }
+
+      if (data.filters && Object.keys(data.filters).length > 0) {
+        setFilters((prev) => ({
+          ...prev,
+          camera_id: data.filters.camera_id || prev.camera_id,
+          object_class: data.filters.object_class || prev.object_class,
+          event_type: data.filters.event_type || prev.event_type,
+          start: data.filters.start || prev.start,
+          end: data.filters.end || prev.end,
+          color: data.filters.color || prev.color,
+          state: data.filters.state || prev.state,
+        }));
+      }
+
+      if (data.explanation) {
+        setNlpExplanation(data.explanation);
+      }
+    } catch (err) {
+      setNlpError(err instanceof Error ? err.message : "Search failed");
+    } finally {
+      setNlpLoading(false);
+    }
+  }
+
   useEffect(() => {
     const id = window.setTimeout(() => {
       setDebouncedFilters((prev) => (filtersEqual(prev, filters) ? prev : filters));
@@ -225,6 +288,69 @@ export default function SearchPage() {
           )}
         </div>
       </div>
+
+      <div className="flex gap-2">
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            value={nlpQuery}
+            onChange={(e) => setNlpQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleNlpSearch()}
+            placeholder={
+              nlpAvailable === false
+                ? "AI search unavailable — Ollama not running"
+                : nlpAvailable === null
+                  ? "Checking AI search availability..."
+                  : 'Try: "person entering server room Monday morning"'
+            }
+            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:text-gray-500"
+            disabled={nlpLoading || nlpAvailable === false}
+          />
+          {nlpLoading && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleNlpSearch}
+          disabled={nlpLoading || !nlpQuery.trim() || nlpAvailable !== true}
+          className="px-4 py-2.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+        >
+          {nlpLoading ? "Thinking..." : "AI Search"}
+        </button>
+      </div>
+
+      {nlpExplanation && (
+        <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-800">
+          <span className="text-blue-500 mt-0.5 flex-shrink-0">✨</span>
+          <div>
+            <span className="font-medium">AI understood:</span> {nlpExplanation}
+          </div>
+          <button
+            type="button"
+            onClick={() => setNlpExplanation(null)}
+            className="ml-auto text-blue-400 hover:text-blue-600 text-xs flex-shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {nlpError && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
+          <span className="flex-shrink-0">⚠</span>
+          <div>{nlpError}</div>
+          <button
+            type="button"
+            onClick={() => setNlpError(null)}
+            className="ml-auto text-amber-400 hover:text-amber-600 text-xs flex-shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
