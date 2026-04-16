@@ -88,6 +88,7 @@ class LoiteringZone:
     zone_id: str
     polygon: Polygon
     duration_s: float
+    name: str = ""
 
 
 @dataclass(frozen=True)
@@ -161,11 +162,13 @@ class CameraZones:
                 or raw_zone.get("loitering_duration_s")
                 or default_loitering_duration_s
             )
+            name = str(raw_zone.get("name") or "")
             loitering_zones.append(
                 LoiteringZone(
                     zone_id=zone_id,
                     polygon=polygon,
                     duration_s=duration_s,
+                    name=name,
                 )
             )
 
@@ -577,7 +580,7 @@ class TrackStateMachine:
             event_id=str(uuid.uuid4()),
             event_type=EventType.LOITERING,
             start_time=start_time,
-            metadata={"zone_id": zone.zone_id},
+            metadata={"zone_id": zone.zone_id, "zone_name": zone.name},
         )
         self._loitering_events[zone.zone_id] = active_event
         return EventTrigger(

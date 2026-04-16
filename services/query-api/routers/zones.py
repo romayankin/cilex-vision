@@ -26,6 +26,58 @@ class ZoneConfig(BaseModel):
     loitering_zones: list[dict[str, Any]] | None = None
 
 
+@router.get("/cameras/context")
+async def cameras_context(
+    request: Request,
+    user: UserClaims = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Camera + zone metadata for AI search context.
+
+    Returns one row per camera with its location_description and the
+    list of loitering zones (zone_id, name, duration_s) so the AI
+    layer can map natural-language queries like "server room" to the
+    underlying zone_id without re-reading config_json.
+    """
+    pool = request.app.state.db_pool
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT camera_id, name, location_description, config_json "
+            "FROM cameras ORDER BY camera_id"
+        )
+
+    cameras: list[dict[str, Any]] = []
+    for row in rows:
+        config = row["config_json"] or {}
+        if isinstance(config, str):
+            try:
+                config = json.loads(config)
+            except json.JSONDecodeError:
+                config = {}
+
+        zones: list[dict[str, Any]] = []
+        for z in config.get("loitering_zones") or []:
+            if not isinstance(z, dict):
+                continue
+            zones.append(
+                {
+                    "zone_id": z.get("zone_id", ""),
+                    "name": z.get("name", ""),
+                    "duration_s": z.get("duration_s", 0),
+                }
+            )
+
+        cameras.append(
+            {
+                "camera_id": row["camera_id"],
+                "name": row["name"],
+                "location_description": row["location_description"] or "",
+                "zones": zones,
+            }
+        )
+
+    return {"cameras": cameras}
+
+
 @router.get("/cameras/{camera_id}/zones")
 async def get_camera_zones(
     camera_id: str,

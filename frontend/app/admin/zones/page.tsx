@@ -9,6 +9,7 @@ interface LoiteringZone {
   zone_id: string;
   polygon: Point[];
   duration_s: number;
+  name: string;
 }
 
 interface ZoneConfig {
@@ -105,6 +106,7 @@ export default function ZonesPage() {
             zone_id: z.zone_id,
             polygon: z.polygon,
             duration_s: z.duration_s ?? DEFAULT_ZONE_DURATION_S,
+            name: z.name ?? "",
           })),
         );
         setDraft([]);
@@ -215,6 +217,7 @@ export default function ZonesPage() {
           zone_id: `zone-${Date.now()}`,
           polygon: draft,
           duration_s: DEFAULT_ZONE_DURATION_S,
+          name: "",
         },
       ]);
     }
@@ -241,6 +244,15 @@ export default function ZonesPage() {
       const copy = prev.slice();
       if (copy[index]) {
         copy[index] = { ...copy[index], zone_id: zoneId };
+      }
+      return copy;
+    });
+
+  const updateZoneName = (index: number, name: string) =>
+    setZones((prev) => {
+      const copy = prev.slice();
+      if (copy[index]) {
+        copy[index] = { ...copy[index], name };
       }
       return copy;
     });
@@ -286,6 +298,7 @@ export default function ZonesPage() {
             zone_id: z.zone_id,
             polygon: z.polygon,
             duration_s: z.duration_s,
+            name: z.name,
           })),
         }),
       });
@@ -570,6 +583,18 @@ export default function ZonesPage() {
                         className="w-16 border border-gray-300 rounded px-1.5 py-0.5 text-xs"
                       />
                       s
+                    </label>
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      value={zone.name}
+                      onChange={(e) => updateZoneName(i, e.target.value)}
+                      placeholder="e.g., Server Room, Main Entrance"
+                      className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
+                    />
+                    <label className="text-[10px] text-gray-500">
+                      Zone name (used for AI search)
                     </label>
                   </div>
                 </div>
