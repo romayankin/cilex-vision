@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ClockPicker from "./ClockPicker";
 import {
   OBJECT_CLASS_ICONS,
@@ -128,6 +128,58 @@ const GROUPS: { id: GroupId; title: string; Icon: (p: { className?: string }) =>
   { id: "time", title: "Time range", Icon: TimeGroupIcon },
 ];
 
+const STORAGE_KEY = "cilex-filter-sidebar-position";
+const SIDEBAR_WIDTH = 44;
+const SIDEBAR_MARGIN = 20;
+const FLYOUT_WIDTH = 256;
+const FLYOUT_GAP = 8;
+const ESTIMATED_SIDEBAR_HEIGHT = 400;
+
+function getDefaultPosition(): { x: number; y: number } {
+  if (typeof window === "undefined") return { x: 0, y: 80 };
+  return {
+    x: window.innerWidth - SIDEBAR_WIDTH - SIDEBAR_MARGIN,
+    y: 80,
+  };
+}
+
+function loadPosition(): { x: number; y: number } {
+  if (typeof window === "undefined") return { x: 0, y: 80 };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.x === "number" && typeof parsed.y === "number") {
+        return parsed;
+      }
+    }
+  } catch {}
+  return getDefaultPosition();
+}
+
+function clampToViewport(pos: { x: number; y: number }): { x: number; y: number } {
+  if (typeof window === "undefined") return pos;
+  const maxX = window.innerWidth - SIDEBAR_WIDTH;
+  const maxY = window.innerHeight - Math.min(ESTIMATED_SIDEBAR_HEIGHT, window.innerHeight - 40);
+  return {
+    x: Math.max(0, Math.min(pos.x, maxX)),
+    y: Math.max(0, Math.min(pos.y, maxY)),
+  };
+}
+
+function GripHandleIcon() {
+  return (
+    <svg width="20" height="10" viewBox="0 0 20 10" fill="none" className="text-gray-400">
+      <circle cx="4" cy="3" r="1" fill="currentColor" />
+      <circle cx="10" cy="3" r="1" fill="currentColor" />
+      <circle cx="16" cy="3" r="1" fill="currentColor" />
+      <circle cx="4" cy="7" r="1" fill="currentColor" />
+      <circle cx="10" cy="7" r="1" fill="currentColor" />
+      <circle cx="16" cy="7" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
 export default function FilterSidebar({
   filters,
   onChange,
@@ -138,6 +190,63 @@ export default function FilterSidebar({
   const [streams, setStreams] = useState<StreamInfo[]>([]);
   const [streamsFailed, setStreamsFailed] = useState(false);
   const [classCounts, setClassCounts] = useState<Record<string, number>>({});
+  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 80 });
+  const [mounted, setMounted] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setPosition(loadPosition());
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(position));
+    } catch {}
+  }, [position, mounted]);
+
+  useEffect(() => {
+    function handleResize() {
+      setPosition((pos) => clampToViewport(pos));
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const handleGripMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const rect = sidebarRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    dragOffsetRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+    setIsDragging(true);
+    setOpen(null);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    function handleMouseMove(e: MouseEvent) {
+      const newX = e.clientX - dragOffsetRef.current.x;
+      const newY = e.clientY - dragOffsetRef.current.y;
+      setPosition(clampToViewport({ x: newX, y: newY }));
+    }
+    function handleMouseUp() {
+      setIsDragging(false);
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging]);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,11 +323,24 @@ export default function FilterSidebar({
   const startParts = splitDt(filters.start);
   const endParts = splitDt(filters.end);
 
+  const flyoutOpensRight = position.x < FLYOUT_WIDTH + FLYOUT_GAP;
+  const flyoutLeft = flyoutOpensRight
+    ? position.x + SIDEBAR_WIDTH + FLYOUT_GAP
+    : position.x - FLYOUT_WIDTH - FLYOUT_GAP;
+
   return (
-    <div className="relative flex items-start">
-      {/* Flyout panel (to the left of the icon bar) */}
-      {open && (
-        <div className="w-64 bg-white border border-gray-200 rounded-l-lg shadow-sm p-3 mr-[-1px] max-h-[calc(100vh-10rem)] overflow-y-auto">
+    <>
+      {/* Flyout panel — fixed, follows sidebar */}
+      {open && mounted && (
+        <div
+          className="fixed z-30 bg-white border border-gray-200 rounded-lg shadow-xl p-3 overflow-y-auto"
+          style={{
+            left: `${flyoutLeft}px`,
+            top: `${position.y}px`,
+            width: `${FLYOUT_WIDTH}px`,
+            maxHeight: `calc(100vh - ${position.y + 20}px)`,
+          }}
+        >
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">
               {GROUPS.find((g) => g.id === open)?.title}
@@ -502,50 +624,71 @@ export default function FilterSidebar({
         </div>
       )}
 
-      {/* Icon bar */}
-      <div className="w-11 bg-white border border-gray-200 rounded-lg flex flex-col items-center py-2 gap-1 self-start">
-        {GROUPS.map(({ id, title, Icon }) => {
-          const isOpen = open === id;
-          const hasActive = groupActive[id];
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => toggleGroup(id)}
-              title={title}
-              aria-label={title}
-              aria-pressed={isOpen}
-              className={`relative w-9 h-9 rounded flex items-center justify-center transition ${
-                isOpen
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
-            >
-              <Icon className="w-6 h-6" />
-              {hasActive && !isOpen && (
-                <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-blue-500" />
-              )}
-            </button>
-          );
-        })}
-
-        <div className="w-7 h-px bg-gray-200 my-1" />
-
-        <button
-          type="button"
-          onClick={() => onThumbOnlyChange(!thumbOnly)}
-          title={thumbOnly ? "Thumbnails only — ON" : "Thumbnails only — OFF"}
-          aria-label="Toggle thumbnails only"
-          aria-pressed={thumbOnly}
-          className={`relative w-9 h-9 rounded flex items-center justify-center transition ${
-            thumbOnly
-              ? "bg-green-600 text-white"
-              : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          }`}
+      {/* Sidebar — fixed, draggable via grip handle */}
+      <div
+        ref={sidebarRef}
+        className="fixed z-40 flex flex-col items-stretch bg-white border border-gray-200 rounded-lg shadow-lg"
+        style={{
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          width: `${SIDEBAR_WIDTH}px`,
+          visibility: mounted ? "visible" : "hidden",
+          userSelect: isDragging ? "none" : "auto",
+        }}
+      >
+        <div
+          onMouseDown={handleGripMouseDown}
+          className="flex items-center justify-center h-6 border-b border-gray-200 bg-gray-50 hover:bg-gray-100 rounded-t-lg transition-colors"
+          style={{ cursor: isDragging ? "grabbing" : "grab" }}
+          title="Drag to move"
         >
-          <ThumbnailIcon className="w-6 h-6" />
-        </button>
+          <GripHandleIcon />
+        </div>
+
+        <div className="flex flex-col items-center py-2 gap-1">
+          {GROUPS.map(({ id, title, Icon }) => {
+            const isOpen = open === id;
+            const hasActive = groupActive[id];
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => toggleGroup(id)}
+                title={title}
+                aria-label={title}
+                aria-pressed={isOpen}
+                className={`relative w-9 h-9 rounded flex items-center justify-center transition ${
+                  isOpen
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+              >
+                <Icon className="w-6 h-6" />
+                {hasActive && !isOpen && (
+                  <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-blue-500" />
+                )}
+              </button>
+            );
+          })}
+
+          <div className="w-7 h-px bg-gray-200 my-1" />
+
+          <button
+            type="button"
+            onClick={() => onThumbOnlyChange(!thumbOnly)}
+            title={thumbOnly ? "Thumbnails only — ON" : "Thumbnails only — OFF"}
+            aria-label="Toggle thumbnails only"
+            aria-pressed={thumbOnly}
+            className={`relative w-9 h-9 rounded flex items-center justify-center transition ${
+              thumbOnly
+                ? "bg-green-600 text-white"
+                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            }`}
+          >
+            <ThumbnailIcon className="w-6 h-6" />
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

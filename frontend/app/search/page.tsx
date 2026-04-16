@@ -203,95 +203,91 @@ export default function SearchPage() {
   const activeCount = Object.values(filters).filter(Boolean).length;
 
   return (
-    <div className="flex gap-4 items-start">
-      <div className="flex-1 min-w-0 space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Search</h1>
-          <div className="flex items-center gap-3 text-sm text-gray-500">
-            {loading ? (
-              <span className="text-gray-400">Searching…</span>
-            ) : (
-              <span>
-                {total.toLocaleString()} result{total === 1 ? "" : "s"}
-              </span>
-            )}
-            {activeCount > 0 && (
-              <button
-                type="button"
-                onClick={clearAll}
-                className="text-xs text-gray-500 hover:text-gray-900 border border-gray-200 rounded px-2 py-1"
-              >
-                Clear {activeCount} filter{activeCount === 1 ? "" : "s"}
-              </button>
-            )}
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Search</h1>
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          {loading ? (
+            <span className="text-gray-400">Searching…</span>
+          ) : (
+            <span>
+              {total.toLocaleString()} result{total === 1 ? "" : "s"}
+            </span>
+          )}
+          {activeCount > 0 && (
+            <button
+              type="button"
+              onClick={clearAll}
+              className="text-xs text-gray-500 hover:text-gray-900 border border-gray-200 rounded px-2 py-1"
+            >
+              Clear {activeCount} filter{activeCount === 1 ? "" : "s"}
+            </button>
+          )}
         </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
-            {error}
-          </div>
-        )}
-
-        {!loading && results.length > 0 && (
-          <>
-            <div className="text-xs text-gray-500">
-              Showing {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} of{" "}
-              {total.toLocaleString()} results
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {results.map((r) => (
-                <ResultCard
-                  key={r.id}
-                  trackId={r.trackId}
-                  cameraId={r.cameraId}
-                  objectClass={r.objectClass}
-                  timestamp={r.timestamp}
-                  confidence={r.confidence}
-                  thumbnailUrl={r.thumbnailUrl}
-                  clipUrl={r.clipUrl}
-                  attributes={r.attributes}
-                />
-              ))}
-            </div>
-
-            <div className="flex items-center justify-center gap-4 pt-4">
-              <button
-                onClick={() =>
-                  doSearch(debouncedFilters, thumbOnly, Math.max(0, offset - PAGE_SIZE))
-                }
-                disabled={offset === 0}
-                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => doSearch(debouncedFilters, thumbOnly, offset + PAGE_SIZE)}
-                disabled={offset + PAGE_SIZE >= total}
-                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
-          </>
-        )}
-
-        {!loading && results.length === 0 && !error && (
-          <div className="text-center py-12 text-gray-400">
-            No results match the current filters.
-          </div>
-        )}
       </div>
 
-      <div className="sticky top-4">
-        <FilterSidebar
-          filters={filters}
-          onChange={setFilters}
-          thumbOnly={thumbOnly}
-          onThumbOnlyChange={setThumbOnly}
-        />
-      </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+          {error}
+        </div>
+      )}
+
+      {!loading && results.length > 0 && (
+        <>
+          <div className="text-xs text-gray-500">
+            Showing {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} of{" "}
+            {total.toLocaleString()} results
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {results.map((r) => (
+              <ResultCard
+                key={r.id}
+                trackId={r.trackId}
+                cameraId={r.cameraId}
+                objectClass={r.objectClass}
+                timestamp={r.timestamp}
+                confidence={r.confidence}
+                thumbnailUrl={r.thumbnailUrl}
+                clipUrl={r.clipUrl}
+                attributes={r.attributes}
+              />
+            ))}
+          </div>
+
+          <div className="flex items-center justify-center gap-4 pt-4">
+            <button
+              onClick={() =>
+                doSearch(debouncedFilters, thumbOnly, Math.max(0, offset - PAGE_SIZE))
+              }
+              disabled={offset === 0}
+              className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => doSearch(debouncedFilters, thumbOnly, offset + PAGE_SIZE)}
+              disabled={offset + PAGE_SIZE >= total}
+              className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </>
+      )}
+
+      {!loading && results.length === 0 && !error && (
+        <div className="text-center py-12 text-gray-400">
+          No results match the current filters.
+        </div>
+      )}
+
+      <FilterSidebar
+        filters={filters}
+        onChange={setFilters}
+        thumbOnly={thumbOnly}
+        onThumbOnlyChange={setThumbOnly}
+      />
     </div>
   );
 }
