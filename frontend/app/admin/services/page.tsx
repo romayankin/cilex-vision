@@ -19,55 +19,55 @@ const SERVICE_CATALOG: Record<string, ServiceMeta> = {
     description:
       "PostgreSQL database with TimescaleDB extension. Stores all detections, tracks, events, audit logs, and system configuration. Every other service depends on it.",
     priority: "P0",
-    priorityLabel: "Critical — system offline",
+    priorityLabel: "If this stops, the entire system loses its memory — nothing works",
   },
   "kafka-0": {
     description:
       "Primary Kafka broker. Message bus connecting all pipeline stages — frames, detections, tracklets, events. If Kafka is down, no data flows through the system.",
     priority: "P0",
-    priorityLabel: "Critical — system offline",
+    priorityLabel: "If this stops, data stops flowing between all services — system is blind",
   },
   minio: {
     description:
       "S3-compatible object storage. Stores camera frames, decoded images, thumbnails, event clips, and debug traces. Pipeline cannot process frames without it.",
     priority: "P0",
-    priorityLabel: "Critical — system offline",
+    priorityLabel: "If this stops, no images or video can be stored or retrieved",
   },
   nats: {
     description:
       "Lightweight message broker for real-time frame delivery from cameras to the pipeline. Edge-agent publishes raw frames here.",
     priority: "P0",
-    priorityLabel: "Critical — system offline",
+    priorityLabel: "If this stops, cameras can't send video frames into the system",
   },
   "edge-agent": {
     description:
       "Connects to IP cameras via RTSP, captures video frames, and publishes them to NATS. One instance handles all cameras. No edge-agent = no video input.",
     priority: "P0",
-    priorityLabel: "Critical — system offline",
+    priorityLabel: "If this stops, all cameras are disconnected — no video comes in",
   },
   "decode-service": {
     description:
       "Receives raw frames from Kafka, decodes/resizes them for inference, and stores decoded images in MinIO. Sits between frame capture and AI detection.",
     priority: "P0",
-    priorityLabel: "Critical — system offline",
+    priorityLabel: "If this stops, raw video can't be prepared for AI analysis",
   },
   "inference-worker": {
     description:
       "Core AI engine. Runs YOLOv8s object detection, ByteTrack tracking, and OSNet Market-1501 Re-ID on every frame. Produces detections, tracks, and embeddings.",
     priority: "P0",
-    priorityLabel: "Critical — system offline",
+    priorityLabel: "If this stops, AI detection and tracking stops completely",
   },
   "query-api": {
     description:
       "FastAPI backend serving all REST endpoints — search, events, storage, admin, auth. The frontend and all API consumers depend on it. Also runs the service watchdog.",
     priority: "P0",
-    priorityLabel: "Critical — system offline",
+    priorityLabel: "If this stops, the website and all searches stop working",
   },
   frontend: {
     description:
       "Next.js web application. The operator-facing UI — live view, search, admin dashboards, this services page. If down, operators lose all visibility.",
     priority: "P0",
-    priorityLabel: "Critical — system offline",
+    priorityLabel: "If this stops, operators can't see anything — the screen goes blank",
   },
 
   // P1 — major feature broken
@@ -75,31 +75,31 @@ const SERVICE_CATALOG: Record<string, ServiceMeta> = {
     description:
       "Processes tracklets from Kafka and generates events: entered_scene, exited_scene, loitering. Without it, no security events are created from detections.",
     priority: "P1",
-    priorityLabel: "High — events not generating",
+    priorityLabel: "If this stops, the system detects objects but won't create security alerts",
   },
   "clip-service": {
     description:
       "Stitches video frames into MP4 clips for each event. If down, events still generate but have no associated video clip for review.",
     priority: "P1",
-    priorityLabel: "High — event clips unavailable",
+    priorityLabel: "If this stops, events still appear but have no video clip attached",
   },
   "bulk-collector": {
     description:
       "Batches detections and tracks from Kafka and bulk-inserts them into TimescaleDB. If down, detections happen but aren't stored — search returns nothing new.",
     priority: "P1",
-    priorityLabel: "High — detections not persisted",
+    priorityLabel: "If this stops, detections happen but aren't saved — search finds nothing new",
   },
   "ingress-bridge": {
     description:
       "Bridges frames from NATS to Kafka, applying sampling rules. Connects the real-time capture layer (NATS) to the processing pipeline (Kafka).",
     priority: "P1",
-    priorityLabel: "High — frame pipeline broken",
+    priorityLabel: "If this stops, camera frames can't reach the AI pipeline for processing",
   },
   go2rtc: {
     description:
       "WebRTC/HLS/MSE streaming proxy. Provides live camera views in the browser and snapshot URLs. Detection pipeline works without it, but operators can't see live video.",
     priority: "P1",
-    priorityLabel: "High — live view unavailable",
+    priorityLabel: "If this stops, live camera view in the browser goes dark",
   },
 
   // P2 — degraded but system runs
@@ -107,37 +107,37 @@ const SERVICE_CATALOG: Record<string, ServiceMeta> = {
     description:
       "Classifies track attributes (vehicle color, person clothing color). Enriches detections with metadata for filtering. Pipeline works without it but color filters are empty.",
     priority: "P2",
-    priorityLabel: "Medium — attribute classification offline",
+    priorityLabel: "If this stops, colour filters in search won't have any data",
   },
   "mtmc-service": {
     description:
       "Multi-target multi-camera tracking. Matches the same person/vehicle across different cameras using Re-ID embeddings. Cross-camera journeys unavailable if down.",
     priority: "P2",
-    priorityLabel: "Medium — cross-camera tracking offline",
+    priorityLabel: "If this stops, the system can't match people across different cameras",
   },
   redis: {
     description:
       "In-memory cache used by mtmc-service for real-time embedding lookup. Only affects cross-camera matching performance.",
     priority: "P2",
-    priorityLabel: "Medium — cache unavailable",
+    priorityLabel: "If this stops, cross-camera matching becomes slower",
   },
   prometheus: {
     description:
       "Metrics collection. Scrapes all services for performance data (latency, throughput, errors). Monitoring dashboards go blank if down, but pipeline is unaffected.",
     priority: "P2",
-    priorityLabel: "Medium — metrics collection stopped",
+    priorityLabel: "If this stops, performance monitoring graphs go blank",
   },
   "kafka-1": {
     description:
       "Secondary Kafka broker. Provides replication and partition distribution. System works with only kafka-0 but has no redundancy — data loss risk on kafka-0 failure.",
     priority: "P2",
-    priorityLabel: "Medium — Kafka redundancy reduced",
+    priorityLabel: "If this stops, message system loses backup — higher risk if kafka-0 also fails",
   },
   "kafka-2": {
     description:
       "Tertiary Kafka broker. Same role as kafka-1 — adds redundancy and throughput capacity.",
     priority: "P2",
-    priorityLabel: "Medium — Kafka redundancy reduced",
+    priorityLabel: "If this stops, same as kafka-1 — less redundancy for messages",
   },
 
   // P3 — nice to have
@@ -145,25 +145,25 @@ const SERVICE_CATALOG: Record<string, ServiceMeta> = {
     description:
       "Dashboarding UI for Prometheus metrics. Pre-built panels for pipeline throughput and system health. Not essential — admin pages provide similar info.",
     priority: "P3",
-    priorityLabel: "Low — monitoring dashboard offline",
+    priorityLabel: "If this stops, Grafana dashboards unavailable but admin pages still work",
   },
   "kafka-ui": {
     description:
       "Web UI for inspecting Kafka topics, consumer groups, and message contents. Development/debugging tool only.",
     priority: "P3",
-    priorityLabel: "Low — Kafka debug UI offline",
+    priorityLabel: "If this stops, developers lose the Kafka inspection tool — no operator impact",
   },
   mlflow: {
     description:
       "ML experiment tracking and model registry. Used during model training and evaluation. Not needed for production inference.",
     priority: "P3",
-    priorityLabel: "Low — ML tracking offline",
+    priorityLabel: "If this stops, ML experiment tracking unavailable — no operator impact",
   },
   "minio-init": {
     description:
       "One-shot initialization container. Creates MinIO buckets and sets lifecycle policies on first startup. Expected to exit after completing its job.",
     priority: "P3",
-    priorityLabel: "Low — init container (expected to exit)",
+    priorityLabel: "Runs once at startup to create storage buckets, then exits — this is normal",
   },
 };
 
@@ -670,13 +670,13 @@ function FragmentRow({
             <div className="min-w-0">
               <div className="font-mono text-xs font-medium text-gray-900">{svc.name}</div>
               <div
-                className="text-[11px] text-gray-500 truncate max-w-xs mt-0.5"
+                className="text-[11px] text-gray-500 max-w-lg mt-0.5"
                 title={meta.description}
               >
                 {meta.description}
               </div>
               <div
-                className="text-[10px] text-gray-400 truncate max-w-xs"
+                className="text-[10px] text-gray-400 max-w-lg"
                 title={svc.image}
               >
                 {svc.image}
