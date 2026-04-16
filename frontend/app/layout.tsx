@@ -4,6 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getUserRole, isAdmin, canAccessDebug } from "@/lib/auth";
+import SystemHealthIndicator from "@/components/SystemHealthIndicator";
 
 const NAV_ITEMS = [
   { href: "/live", label: "Live" },
@@ -30,9 +31,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-gray-50 text-gray-900">
         <nav className="bg-white border-b border-gray-200 px-4 py-3">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <Link href="/search" className="text-lg font-semibold text-gray-900">
-              Cilex Vision
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/search" className="text-lg font-semibold text-gray-900">
+                Cilex Vision
+              </Link>
+              {!isLoginPage && isAdmin(role) && <SystemHealthIndicator />}
+            </div>
             {!isLoginPage && (
               <div className="flex items-center gap-1">
                 {NAV_ITEMS.map((item) => (
