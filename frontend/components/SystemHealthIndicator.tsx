@@ -3,7 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const POLL_INTERVAL_MS = 30_000;
-const CRITICAL_CONTAINERS = ["inference-worker", "decode-service", "edge-agent"];
+// Mirror the P0 set from /admin/services SERVICE_CATALOG. Keep in sync.
+// query-api and frontend are technically P0 but if either is down the user
+// can't see this widget anyway, so listing them here is harmless.
+const CRITICAL_CONTAINERS = [
+  "timescaledb",
+  "kafka-0",
+  "minio",
+  "nats",
+  "edge-agent",
+  "decode-service",
+  "inference-worker",
+  "query-api",
+  "frontend",
+];
 const STALE_DETECTIONS_WARN_S = 5 * 60;
 const STALE_DETECTIONS_CRIT_S = 15 * 60;
 

@@ -1,8 +1,200 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const POLL_INTERVAL_MS = 15_000;
+const ALERT_INTERVAL_MS = 15_000;
+const ALERT_MUTE_STORAGE_KEY = "cilex-alert-muted";
+
+interface ServiceMeta {
+  description: string;
+  priority: "P0" | "P1" | "P2" | "P3";
+  priorityLabel: string;
+}
+
+// Static metadata. Update only when services are added/removed.
+const SERVICE_CATALOG: Record<string, ServiceMeta> = {
+  // P0 — system is useless without these
+  timescaledb: {
+    description:
+      "PostgreSQL database with TimescaleDB extension. Stores all detections, tracks, events, audit logs, and system configuration. Every other service depends on it.",
+    priority: "P0",
+    priorityLabel: "Critical — system offline",
+  },
+  "kafka-0": {
+    description:
+      "Primary Kafka broker. Message bus connecting all pipeline stages — frames, detections, tracklets, events. If Kafka is down, no data flows through the system.",
+    priority: "P0",
+    priorityLabel: "Critical — system offline",
+  },
+  minio: {
+    description:
+      "S3-compatible object storage. Stores camera frames, decoded images, thumbnails, event clips, and debug traces. Pipeline cannot process frames without it.",
+    priority: "P0",
+    priorityLabel: "Critical — system offline",
+  },
+  nats: {
+    description:
+      "Lightweight message broker for real-time frame delivery from cameras to the pipeline. Edge-agent publishes raw frames here.",
+    priority: "P0",
+    priorityLabel: "Critical — system offline",
+  },
+  "edge-agent": {
+    description:
+      "Connects to IP cameras via RTSP, captures video frames, and publishes them to NATS. One instance handles all cameras. No edge-agent = no video input.",
+    priority: "P0",
+    priorityLabel: "Critical — system offline",
+  },
+  "decode-service": {
+    description:
+      "Receives raw frames from Kafka, decodes/resizes them for inference, and stores decoded images in MinIO. Sits between frame capture and AI detection.",
+    priority: "P0",
+    priorityLabel: "Critical — system offline",
+  },
+  "inference-worker": {
+    description:
+      "Core AI engine. Runs YOLOv8s object detection, ByteTrack tracking, and OSNet Market-1501 Re-ID on every frame. Produces detections, tracks, and embeddings.",
+    priority: "P0",
+    priorityLabel: "Critical — system offline",
+  },
+  "query-api": {
+    description:
+      "FastAPI backend serving all REST endpoints — search, events, storage, admin, auth. The frontend and all API consumers depend on it. Also runs the service watchdog.",
+    priority: "P0",
+    priorityLabel: "Critical — system offline",
+  },
+  frontend: {
+    description:
+      "Next.js web application. The operator-facing UI — live view, search, admin dashboards, this services page. If down, operators lose all visibility.",
+    priority: "P0",
+    priorityLabel: "Critical — system offline",
+  },
+
+  // P1 — major feature broken
+  "event-engine": {
+    description:
+      "Processes tracklets from Kafka and generates events: entered_scene, exited_scene, loitering. Without it, no security events are created from detections.",
+    priority: "P1",
+    priorityLabel: "High — events not generating",
+  },
+  "clip-service": {
+    description:
+      "Stitches video frames into MP4 clips for each event. If down, events still generate but have no associated video clip for review.",
+    priority: "P1",
+    priorityLabel: "High — event clips unavailable",
+  },
+  "bulk-collector": {
+    description:
+      "Batches detections and tracks from Kafka and bulk-inserts them into TimescaleDB. If down, detections happen but aren't stored — search returns nothing new.",
+    priority: "P1",
+    priorityLabel: "High — detections not persisted",
+  },
+  "ingress-bridge": {
+    description:
+      "Bridges frames from NATS to Kafka, applying sampling rules. Connects the real-time capture layer (NATS) to the processing pipeline (Kafka).",
+    priority: "P1",
+    priorityLabel: "High — frame pipeline broken",
+  },
+  go2rtc: {
+    description:
+      "WebRTC/HLS/MSE streaming proxy. Provides live camera views in the browser and snapshot URLs. Detection pipeline works without it, but operators can't see live video.",
+    priority: "P1",
+    priorityLabel: "High — live view unavailable",
+  },
+
+  // P2 — degraded but system runs
+  "attribute-service": {
+    description:
+      "Classifies track attributes (vehicle color, person clothing color). Enriches detections with metadata for filtering. Pipeline works without it but color filters are empty.",
+    priority: "P2",
+    priorityLabel: "Medium — attribute classification offline",
+  },
+  "mtmc-service": {
+    description:
+      "Multi-target multi-camera tracking. Matches the same person/vehicle across different cameras using Re-ID embeddings. Cross-camera journeys unavailable if down.",
+    priority: "P2",
+    priorityLabel: "Medium — cross-camera tracking offline",
+  },
+  redis: {
+    description:
+      "In-memory cache used by mtmc-service for real-time embedding lookup. Only affects cross-camera matching performance.",
+    priority: "P2",
+    priorityLabel: "Medium — cache unavailable",
+  },
+  prometheus: {
+    description:
+      "Metrics collection. Scrapes all services for performance data (latency, throughput, errors). Monitoring dashboards go blank if down, but pipeline is unaffected.",
+    priority: "P2",
+    priorityLabel: "Medium — metrics collection stopped",
+  },
+  "kafka-1": {
+    description:
+      "Secondary Kafka broker. Provides replication and partition distribution. System works with only kafka-0 but has no redundancy — data loss risk on kafka-0 failure.",
+    priority: "P2",
+    priorityLabel: "Medium — Kafka redundancy reduced",
+  },
+  "kafka-2": {
+    description:
+      "Tertiary Kafka broker. Same role as kafka-1 — adds redundancy and throughput capacity.",
+    priority: "P2",
+    priorityLabel: "Medium — Kafka redundancy reduced",
+  },
+
+  // P3 — nice to have
+  grafana: {
+    description:
+      "Dashboarding UI for Prometheus metrics. Pre-built panels for pipeline throughput and system health. Not essential — admin pages provide similar info.",
+    priority: "P3",
+    priorityLabel: "Low — monitoring dashboard offline",
+  },
+  "kafka-ui": {
+    description:
+      "Web UI for inspecting Kafka topics, consumer groups, and message contents. Development/debugging tool only.",
+    priority: "P3",
+    priorityLabel: "Low — Kafka debug UI offline",
+  },
+  mlflow: {
+    description:
+      "ML experiment tracking and model registry. Used during model training and evaluation. Not needed for production inference.",
+    priority: "P3",
+    priorityLabel: "Low — ML tracking offline",
+  },
+  "minio-init": {
+    description:
+      "One-shot initialization container. Creates MinIO buckets and sets lifecycle policies on first startup. Expected to exit after completing its job.",
+    priority: "P3",
+    priorityLabel: "Low — init container (expected to exit)",
+  },
+};
+
+const UNKNOWN_SERVICE: ServiceMeta = {
+  description: "No description available for this service.",
+  priority: "P3",
+  priorityLabel: "Unknown",
+};
+
+const PRIORITY_ORDER: Record<ServiceMeta["priority"], number> = {
+  P0: 0, P1: 1, P2: 2, P3: 3,
+};
+
+const PRIORITY_COLORS: Record<ServiceMeta["priority"], string> = {
+  P0: "bg-red-600 text-white",
+  P1: "bg-orange-500 text-white",
+  P2: "bg-yellow-500 text-gray-900",
+  P3: "bg-gray-300 text-gray-700",
+};
+
+function metaFor(name: string): ServiceMeta {
+  return SERVICE_CATALOG[name] ?? UNKNOWN_SERVICE;
+}
+
+// minio-init exits cleanly by design — don't count it as down.
+function isDown(svc: Service): boolean {
+  if (svc.name === "minio-init" && svc.status === "exited" && svc.exit_code === 0) {
+    return false;
+  }
+  return svc.status !== "running";
+}
 
 interface WatchdogState {
   attempt: number;
@@ -70,6 +262,11 @@ export default function ServicesPage() {
   const [restarting, setRestarting] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
+  const [alertMuted, setAlertMuted] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem(ALERT_MUTE_STORAGE_KEY) === "true";
+  });
+  const [audioBlocked, setAudioBlocked] = useState(false);
 
   // Pause auto-refresh while a logs/diagnostics panel is open so we don't
   // interrupt scroll position.
@@ -105,6 +302,80 @@ export default function ServicesPage() {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  const sorted = useMemo(() => {
+    return [...services].sort((a, b) => {
+      const pDiff = PRIORITY_ORDER[metaFor(a.name).priority] - PRIORITY_ORDER[metaFor(b.name).priority];
+      if (pDiff !== 0) return pDiff;
+      return a.name.localeCompare(b.name);
+    });
+  }, [services]);
+
+  const p0Down = useMemo(() => {
+    return services.filter((s) => metaFor(s.name).priority === "P0" && isDown(s));
+  }, [services]);
+
+  const otherIssues = useMemo(() => {
+    return services.filter((s) => isDown(s) && metaFor(s.name).priority !== "P0").length;
+  }, [services]);
+
+  // Persist mute preference for the session.
+  useEffect(() => {
+    sessionStorage.setItem(ALERT_MUTE_STORAGE_KEY, String(alertMuted));
+  }, [alertMuted]);
+
+  // Auto-unmute when all P0 services recover, so the next incident alerts again.
+  useEffect(() => {
+    if (p0Down.length === 0 && alertMuted) {
+      setAlertMuted(false);
+    }
+  }, [p0Down.length, alertMuted]);
+
+  // Audio alert: 3 short beeps every 15s while any P0 service is down.
+  useEffect(() => {
+    if (p0Down.length === 0 || alertMuted) {
+      setAudioBlocked(false);
+      return;
+    }
+    const Ctor: typeof AudioContext | undefined =
+      window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+
+    const ctx = new Ctor();
+    let cancelled = false;
+
+    function playBeepPattern() {
+      if (cancelled || ctx.state === "closed") return;
+      // Browsers block audio until the user has interacted with the page.
+      if (ctx.state === "suspended") {
+        setAudioBlocked(true);
+        ctx.resume().catch(() => {});
+        return;
+      }
+      setAudioBlocked(false);
+      const start = ctx.currentTime;
+      for (let i = 0; i < 3; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        osc.type = "square";
+        gain.gain.value = 0.3;
+        const t = start + i * 0.2;
+        osc.start(t);
+        osc.stop(t + 0.1);
+      }
+    }
+
+    playBeepPattern();
+    const id = window.setInterval(playBeepPattern, ALERT_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      ctx.close().catch(() => {});
+    };
+  }, [p0Down.length, alertMuted]);
 
   // Auto-dismiss toasts.
   useEffect(() => {
@@ -248,6 +519,65 @@ export default function ServicesPage() {
         </div>
       )}
 
+      {p0Down.length > 0 && (
+        <div className="bg-red-600 text-white rounded-lg p-4 flex items-center gap-3 animate-pulse">
+          <div className="flex-shrink-0">
+            <svg
+              className="w-8 h-8"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="font-bold text-lg">
+              SYSTEM ALERT — {p0Down.length} critical service{p0Down.length > 1 ? "s" : ""} down
+            </div>
+            <div className="text-sm text-red-100">
+              {p0Down.map((s) => s.name).join(", ")} — system cannot operate normally.
+              Contact support if you cannot resolve this.
+            </div>
+            {!alertMuted && audioBlocked && (
+              <div className="text-xs text-red-100 mt-1 italic">
+                Click anywhere on the page to enable audio alerts.
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setAlertMuted((m) => !m)}
+            className="ml-auto flex-shrink-0 text-red-50 hover:text-white text-sm border border-red-300 rounded px-3 py-1 bg-red-700/30 hover:bg-red-700/60"
+            title={alertMuted ? "Unmute audio alert" : "Mute audio alert (visual alert stays)"}
+          >
+            {alertMuted ? "🔔 Unmute" : "🔇 Mute"}
+          </button>
+        </div>
+      )}
+
+      <div className="text-sm text-gray-600">
+        {services.length} service{services.length === 1 ? "" : "s"}:
+        <span className="text-green-600 font-medium ml-2">
+          {services.filter((s) => s.status === "running").length} running
+        </span>
+        {p0Down.length > 0 && (
+          <span className="text-red-600 font-medium ml-2">
+            {p0Down.length} P0 down
+          </span>
+        )}
+        {otherIssues > 0 && (
+          <span className="text-amber-600 font-medium ml-2">
+            {otherIssues} other issue{otherIssues === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
@@ -261,15 +591,17 @@ export default function ServicesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {services.map((svc) => {
+            {sorted.map((svc) => {
               const dot = statusDot(svc);
               const showDiag = svc.status !== "running" || svc.watchdog;
               const isRestarting = restarting.has(svc.name);
               const wd = svc.watchdog;
+              const meta = metaFor(svc.name);
               return (
                 <FragmentRow
                   key={svc.name}
                   svc={svc}
+                  meta={meta}
                   dot={dot}
                   wd={wd}
                   now={now}
@@ -301,11 +633,12 @@ export default function ServicesPage() {
 }
 
 function FragmentRow({
-  svc, dot, wd, now, isRestarting,
+  svc, meta, dot, wd, now, isRestarting,
   onRestart, onToggleLogs, onToggleDiag,
   expandedLogs, expandedDiag, logs, diagnostics, diagDot, refreshLogs,
 }: {
   svc: Service;
+  meta: ServiceMeta;
   dot: { color: string; pulse: boolean };
   wd: WatchdogState | undefined;
   now: number;
@@ -323,15 +656,32 @@ function FragmentRow({
   return (
     <>
       <tr className="hover:bg-gray-50">
-        <td className="px-3 py-2 font-mono text-xs">
-          <div className="flex items-center gap-2">
+        <td className="px-3 py-3">
+          <div className="flex items-start gap-2">
             <span
-              className={`inline-block w-2 h-2 rounded-full ${dot.color} ${dot.pulse ? "animate-pulse" : ""}`}
+              className={`inline-block w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${dot.color} ${dot.pulse ? "animate-pulse" : ""}`}
             />
-            <span>{svc.name}</span>
-          </div>
-          <div className="text-[10px] text-gray-400 mt-0.5 truncate max-w-xs" title={svc.image}>
-            {svc.image}
+            <span
+              className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none mt-1 flex-shrink-0 ${PRIORITY_COLORS[meta.priority]}`}
+              title={meta.priorityLabel}
+            >
+              {meta.priority}
+            </span>
+            <div className="min-w-0">
+              <div className="font-mono text-xs font-medium text-gray-900">{svc.name}</div>
+              <div
+                className="text-[11px] text-gray-500 truncate max-w-xs mt-0.5"
+                title={meta.description}
+              >
+                {meta.description}
+              </div>
+              <div
+                className="text-[10px] text-gray-400 truncate max-w-xs"
+                title={svc.image}
+              >
+                {svc.image}
+              </div>
+            </div>
           </div>
         </td>
         <td className="px-3 py-2 text-xs">
