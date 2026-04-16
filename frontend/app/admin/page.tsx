@@ -21,6 +21,7 @@ const ADMIN_SECTIONS = [
   { href: "/admin/storage", name: "Storage", desc: "MinIO bucket sizes, purge old data, storage configuration" },
   { href: "/admin/settings", name: "Settings", desc: "Thumbnail quality, frame rate, detection parameters" },
   { href: "/admin/topology", name: "Topology", desc: "Edit camera graph, edges, and transit times" },
+  { href: "/admin/zones", name: "Zone Editor", desc: "Draw detection and loitering zones on camera snapshots" },
   { href: "/admin/retention", name: "Retention", desc: "Data retention policies by class" },
   { href: "/admin/users", name: "Users", desc: "Role definitions and permissions" },
   { href: "/admin/health", name: "Health", desc: "Embedded Grafana monitoring panels" },

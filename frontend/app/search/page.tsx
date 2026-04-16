@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import SearchFilters, { FilterState } from "@/components/SearchFilters";
+import FilterSidebar, { FilterState } from "@/components/FilterSidebar";
 import ResultCard from "@/components/ResultCard";
 import {
   getDetections,
@@ -10,11 +10,10 @@ import {
   getTracks,
   getTrackDetail,
   type TrackDetailResponse,
-  type DetectionResponse,
-  type EventResponse,
 } from "@/lib/api-client";
 
 const PAGE_SIZE = 20;
+const FILTER_DEBOUNCE_MS = 300;
 
 type ResultItem = {
   kind: "detection" | "event" | "track";
@@ -41,44 +40,65 @@ function parseFiltersFromParams(params: URLSearchParams): FilterState {
   };
 }
 
+function filtersEqual(a: FilterState, b: FilterState): boolean {
+  return (
+    a.camera_id === b.camera_id &&
+    a.start === b.start &&
+    a.end === b.end &&
+    a.object_class === b.object_class &&
+    a.color === b.color &&
+    a.event_type === b.event_type &&
+    a.state === b.state
+  );
+}
+
 export default function SearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [filters, setFilters] = useState<FilterState>(() => parseFiltersFromParams(searchParams));
+  const [filters, setFilters] = useState<FilterState>(() =>
+    parseFiltersFromParams(searchParams),
+  );
+  const [debouncedFilters, setDebouncedFilters] = useState<FilterState>(filters);
   const [results, setResults] = useState<ResultItem[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [thumbOnly, setThumbOnly] = useState(false);
-  const thumbOnlyRef = useRef(thumbOnly);
-  thumbOnlyRef.current = thumbOnly;
+  const [thumbOnly, setThumbOnly] = useState(true);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setDebouncedFilters((prev) => (filtersEqual(prev, filters) ? prev : filters));
+    }, FILTER_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [filters]);
 
   const doSearch = useCallback(
-    async (newOffset = 0) => {
+    async (currentFilters: FilterState, currentThumbOnly: boolean, newOffset: number) => {
       setLoading(true);
       setError(null);
 
-      // Sync URL
       const params = new URLSearchParams();
-      for (const [k, v] of Object.entries(filters)) {
+      for (const [k, v] of Object.entries(currentFilters)) {
         if (v) params.set(k, v);
       }
       if (newOffset > 0) params.set("offset", String(newOffset));
       router.replace(`/search?${params.toString()}`, { scroll: false });
 
+      const reqId = ++requestIdRef.current;
+
       try {
         const items: ResultItem[] = [];
         let fetchedTotal = 0;
 
-        // If event_type filter is set, search events
-        if (filters.event_type) {
+        if (currentFilters.event_type) {
           const res = await getEvents({
-            camera_id: filters.camera_id || undefined,
-            start: filters.start || undefined,
-            end: filters.end || undefined,
-            event_type: filters.event_type || undefined,
-            state: filters.state || undefined,
+            camera_id: currentFilters.camera_id || undefined,
+            start: currentFilters.start || undefined,
+            end: currentFilters.end || undefined,
+            event_type: currentFilters.event_type || undefined,
+            state: currentFilters.state || undefined,
             offset: newOffset,
             limit: PAGE_SIZE,
           });
@@ -95,15 +115,13 @@ export default function SearchPage() {
               clipUrl: ev.clip_url,
             });
           }
-        }
-        // If state filter is set, search tracks
-        else if (filters.state) {
+        } else if (currentFilters.state) {
           const res = await getTracks({
-            camera_id: filters.camera_id || undefined,
-            start: filters.start || undefined,
-            end: filters.end || undefined,
-            object_class: filters.object_class || undefined,
-            state: filters.state || undefined,
+            camera_id: currentFilters.camera_id || undefined,
+            start: currentFilters.start || undefined,
+            end: currentFilters.end || undefined,
+            object_class: currentFilters.object_class || undefined,
+            state: currentFilters.state || undefined,
             offset: newOffset,
             limit: PAGE_SIZE,
           });
@@ -113,7 +131,7 @@ export default function SearchPage() {
             try {
               detail = await getTrackDetail(tr.local_track_id);
             } catch {
-              /* track detail may fail */
+              /* optional */
             }
             items.push({
               kind: "track",
@@ -127,15 +145,13 @@ export default function SearchPage() {
               attributes: detail?.attributes,
             });
           }
-        }
-        // Default: search detections
-        else {
+        } else {
           const res = await getDetections({
-            camera_id: filters.camera_id || undefined,
-            start: filters.start || undefined,
-            end: filters.end || undefined,
-            object_class: filters.object_class || undefined,
-            has_thumbnail: thumbOnlyRef.current || undefined,
+            camera_id: currentFilters.camera_id || undefined,
+            start: currentFilters.start || undefined,
+            end: currentFilters.end || undefined,
+            object_class: currentFilters.object_class || undefined,
+            has_thumbnail: currentThumbOnly || undefined,
             offset: newOffset,
             limit: PAGE_SIZE,
           });
@@ -154,96 +170,128 @@ export default function SearchPage() {
           }
         }
 
+        if (reqId !== requestIdRef.current) return;
+
         setResults(items);
         setTotal(fetchedTotal);
         setOffset(newOffset);
       } catch (err) {
+        if (reqId !== requestIdRef.current) return;
         setError(err instanceof Error ? err.message : "Search failed");
       } finally {
-        setLoading(false);
+        if (reqId === requestIdRef.current) setLoading(false);
       }
     },
-    [filters, router],
+    [router],
   );
 
-  // Auto-search on mount if URL has params
   useEffect(() => {
-    const hasParams = Array.from(searchParams.entries()).some(([k]) => k !== "offset");
-    if (hasParams) {
-      doSearch(Number(searchParams.get("offset") ?? 0));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    doSearch(debouncedFilters, thumbOnly, 0);
+  }, [debouncedFilters, thumbOnly, doSearch]);
+
+  const clearAll = () =>
+    setFilters({
+      camera_id: "",
+      start: "",
+      end: "",
+      object_class: "",
+      color: "",
+      event_type: "",
+      state: "",
+    });
+
+  const activeCount = Object.values(filters).filter(Boolean).length;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Search</h1>
-
-      <SearchFilters
-        filters={filters}
-        onChange={setFilters}
-        onSearch={() => doSearch(0)}
-        thumbOnly={thumbOnly}
-        onThumbOnlyChange={setThumbOnly}
-      />
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
-          {error}
+    <div className="flex gap-4 items-start">
+      <div className="flex-1 min-w-0 space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold">Search</h1>
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            {loading ? (
+              <span className="text-gray-400">Searching…</span>
+            ) : (
+              <span>
+                {total.toLocaleString()} result{total === 1 ? "" : "s"}
+              </span>
+            )}
+            {activeCount > 0 && (
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-xs text-gray-500 hover:text-gray-900 border border-gray-200 rounded px-2 py-1"
+              >
+                Clear {activeCount} filter{activeCount === 1 ? "" : "s"}
+              </button>
+            )}
+          </div>
         </div>
-      )}
 
-      {loading && (
-        <div className="text-center py-8 text-gray-400">Loading...</div>
-      )}
-
-      {!loading && results.length > 0 && (
-        <>
-          <div className="text-sm text-gray-500">
-            Showing {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} of {total} results
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+            {error}
           </div>
+        )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {results.map((r) => (
-              <ResultCard
-                key={r.id}
-                trackId={r.trackId}
-                cameraId={r.cameraId}
-                objectClass={r.objectClass}
-                timestamp={r.timestamp}
-                confidence={r.confidence}
-                thumbnailUrl={r.thumbnailUrl}
-                clipUrl={r.clipUrl}
-                attributes={r.attributes}
-              />
-            ))}
+        {!loading && results.length > 0 && (
+          <>
+            <div className="text-xs text-gray-500">
+              Showing {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} of{" "}
+              {total.toLocaleString()} results
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {results.map((r) => (
+                <ResultCard
+                  key={r.id}
+                  trackId={r.trackId}
+                  cameraId={r.cameraId}
+                  objectClass={r.objectClass}
+                  timestamp={r.timestamp}
+                  confidence={r.confidence}
+                  thumbnailUrl={r.thumbnailUrl}
+                  clipUrl={r.clipUrl}
+                  attributes={r.attributes}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center justify-center gap-4 pt-4">
+              <button
+                onClick={() =>
+                  doSearch(debouncedFilters, thumbOnly, Math.max(0, offset - PAGE_SIZE))
+                }
+                disabled={offset === 0}
+                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => doSearch(debouncedFilters, thumbOnly, offset + PAGE_SIZE)}
+                disabled={offset + PAGE_SIZE >= total}
+                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </>
+        )}
+
+        {!loading && results.length === 0 && !error && (
+          <div className="text-center py-12 text-gray-400">
+            No results match the current filters.
           </div>
+        )}
+      </div>
 
-          {/* Pagination */}
-          <div className="flex items-center justify-center gap-4 pt-4">
-            <button
-              onClick={() => doSearch(Math.max(0, offset - PAGE_SIZE))}
-              disabled={offset === 0}
-              className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => doSearch(offset + PAGE_SIZE)}
-              disabled={offset + PAGE_SIZE >= total}
-              className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </>
-      )}
-
-      {!loading && results.length === 0 && !error && total === 0 && (
-        <div className="text-center py-12 text-gray-400">
-          Use the filters above to search detections, tracks, and events.
-        </div>
-      )}
+      <div className="sticky top-4">
+        <FilterSidebar
+          filters={filters}
+          onChange={setFilters}
+          thumbOnly={thumbOnly}
+          onThumbOnlyChange={setThumbOnly}
+        />
+      </div>
     </div>
   );
 }

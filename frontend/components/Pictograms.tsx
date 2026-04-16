@@ -383,3 +383,141 @@ export const TRACK_STATE_ICONS: Record<string, (p: IconProps) => JSX.Element> = 
   lost: TrackLostIcon,
   terminated: TrackTerminatedIcon,
 };
+
+// ---------------------------------------------------------------------------
+// Filter group icons (sidebar pictograms)
+// ---------------------------------------------------------------------------
+
+export function CameraGroupIcon({ className = "" }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`${base} ${className}`}
+    >
+      <rect x="6" y="12" width="28" height="20" rx="2" />
+      <circle cx="20" cy="22" r="6" />
+      <circle cx="20" cy="22" r="2.5" />
+      <rect x="25" y="14" width="6" height="3" rx="0.5" />
+    </svg>
+  );
+}
+
+export function ObjectClassGroupIcon({ className = "" }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`${base} ${className}`}
+    >
+      <circle cx="13" cy="10" r="3" />
+      <line x1="13" y1="13" x2="13" y2="22" />
+      <line x1="13" y1="16" x2="8" y2="19" />
+      <line x1="13" y1="16" x2="18" y2="19" />
+      <line x1="13" y1="22" x2="9" y2="28" />
+      <line x1="13" y1="22" x2="17" y2="28" />
+      <path d="M22 24 L22 22 L25 18 L33 18 L35 22 L35 24 Z" />
+      <circle cx="25" cy="25" r="2" />
+      <circle cx="33" cy="25" r="2" />
+    </svg>
+  );
+}
+
+export function ColorsGroupIcon({ className = "" }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`${base} ${className}`}
+    >
+      <circle cx="20" cy="20" r="14" />
+      <circle cx="15" cy="14" r="2.5" />
+      <circle cx="25" cy="14" r="2.5" />
+      <circle cx="12" cy="22" r="2.5" />
+      <circle cx="20" cy="26" r="2.5" />
+    </svg>
+  );
+}
+
+export function EventGroupIcon({ className = "" }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`${base} ${className}`}
+    >
+      <polyline points="24,4 14,20 22,20 16,36 30,18 22,18 28,4" />
+    </svg>
+  );
+}
+
+export function TrackStateGroupIcon({ className = "" }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`${base} ${className}`}
+    >
+      <path d="M30 14 A12 12 0 0 1 30 26" />
+      <path d="M10 26 A12 12 0 0 1 10 14" />
+      <polyline points="30,10 30,14 26,14" />
+      <polyline points="10,30 10,26 14,26" />
+    </svg>
+  );
+}
+
+export function TimeGroupIcon({ className = "" }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`${base} ${className}`}
+    >
+      <circle cx="20" cy="20" r="14" />
+      <line x1="20" y1="20" x2="20" y2="11" />
+      <line x1="20" y1="20" x2="27" y2="24" />
+    </svg>
+  );
+}
+
+export function ThumbnailIcon({ className = "" }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`${base} ${className}`}
+    >
+      <rect x="6" y="8" width="28" height="24" rx="2" />
+      <circle cx="14" cy="16" r="2" />
+      <polyline points="6,28 16,20 22,25 28,19 34,26" />
+    </svg>
+  );
+}
