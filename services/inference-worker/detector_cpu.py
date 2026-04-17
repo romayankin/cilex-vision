@@ -28,37 +28,19 @@ from metrics import DETECTIONS_TOTAL, INFERENCE_LATENCY
 logger = logging.getLogger(__name__)
 
 # COCO class indices (ultralytics YOLOv8 default) → Cilex class indices.
-# Cilex classes: person=0, car=1, truck=2, bus=3, bicycle=4, motorcycle=5, animal=6.
+# Restricted to person and car only for the current pilot.
+# Truck/bus/bicycle/motorcycle/animal are intentionally not mapped —
+# their CLASS_INDEX_TO_NAME entries remain in detector_client.py so
+# historical records from before this restriction still render correctly.
 COCO_TO_CILEX: dict[int, int] = {
     0: 0,   # person
     2: 1,   # car
-    7: 2,   # truck
-    5: 3,   # bus
-    1: 4,   # bicycle
-    3: 5,   # motorcycle
-    15: 6,  # cat
-    16: 6,  # dog
-    17: 6,  # horse
-    18: 6,  # sheep
-    19: 6,  # cow
-    20: 6,  # elephant
-    21: 6,  # bear
-    22: 6,  # zebra
-    23: 6,  # giraffe
 }
 
 # Default class-specific confidence thresholds (Cilex class indices).
-# Rationale: persons benefit from lower thresholds (partial views, distance);
-# animals need very high thresholds because YOLOv8 frequently misclassifies
-# partial-body persons as animals at 0.65-0.75 confidence.
 DEFAULT_CLASS_THRESHOLDS: dict[int, float] = {
     0: 0.50,   # person
     1: 0.50,   # car
-    2: 0.60,   # truck
-    3: 0.60,   # bus
-    4: 0.50,   # bicycle
-    5: 0.50,   # motorcycle
-    6: 0.85,   # animal
 }
 
 # Cilex class name → index (inverse of CLASS_INDEX_TO_NAME, used when

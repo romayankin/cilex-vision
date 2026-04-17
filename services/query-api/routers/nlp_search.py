@@ -68,7 +68,7 @@ CAMERAS:
 
 ZONE MATCHING RULE: If the user mentions a zone name (e.g. "office"), find the camera that has that zone. Zone names are the PRIMARY key — ignore location descriptions when a zone name matches.
 
-CLASSES: person, car, truck, bus, bicycle, motorcycle, animal
+CLASSES: person, car
 EVENTS: entered_scene, exited_scene, loitering, stopped
 COLORS: black, white, red, blue, green, yellow, silver, orange, brown
 

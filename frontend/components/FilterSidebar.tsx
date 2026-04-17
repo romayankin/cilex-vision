@@ -19,11 +19,6 @@ import {
 const OBJECT_CLASSES = [
   "person",
   "car",
-  "truck",
-  "bus",
-  "bicycle",
-  "motorcycle",
-  "animal",
 ];
 const COLORS = [
   "red",

@@ -65,16 +65,11 @@ class DetectorConfig(BaseModel):
     confidence_threshold: float = 0.40
     nms_iou_threshold: float = 0.45
     input_size: int = 640
-    num_classes: int = 7
+    num_classes: int = 2
     class_thresholds: dict[str, float] = Field(
         default_factory=lambda: {
             "person": 0.50,
             "car": 0.50,
-            "truck": 0.60,
-            "bus": 0.60,
-            "bicycle": 0.50,
-            "motorcycle": 0.50,
-            "animal": 0.85,
         }
     )
 
