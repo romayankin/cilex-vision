@@ -102,13 +102,15 @@ class ThumbnailWriter:
         return f"s3://{self._cfg.bucket}/{key}"
 
     def _crop(self, frame: np.ndarray, det: RawDetection) -> np.ndarray | None:
-        """Crop a detection bbox from the frame with padding + minimum size.
+        """Crop a detection bbox from the frame with padding + fixed aspect ratio.
 
-        - Converts normalized [0,1] detection to pixel coordinates
-        - Adds `crop_padding` fraction on each side of the bbox
-        - If the padded crop is still smaller than `min_crop_ratio` of frame
-          dimensions, expands around the bbox center until it meets the minimum
-        - Clamps to frame bounds (so crops near edges are smaller on one side)
+        Algorithm:
+        1. Compute bbox pixel coords and center
+        2. Pad each dimension by ``crop_padding`` fraction
+        3. Enforce minimum crop size (``min_crop_ratio`` of frame)
+        4. Force ``target_aspect_ratio`` by widening or heightening
+        5. Shift instead of clip when bumping into a frame edge — preserves
+           the crop size when the subject is near the border
         """
         h, w = frame.shape[:2]
         x0 = int(det.x_min * w)
@@ -123,18 +125,40 @@ class ThumbnailWriter:
         bw = x1 - x0
         bh = y1 - y0
 
-        half_w = bw * (0.5 + self._cfg.crop_padding)
-        half_h = bh * (0.5 + self._cfg.crop_padding)
+        padded_w = bw * (1 + 2 * self._cfg.crop_padding)
+        padded_h = bh * (1 + 2 * self._cfg.crop_padding)
 
-        min_half_w = (w * self._cfg.min_crop_ratio) / 2
-        min_half_h = (h * self._cfg.min_crop_ratio) / 2
-        half_w = max(half_w, min_half_w)
-        half_h = max(half_h, min_half_h)
+        min_w = w * self._cfg.min_crop_ratio
+        min_h = h * self._cfg.min_crop_ratio
+        crop_w = max(padded_w, min_w)
+        crop_h = max(padded_h, min_h)
 
-        nx0 = max(0, int(cx - half_w))
-        ny0 = max(0, int(cy - half_h))
-        nx1 = min(w, int(cx + half_w))
-        ny1 = min(h, int(cy + half_h))
+        target = self._cfg.target_aspect_ratio
+        current_aspect = crop_w / crop_h
+        if current_aspect < target:
+            crop_w = crop_h * target
+        elif current_aspect > target:
+            crop_h = crop_w / target
+
+        half_w = crop_w / 2
+        half_h = crop_h / 2
+        nx0 = int(cx - half_w)
+        ny0 = int(cy - half_h)
+        nx1 = int(cx + half_w)
+        ny1 = int(cy + half_h)
+
+        if nx0 < 0:
+            nx1 = min(w, nx1 - nx0)
+            nx0 = 0
+        if ny0 < 0:
+            ny1 = min(h, ny1 - ny0)
+            ny0 = 0
+        if nx1 > w:
+            nx0 = max(0, nx0 - (nx1 - w))
+            nx1 = w
+        if ny1 > h:
+            ny0 = max(0, ny0 - (ny1 - h))
+            ny1 = h
 
         if nx1 <= nx0 or ny1 <= ny0:
             return None

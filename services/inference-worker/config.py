@@ -87,8 +87,13 @@ class ThumbnailConfig(BaseModel):
     min_confidence: float = 0.50
     max_width: int = 320
     quality: int = 80
-    crop_padding: float = 0.5
-    min_crop_ratio: float = 0.15
+    crop_padding: float = 0.5           # padding relative to bbox
+    min_crop_ratio: float = 0.15        # min fraction of frame
+    # Aspect ratio for the output crop (width/height).
+    # 0.75 = 3:4 portrait (good for people, vehicles in traffic cam views).
+    # If padded bbox is narrower than target, width is widened; if wider,
+    # height is increased.
+    target_aspect_ratio: float = 0.75
 
 
 class Settings(BaseSettings):
