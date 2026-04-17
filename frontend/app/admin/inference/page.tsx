@@ -244,6 +244,166 @@ function normalize(value: number, ceiling: number): number {
   return Math.min(100, (value / ceiling) * 100);
 }
 
+function fmtInt(n: number | undefined | null): string {
+  if (n === undefined || n === null) return "—";
+  return Math.round(n).toLocaleString();
+}
+
+function fmtUptime(startedAt: number | undefined | null): string {
+  if (!startedAt) return "—";
+  const sec = Math.max(0, Math.floor(Date.now() / 1000 - startedAt));
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ${sec % 60}s`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h ${min % 60}m`;
+}
+
+// ----------------------------------------------------------------------
+// Simple components for the Models tab
+// ----------------------------------------------------------------------
+
+function Sparkline({ values, color = "#6366f1" }: { values: number[]; color?: string }) {
+  if (values.length < 2) {
+    return <div className="h-8 text-[10px] text-gray-400 flex items-end">gathering…</div>;
+  }
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const W = 200;
+  const H = 32;
+  const step = W / (values.length - 1);
+  const points = values
+    .map((v, i) => `${i * step},${H - ((v - min) / range) * H}`)
+    .join(" ");
+  return (
+    <svg
+      width="100%"
+      height={H}
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      className="overflow-visible"
+    >
+      <polyline fill="none" stroke={color} strokeWidth={1.5} points={points} />
+    </svg>
+  );
+}
+
+function ModelCard({
+  title,
+  subtitle,
+  mode,
+  stats,
+  sparklineValues,
+  sparklineColor,
+}: {
+  title: string;
+  subtitle?: string;
+  mode: string;
+  stats: { label: string; value: string }[];
+  sparklineValues: number[];
+  sparklineColor?: string;
+}) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-4 flex-1 min-w-0">
+      <div className="flex items-center justify-between mb-3">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-gray-900 truncate">{title}</h3>
+          {subtitle && <div className="text-xs text-gray-500 truncate">{subtitle}</div>}
+        </div>
+        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono flex-shrink-0 ml-2">
+          {mode}
+        </span>
+      </div>
+
+      <div className="space-y-1.5 mb-3">
+        {stats.map((s) => (
+          <div key={s.label} className="flex justify-between text-sm">
+            <span className="text-gray-500">{s.label}</span>
+            <span className="font-mono text-gray-900">{s.value}</span>
+          </div>
+        ))}
+      </div>
+
+      <Sparkline values={sparklineValues} color={sparklineColor} />
+    </div>
+  );
+}
+
+function HorizontalBars({
+  data,
+  color = "bg-blue-500",
+}: {
+  data: Record<string, number>;
+  color?: string;
+}) {
+  const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 0) {
+    return <div className="text-xs text-gray-400 py-6 text-center">No detections yet</div>;
+  }
+  const max = Math.max(1, ...entries.map(([, v]) => v));
+  const total = entries.reduce((sum, [, v]) => sum + v, 0);
+  return (
+    <div className="space-y-1.5">
+      {entries.map(([k, v]) => (
+        <div key={k} className="flex items-center gap-2 text-xs">
+          <div className="w-20 font-mono text-right text-gray-700 truncate">{k}</div>
+          <div className="flex-1 bg-gray-100 rounded h-4 overflow-hidden">
+            <div
+              className={`h-full ${color} transition-all duration-500`}
+              style={{ width: `${(v / max) * 100}%` }}
+            />
+          </div>
+          <div className="w-24 font-mono text-right text-gray-700">
+            {Math.round(v).toLocaleString()} ({total > 0 ? ((v / total) * 100).toFixed(1) : "0.0"}%)
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LatencyHistogram({ buckets }: { buckets: { le: string; count: number }[] }) {
+  if (!buckets || buckets.length === 0) {
+    return <div className="text-xs text-gray-400 py-6 text-center">No latency samples yet</div>;
+  }
+  const sorted = [...buckets].sort((a, b) => {
+    const pa = a.le === "+Inf" ? Infinity : parseFloat(a.le);
+    const pb = b.le === "+Inf" ? Infinity : parseFloat(b.le);
+    return pa - pb;
+  });
+
+  const bars: { label: string; count: number }[] = [];
+  let prev = 0;
+  for (const b of sorted) {
+    const delta = Math.max(0, b.count - prev);
+    prev = b.count;
+    const label = b.le === "+Inf" ? ">1000" : `≤${b.le}`;
+    bars.push({ label: `${label} ms`, count: delta });
+  }
+
+  const max = Math.max(1, ...bars.map((b) => b.count));
+
+  return (
+    <div className="space-y-1">
+      {bars.map((b) => (
+        <div key={b.label} className="flex items-center gap-2 text-xs">
+          <div className="w-20 font-mono text-right text-gray-600">{b.label}</div>
+          <div className="flex-1 bg-gray-100 rounded h-4 overflow-hidden">
+            <div
+              className="h-full bg-indigo-500 transition-all duration-500"
+              style={{ width: `${(b.count / max) * 100}%` }}
+            />
+          </div>
+          <div className="w-16 font-mono text-right text-gray-700">
+            {Math.round(b.count).toLocaleString()}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ----------------------------------------------------------------------
 // Page
 // ----------------------------------------------------------------------
@@ -278,6 +438,7 @@ type GraphKey =
 
 export default function PipelineMonitorPage() {
   const role = getUserRole();
+  const [activeTab, setActiveTab] = useState<"pipeline" | "models">("pipeline");
   const [error, setError] = useState<string | null>(null);
   const [lastFetch, setLastFetch] = useState<number>(Date.now());
   const [groups, setGroups] = useState<Record<string, KafkaGroup>>({});
@@ -285,6 +446,18 @@ export default function PipelineMonitorPage() {
   const [purgeResult, setPurgeResult] = useState<
     { group: string; success: boolean; message: string } | null
   >(null);
+
+  const [modelMetrics, setModelMetrics] = useState<any>(null);
+  const [modelError, setModelError] = useState<string | null>(null);
+  const modelHistoryRef = useRef<
+    {
+      t: number;
+      latency_avg_ms: number;
+      embedding_avg_ms: number;
+      frames_consumed: number;
+      detections_total: number;
+    }[]
+  >([]);
 
   // Rolling per-graph buffers (kept in a ref so updates don't re-render the whole tree).
   const buffersRef = useRef<Record<string, GraphState>>({});
@@ -440,11 +613,44 @@ export default function PipelineMonitorPage() {
   }, [role]);
 
   useEffect(() => {
-    if (!isAdmin(role)) return;
+    if (!isAdmin(role) || activeTab !== "pipeline") return;
     fetchOnce();
     const id = setInterval(fetchOnce, POLL_MS);
     return () => clearInterval(id);
-  }, [role, fetchOnce]);
+  }, [role, fetchOnce, activeTab]);
+
+  useEffect(() => {
+    if (!isAdmin(role) || activeTab !== "models") return;
+    const fetchModelMetrics = async () => {
+      try {
+        const res = await fetch("/api/inference/metrics", { credentials: "include" });
+        if (!res.ok) {
+          setModelError(`HTTP ${res.status}`);
+          return;
+        }
+        const data = await res.json();
+        setModelMetrics(data);
+        setModelError(null);
+
+        modelHistoryRef.current.push({
+          t: Date.now(),
+          latency_avg_ms: data.latency_avg_ms ?? 0,
+          embedding_avg_ms: data.embedding_avg_ms ?? 0,
+          frames_consumed: data.frames_consumed ?? 0,
+          detections_total: data.detections_total ?? 0,
+        });
+        if (modelHistoryRef.current.length > HISTORY_SIZE) {
+          modelHistoryRef.current.shift();
+        }
+      } catch (err) {
+        setModelError(err instanceof Error ? err.message : "Fetch failed");
+      }
+    };
+
+    fetchModelMetrics();
+    const id = setInterval(fetchModelMetrics, POLL_MS);
+    return () => clearInterval(id);
+  }, [role, activeTab]);
 
   // Tick once a second so "last polled Ns ago" stays current
   useEffect(() => {
@@ -574,25 +780,54 @@ export default function PipelineMonitorPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Pipeline Monitor</h1>
-          <div className="text-xs text-gray-500 mt-0.5">
-            5-minute rolling view · refreshes every 5 seconds
-          </div>
+      <div className="flex items-end justify-between border-b border-gray-200">
+        <div className="flex items-center gap-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab("pipeline")}
+            className={`pb-2 text-sm font-medium border-b-2 transition ${
+              activeTab === "pipeline"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Pipeline Monitor
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("models")}
+            className={`pb-2 text-sm font-medium border-b-2 transition ${
+              activeTab === "models"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Model Performance
+          </button>
         </div>
-        <div className="text-xs text-gray-500">
-          {error ? (
-            <span className="text-red-600">Error: {error}</span>
+        <div className="text-xs text-gray-500 pb-2">
+          {activeTab === "pipeline" ? (
+            error ? (
+              <span className="text-red-600">Error: {error}</span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                Live · polled {secAgo}s ago
+              </span>
+            )
+          ) : modelError ? (
+            <span className="text-red-600">Error: {modelError}</span>
           ) : (
             <span className="inline-flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Live · polled {secAgo}s ago
+              Auto-refresh · 5s
             </span>
           )}
         </div>
       </div>
 
+      {activeTab === "pipeline" && (
+        <>
       <section className="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-3">
           Processing pipeline
@@ -690,6 +925,123 @@ export default function PipelineMonitorPage() {
         <span className="text-red-700">red &gt; 80%</span> of capacity ceiling. Capacity
         ceilings are tuned per service for an i5-13500 CPU pilot deployment.
       </div>
+        </>
+      )}
+
+      {activeTab === "models" && (
+        <>
+          {modelError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+              {modelError}
+            </div>
+          )}
+
+          <div className="flex flex-col md:flex-row gap-4">
+            <ModelCard
+              title={modelMetrics?.model_name ?? "YOLOv8s"}
+              subtitle="Object detection"
+              mode={(modelMetrics?.inference_mode ?? "—").toString().toUpperCase()}
+              stats={[
+                {
+                  label: "Avg latency",
+                  value: `${(modelMetrics?.latency_avg_ms ?? 0).toFixed(1)} ms`,
+                },
+                { label: "Frames processed", value: fmtInt(modelMetrics?.frames_consumed) },
+                { label: "Total detections", value: fmtInt(modelMetrics?.detections_total) },
+                {
+                  label: "Det / frame",
+                  value: (modelMetrics?.avg_detections_per_frame ?? 0).toFixed(2),
+                },
+                {
+                  label: "Confidence",
+                  value: (modelMetrics?.confidence_threshold ?? 0).toFixed(2),
+                },
+                { label: "NMS IoU", value: (modelMetrics?.nms_iou_threshold ?? 0).toFixed(2) },
+                { label: "Uptime", value: fmtUptime(modelMetrics?.started_at) },
+              ]}
+              sparklineValues={modelHistoryRef.current.map((h) => h.latency_avg_ms)}
+              sparklineColor="#6366f1"
+            />
+            <ModelCard
+              title={modelMetrics?.embedder_model ?? "OSNet x0.25"}
+              subtitle="Re-identification (appearance embedding)"
+              mode={(modelMetrics?.embedder_mode ?? "—").toString().toUpperCase()}
+              stats={[
+                {
+                  label: "Avg latency",
+                  value: `${(modelMetrics?.embedding_avg_ms ?? 0).toFixed(1)} ms`,
+                },
+                { label: "Embeddings", value: fmtInt(modelMetrics?.embedding_count) },
+                { label: "Embedding dim", value: "512" },
+              ]}
+              sparklineValues={modelHistoryRef.current.map((h) => h.embedding_avg_ms)}
+              sparklineColor="#10b981"
+            />
+          </div>
+
+          {modelMetrics?.class_thresholds &&
+            Object.keys(modelMetrics.class_thresholds).length > 0 && (
+              <section className="bg-white border border-gray-200 rounded-lg p-4">
+                <h2 className="font-medium text-sm mb-2">Class confidence thresholds</h2>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {Object.entries(modelMetrics.class_thresholds).map(([cls, thresh]) => (
+                    <div key={cls} className="bg-gray-50 rounded px-2 py-1 font-mono">
+                      {cls}:{" "}
+                      <span className="font-semibold">{(thresh as number).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+          <section className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="font-medium text-sm mb-3">Detections by class</h2>
+            <HorizontalBars data={modelMetrics?.detections_by_class ?? {}} />
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="font-medium text-sm mb-3">Tracks by camera</h2>
+            {Object.keys(modelMetrics?.tracks_active ?? {}).length === 0 ? (
+              <div className="text-xs text-gray-400 py-2 text-center">No active tracks</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(modelMetrics?.tracks_active ?? {}).map(([cam, count]) => (
+                  <div key={cam} className="text-sm">
+                    <span className="font-medium text-gray-900">{cam}</span>
+                    <span className="text-gray-500 ml-2">
+                      {fmtInt(count as number)} active /{" "}
+                      {fmtInt((modelMetrics?.tracks_closed ?? {})[cam])} closed
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="font-medium text-sm mb-3">Inference latency distribution</h2>
+            <LatencyHistogram buckets={modelMetrics?.latency_buckets ?? []} />
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="font-medium text-sm mb-2">Configuration</h2>
+            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+              <span className="text-gray-500">Confidence</span>
+              <span className="font-mono">
+                {modelMetrics?.confidence_threshold?.toFixed(2) ?? "—"}
+              </span>
+              <span className="text-gray-500">NMS IoU</span>
+              <span className="font-mono">
+                {modelMetrics?.nms_iou_threshold?.toFixed(2) ?? "—"}
+              </span>
+              <span className="text-gray-500">Thumbnails / track</span>
+              <span className="font-mono">
+                {modelMetrics?.thumbnail_max_per_track ?? "—"}
+              </span>
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }
