@@ -85,9 +85,10 @@ class ThumbnailConfig(BaseModel):
     bucket: str = "thumbnails"
     max_per_track: int = 5
     min_confidence: float = 0.50
-    max_width: int = 224
+    max_width: int = 320
     quality: int = 80
-    crop_padding: float = 0.2
+    crop_padding: float = 0.5
+    min_crop_ratio: float = 0.15
 
 
 class Settings(BaseSettings):

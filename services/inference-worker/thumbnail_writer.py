@@ -102,6 +102,14 @@ class ThumbnailWriter:
         return f"s3://{self._cfg.bucket}/{key}"
 
     def _crop(self, frame: np.ndarray, det: RawDetection) -> np.ndarray | None:
+        """Crop a detection bbox from the frame with padding + minimum size.
+
+        - Converts normalized [0,1] detection to pixel coordinates
+        - Adds `crop_padding` fraction on each side of the bbox
+        - If the padded crop is still smaller than `min_crop_ratio` of frame
+          dimensions, expands around the bbox center until it meets the minimum
+        - Clamps to frame bounds (so crops near edges are smaller on one side)
+        """
         h, w = frame.shape[:2]
         x0 = int(det.x_min * w)
         y0 = int(det.y_min * h)
@@ -110,14 +118,28 @@ class ThumbnailWriter:
         if x1 <= x0 or y1 <= y0:
             return None
 
-        pad_x = int((x1 - x0) * self._cfg.crop_padding)
-        pad_y = int((y1 - y0) * self._cfg.crop_padding)
-        x0 = max(0, x0 - pad_x)
-        y0 = max(0, y0 - pad_y)
-        x1 = min(w, x1 + pad_x)
-        y1 = min(h, y1 + pad_y)
+        cx = (x0 + x1) / 2
+        cy = (y0 + y1) / 2
+        bw = x1 - x0
+        bh = y1 - y0
 
-        return frame[y0:y1, x0:x1]
+        half_w = bw * (0.5 + self._cfg.crop_padding)
+        half_h = bh * (0.5 + self._cfg.crop_padding)
+
+        min_half_w = (w * self._cfg.min_crop_ratio) / 2
+        min_half_h = (h * self._cfg.min_crop_ratio) / 2
+        half_w = max(half_w, min_half_w)
+        half_h = max(half_h, min_half_h)
+
+        nx0 = max(0, int(cx - half_w))
+        ny0 = max(0, int(cy - half_h))
+        nx1 = min(w, int(cx + half_w))
+        ny1 = min(h, int(cy + half_h))
+
+        if nx1 <= nx0 or ny1 <= ny0:
+            return None
+
+        return frame[ny0:ny1, nx0:nx1]
 
     def _encode(self, crop: np.ndarray) -> bytes | None:
         try:
