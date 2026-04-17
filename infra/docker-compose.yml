@@ -608,6 +608,8 @@ services:
         condition: service_healthy
       timescaledb:
         condition: service_healthy
+      go2rtc:
+        condition: service_healthy
     environment:
       CLIP_KAFKA_BOOTSTRAP: kafka-0:9092
       CLIP_KAFKA_SECURITY_PROTOCOL: PLAINTEXT
@@ -619,7 +621,13 @@ services:
       CLIP_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
       CLIP_HEALTH_PORT: "8081"
       CLIP_LOG_LEVEL: INFO
-    mem_limit: 512m
+      CLIP_GO2RTC_RTSP_BASE: "rtsp://go2rtc:8554"
+      CLIP_BUFFER_ENABLED: "true"
+      CLIP_BUFFER_DIR: "/tmp/buffer"
+      CLIP_BUFFER_SEGMENT_S: "30"
+      CLIP_BUFFER_MAX_SEGMENTS: "20"
+      CLIP_BUFFER_TARGET_BITRATE: "2000k"
+    mem_limit: 1024m
     restart: unless-stopped
     healthcheck:
       test:

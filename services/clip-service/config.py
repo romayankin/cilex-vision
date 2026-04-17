@@ -38,6 +38,13 @@ class ClipServiceSettings(BaseSettings):
     thumbnail_height: int = 180
     min_clip_duration_ms: int = 1000
 
+    go2rtc_rtsp_base: str = "rtsp://go2rtc:8554"
+    buffer_dir: str = "/tmp/buffer"
+    buffer_segment_s: int = 30
+    buffer_max_segments: int = 20
+    buffer_enabled: bool = True
+    buffer_target_bitrate: str = "2000k"
+
     temp_dir: str = "/tmp/clip-service"
     metrics_port: int = 8080
     health_port: int = 8081

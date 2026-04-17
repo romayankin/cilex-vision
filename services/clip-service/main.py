@@ -20,6 +20,7 @@ from typing import Any, cast
 
 import asyncpg
 
+from buffer_extractor import extract_clip_from_buffer
 from clip_extractor import extract_clip
 from config import ClipServiceSettings
 from db_updater import ClipDBUpdater
@@ -33,7 +34,8 @@ from metrics import (
     CLIP_THUMBNAILS_GENERATED_TOTAL,
 )
 from minio_client import ClipMinioClient
-from thumbnail_gen import generate_thumbnail
+from recording_buffer import RecordingBuffer
+from thumbnail_gen import generate_thumbnail, generate_thumbnail_from_video
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +101,7 @@ class ClipService:
         self._consumer_subscribed: bool = False
         self._clips_generated: int = 0
         self._health_runner: Any = None
+        self._recording_buffer: RecordingBuffer | None = None
 
     async def start(self) -> None:
         """Initialise dependencies and start the Kafka loop."""
@@ -147,7 +150,36 @@ class ClipService:
         start_http_server(self.settings.metrics_port)
         logger.info("Metrics server listening on port %d", self.settings.metrics_port)
         await self._start_health_server()
+
+        if self.settings.buffer_enabled:
+            try:
+                camera_ids = await self._get_camera_ids()
+                if camera_ids:
+                    self._recording_buffer = RecordingBuffer(
+                        go2rtc_rtsp_base=self.settings.go2rtc_rtsp_base,
+                        buffer_dir=self.settings.buffer_dir,
+                        segment_duration_s=self.settings.buffer_segment_s,
+                        max_segments=self.settings.buffer_max_segments,
+                    )
+                    await self._recording_buffer.start(camera_ids)
+                    logger.info("Recording buffer started for %d cameras", len(camera_ids))
+                else:
+                    logger.warning("No online cameras found — recording buffer disabled")
+            except Exception:
+                logger.exception("Failed to start recording buffer — continuing without it")
+                self._recording_buffer = None
+
         await self._consume_loop()
+
+    async def _get_camera_ids(self) -> list[str]:
+        """Query active camera IDs from the database."""
+        if self._pool is None:
+            return []
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT camera_id FROM cameras WHERE status = 'online'"
+            )
+        return [row["camera_id"] for row in rows]
 
     async def _start_health_server(self) -> None:
         try:
@@ -170,6 +202,16 @@ class ClipService:
 
             checks["clips_generated"] = str(self._clips_generated)
 
+            if self._recording_buffer is not None:
+                buffer_cams = [
+                    cam_id
+                    for cam_id in self._recording_buffer.processes
+                    if self._recording_buffer.is_recording(cam_id)
+                ]
+                checks["buffer"] = f"{len(buffer_cams)} cameras recording"
+            else:
+                checks["buffer"] = "disabled"
+
             body = {
                 "status": "ok" if healthy else "unhealthy",
                 "uptime_seconds": int(uptime),
@@ -189,6 +231,11 @@ class ClipService:
     async def shutdown(self) -> None:
         """Flush and close all external resources."""
         self._shutdown.set()
+        if self._recording_buffer is not None:
+            try:
+                await self._recording_buffer.stop()
+            except Exception:
+                logger.exception("Error stopping recording buffer")
         if self._producer is not None:
             await asyncio.to_thread(self._producer.flush, 5.0)
         if self._consumer is not None:
@@ -272,16 +319,8 @@ class ClipService:
         clip_start = start_time - timedelta(seconds=self.settings.pre_roll_s)
         clip_end = end_time + timedelta(seconds=self.settings.post_roll_s)
 
-        frames = await self._minio.list_source_frames(
-            camera_id=str(event.camera_id),
-            start_time=clip_start,
-            end_time=clip_end,
-        )
-        if not frames:
-            CLIP_EVENTS_SKIPPED_TOTAL.labels(reason="no_source_frames").inc()
-            return
-
-        site_id = await self._db.get_camera_site_id(str(event.camera_id))
+        camera_id = str(event.camera_id)
+        site_id = await self._db.get_camera_site_id(camera_id)
         temp_root = Path(self.settings.temp_dir) / event_id
         frames_dir = temp_root / "frames"
         clip_path = temp_root / f"{event_id}.mp4"
@@ -290,39 +329,88 @@ class ClipService:
         clip_size = 0
 
         try:
-            frame_paths = await self._minio.download_frames(frames, frames_dir)
-            if not frame_paths:
-                logger.warning(
-                    "No frames available for event %s (all source frames missing) — skipping clip",
-                    event_id,
+            buffer_used = False
+            if (
+                self._recording_buffer is not None
+                and self._recording_buffer.is_recording(camera_id)
+            ):
+                segments = self._recording_buffer.get_segments(
+                    camera_id, clip_start, clip_end
                 )
-                CLIP_EVENTS_SKIPPED_TOTAL.labels(reason="frames_unavailable").inc()
-                return
-            await extract_clip(
-                frame_paths=frame_paths,
-                output_path=clip_path,
-                target_bitrate=self.settings.target_bitrate,
-                fps=self.settings.target_fps,
-            )
-            await generate_thumbnail(
-                frame_paths=frame_paths,
-                output_path=thumbnail_path,
-                width=self.settings.thumbnail_width,
-                height=self.settings.thumbnail_height,
-            )
+                if segments:
+                    try:
+                        seg_start = datetime.strptime(
+                            segments[0].stem, "%Y%m%d_%H%M%S"
+                        ).replace(tzinfo=timezone.utc)
+                        await extract_clip_from_buffer(
+                            segments=segments,
+                            segment_start=seg_start,
+                            clip_start=clip_start,
+                            clip_end=clip_end,
+                            output_path=clip_path,
+                            target_bitrate=self.settings.buffer_target_bitrate,
+                        )
+                        await generate_thumbnail_from_video(
+                            video_path=clip_path,
+                            output_path=thumbnail_path,
+                            width=self.settings.thumbnail_width,
+                            height=self.settings.thumbnail_height,
+                        )
+                        buffer_used = True
+                        logger.info(
+                            "Clip %s extracted from RTSP buffer (%d segments, full FPS)",
+                            event_id,
+                            len(segments),
+                        )
+                    except Exception:
+                        logger.warning(
+                            "Buffer extraction failed for %s — falling back to JPEG method",
+                            event_id,
+                            exc_info=True,
+                        )
+
+            if not buffer_used:
+                frames = await self._minio.list_source_frames(
+                    camera_id=camera_id,
+                    start_time=clip_start,
+                    end_time=clip_end,
+                )
+                if not frames:
+                    CLIP_EVENTS_SKIPPED_TOTAL.labels(reason="no_source_frames").inc()
+                    return
+                frame_paths = await self._minio.download_frames(frames, frames_dir)
+                if not frame_paths:
+                    logger.warning(
+                        "No frames available for event %s (all source frames missing) — skipping clip",
+                        event_id,
+                    )
+                    CLIP_EVENTS_SKIPPED_TOTAL.labels(reason="frames_unavailable").inc()
+                    return
+                await extract_clip(
+                    frame_paths=frame_paths,
+                    output_path=clip_path,
+                    target_bitrate=self.settings.target_bitrate,
+                    fps=self.settings.target_fps,
+                )
+                await generate_thumbnail(
+                    frame_paths=frame_paths,
+                    output_path=thumbnail_path,
+                    width=self.settings.thumbnail_width,
+                    height=self.settings.thumbnail_height,
+                )
 
             asset_date = start_time.date()
             clip_uri = await self._minio.upload_clip(
                 local_path=clip_path,
                 site_id=site_id,
-                camera_id=str(event.camera_id),
+                camera_id=camera_id,
                 event_id=event_id,
                 asset_date=asset_date,
             )
             thumbnail_uri = await self._minio.upload_thumbnail(
                 local_path=thumbnail_path,
                 site_id=site_id,
-                camera_id=str(event.camera_id),
+                camera_id=camera_id,
                 event_id=event_id,
                 asset_date=asset_date,
             )
