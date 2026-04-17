@@ -92,6 +92,7 @@ class ThumbnailConfig(BaseModel):
     min_confidence: float = 0.50
     max_width: int = 224
     quality: int = 80
+    crop_padding: float = 0.2
 
 
 class Settings(BaseSettings):

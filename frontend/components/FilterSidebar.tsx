@@ -112,14 +112,24 @@ function fromSet(set: Set<string>): string {
 
 function splitDt(dt: string): { date: string; time: string } {
   if (!dt) return { date: "", time: "" };
-  const [date, time] = dt.split("T");
-  return { date: date ?? "", time: (time ?? "").slice(0, 5) };
+  const [date, rest] = dt.split("T");
+  const time = (rest ?? "").replace(/([+-]\d{2}:\d{2}|Z)$/, "").slice(0, 5);
+  return { date: date ?? "", time };
+}
+
+function getLocalTzOffset(): string {
+  const offsetMin = new Date().getTimezoneOffset();
+  const sign = offsetMin <= 0 ? "+" : "-";
+  const absMin = Math.abs(offsetMin);
+  const hh = String(Math.floor(absMin / 60)).padStart(2, "0");
+  const mm = String(absMin % 60).padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
 }
 
 function joinDt(date: string, time: string): string {
   if (!date && !time) return "";
   if (!date) return "";
-  return `${date}T${time || "00:00"}`;
+  return `${date}T${time || "00:00"}${getLocalTzOffset()}`;
 }
 
 const GROUPS: { id: GroupId; title: string; Icon: (p: { className?: string }) => JSX.Element }[] = [

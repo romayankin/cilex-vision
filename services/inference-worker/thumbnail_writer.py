@@ -103,12 +103,20 @@ class ThumbnailWriter:
 
     def _crop(self, frame: np.ndarray, det: RawDetection) -> np.ndarray | None:
         h, w = frame.shape[:2]
-        x0 = max(0, int(det.x_min * w))
-        y0 = max(0, int(det.y_min * h))
-        x1 = min(w, int(det.x_max * w))
-        y1 = min(h, int(det.y_max * h))
+        x0 = int(det.x_min * w)
+        y0 = int(det.y_min * h)
+        x1 = int(det.x_max * w)
+        y1 = int(det.y_max * h)
         if x1 <= x0 or y1 <= y0:
             return None
+
+        pad_x = int((x1 - x0) * self._cfg.crop_padding)
+        pad_y = int((y1 - y0) * self._cfg.crop_padding)
+        x0 = max(0, x0 - pad_x)
+        y0 = max(0, y0 - pad_y)
+        x1 = min(w, x1 + pad_x)
+        y1 = min(h, y1 + pad_y)
+
         return frame[y0:y1, x0:x1]
 
     def _encode(self, crop: np.ndarray) -> bytes | None:
