@@ -455,8 +455,9 @@ services:
       - ./dev/edge-agent.yaml:/app/config.yaml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    mem_limit: 192m
-    memswap_limit: 192m
+    mem_limit: 1g
+    mem_reservation: 768m
+    memswap_limit: 1g
     cpus: 0.3
     restart: unless-stopped
     healthcheck:
