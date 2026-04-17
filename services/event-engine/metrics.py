@@ -29,3 +29,9 @@ EVENT_TRACKLETS_CONSUMED_TOTAL = Counter(
     "event_tracklets_consumed_total",
     "Total tracklets consumed from Kafka",
 )
+
+EVENT_SUPPRESSED_TOTAL = Counter(
+    "event_suppressed_total",
+    "Events suppressed by deduplication cooldown",
+    ["event_type"],
+)

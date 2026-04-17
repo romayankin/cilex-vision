@@ -33,6 +33,10 @@ class EventEngineSettings(BaseSettings):
     motion_end_duration_s: float = 2.0
     motion_events_enabled: bool = False
 
+    # Suppress duplicate entered/exited events on the same camera within
+    # this window. 10s matches the ±5s clip pre/post roll. Set to 0 to disable.
+    event_cooldown_s: float = 10.0
+
     metrics_port: int = 8080
     health_port: int = 8081
     log_level: str = "INFO"

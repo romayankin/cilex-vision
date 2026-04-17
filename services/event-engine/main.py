@@ -24,6 +24,7 @@ from event_emitter import EventEmitter
 from metrics import (
     EVENT_ACTIVE_STATE_MACHINES,
     EVENT_STATE_TRANSITIONS_TOTAL,
+    EVENT_SUPPRESSED_TOTAL,
     EVENT_TRACKLETS_CONSUMED_TOTAL,
 )
 from state_machine import (
@@ -130,6 +131,11 @@ class CameraConfigStore:
 class EventEngineService:
     """Service orchestrator for the event engine."""
 
+    _DEDUP_EVENT_TYPES = {
+        EventType.ENTERED_SCENE.value,
+        EventType.EXITED_SCENE.value,
+    }
+
     def __init__(self, settings: EventEngineSettings) -> None:
         self.settings = settings
         self._shutdown = asyncio.Event()
@@ -140,6 +146,7 @@ class EventEngineService:
         self._camera_configs: CameraConfigStore | None = None
         self._state_machines: dict[str, TrackStateMachine] = {}
         self._camera_motion: dict[str, CameraMotionState] = {}
+        self._event_cooldowns: dict[tuple[str, str], float] = {}
         self._tick_task: asyncio.Task[None] | None = None
         self._started_at: float = time.time()
         self._last_tracklet_ts: float = 0.0
@@ -227,6 +234,9 @@ class EventEngineService:
                 if age > 120:
                     checks["processing"] += " (STALE)"
                     healthy = False
+
+            checks["cooldown_s"] = str(self.settings.event_cooldown_s)
+            checks["active_cooldowns"] = str(len(self._event_cooldowns))
 
             body = {
                 "status": "ok" if healthy else "unhealthy",
@@ -331,8 +341,9 @@ class EventEngineService:
         if motion_triggers:
             triggers.extend(motion_triggers)
 
-        if triggers:
-            await self._emitter.emit_many(triggers)
+        filtered_triggers = [t for t in triggers if not self._should_suppress(t)]
+        if filtered_triggers:
+            await self._emitter.emit_many(filtered_triggers)
 
         if getattr(tracklet, "state", None) == TRACKLET_STATE_TERMINATED:
             self._state_machines.pop(track_id, None)
@@ -353,8 +364,11 @@ class EventEngineService:
                 self._record_transition(previous_state.value, machine.state.value)
 
             triggers.extend(self._check_camera_motion(now))
-            if triggers and self._emitter is not None:
-                await self._emitter.emit_many(triggers)
+            filtered = [t for t in triggers if not self._should_suppress(t)]
+            if filtered and self._emitter is not None:
+                await self._emitter.emit_many(filtered)
+
+            self._cleanup_cooldowns(now)
 
     def _update_camera_motion(self, tracklet: Any) -> list[EventTrigger]:
         if not self.settings.motion_events_enabled:
@@ -427,6 +441,51 @@ class EventEngineService:
                 from_state=from_state,
                 to_state=to_state,
             ).inc()
+
+    def _should_suppress(self, trigger: EventTrigger) -> bool:
+        """Return True if this event should be suppressed as a duplicate.
+
+        Only entered_scene and exited_scene are subject to cooldown.
+        The cooldown is per (camera_id, event_type) — not per track.
+        """
+        if self.settings.event_cooldown_s <= 0:
+            return False
+
+        event_type = trigger.event_type
+        if isinstance(event_type, EventType):
+            event_type = event_type.value
+
+        if event_type not in self._DEDUP_EVENT_TYPES:
+            return False
+
+        key = (trigger.camera_id, event_type)
+        now = time.time()
+        last = self._event_cooldowns.get(key, 0.0)
+
+        if (now - last) < self.settings.event_cooldown_s:
+            logger.debug(
+                "Suppressed duplicate %s on %s (%.1fs since last)",
+                event_type,
+                trigger.camera_id,
+                now - last,
+            )
+            EVENT_SUPPRESSED_TOTAL.labels(event_type=event_type).inc()
+            return True
+
+        self._event_cooldowns[key] = now
+        return False
+
+    def _cleanup_cooldowns(self, now: float) -> None:
+        """Remove cooldown entries older than 2× the cooldown window."""
+        if self.settings.event_cooldown_s <= 0:
+            return
+        stale_threshold = self.settings.event_cooldown_s * 2
+        stale_keys = [
+            k for k, t in self._event_cooldowns.items()
+            if (now - t) > stale_threshold
+        ]
+        for k in stale_keys:
+            del self._event_cooldowns[k]
 
 
 def datetime_from_epoch(epoch_seconds: float) -> Any:
