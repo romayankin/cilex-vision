@@ -15,6 +15,21 @@ import {
 const PAGE_SIZE = 20;
 const FILTER_DEBOUNCE_MS = 300;
 
+const EXAMPLE_QUERIES = [
+  "person in office friday afternoon",
+  "car yesterday evening",
+  "person entering corridor monday morning",
+  "person loitering in office today",
+  "all activity on cam-2 this morning",
+  "red car",
+];
+
+function isValidDate(s: string | undefined | null): boolean {
+  if (!s || s.length < 10) return false;
+  const d = new Date(s);
+  return !isNaN(d.getTime());
+}
+
 type ResultItem = {
   kind: "detection" | "event" | "track";
   id: string;
@@ -125,8 +140,8 @@ export default function SearchPage() {
           camera_id: data.filters.camera_id || prev.camera_id,
           object_class: data.filters.object_class || prev.object_class,
           event_type: data.filters.event_type || prev.event_type,
-          start: data.filters.start || prev.start,
-          end: data.filters.end || prev.end,
+          start: isValidDate(data.filters.start) ? data.filters.start : prev.start,
+          end: isValidDate(data.filters.end) ? data.filters.end : prev.end,
           color: data.filters.color || prev.color,
           state: data.filters.state || prev.state,
         }));
@@ -347,7 +362,7 @@ export default function SearchPage() {
                 ? "AI search unavailable — Ollama not running"
                 : nlpAvailable === null
                   ? "Checking AI search availability..."
-                  : 'Try: "person entering server room Monday morning"'
+                  : `Try: "${EXAMPLE_QUERIES[Math.floor(Date.now() / 30000) % EXAMPLE_QUERIES.length]}"`
             }
             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:text-gray-500"
             disabled={nlpLoading || nlpAvailable === false}
@@ -376,10 +391,21 @@ export default function SearchPage() {
           </div>
           <button
             type="button"
-            onClick={() => setNlpExplanation(null)}
-            className="ml-auto text-blue-400 hover:text-blue-600 text-xs flex-shrink-0"
+            onClick={() => {
+              setNlpExplanation(null);
+              setFilters({
+                camera_id: "",
+                start: "",
+                end: "",
+                object_class: "",
+                color: "",
+                event_type: "",
+                state: "",
+              });
+            }}
+            className="ml-auto text-blue-600 hover:text-blue-800 text-xs font-medium whitespace-nowrap flex-shrink-0"
           >
-            ✕
+            Clear filters
           </button>
         </div>
       )}

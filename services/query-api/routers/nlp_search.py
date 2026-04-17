@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -40,40 +40,68 @@ def _build_system_prompt(cameras: list[dict[str, Any]], now: datetime) -> str:
         zones = cam.get("zones", [])
         zone_names = [z["name"] for z in zones if z.get("name")] or ["no named zones"]
         camera_lines.append(
-            f"  - {cam['camera_id']} ({cam['name']}): {desc}. "
-            f"Zones: {', '.join(zone_names)}"
+            f"  - {cam['camera_id']}: location={desc}, zones=[{', '.join(zone_names)}]"
         )
 
     cameras_text = "\n".join(camera_lines) if camera_lines else "  No cameras configured."
 
-    return f"""You are a search query parser for a video surveillance system.
-Your ONLY job: take the user's natural language query and return a JSON object with structured filters.
+    today = now.date()
+    weekday = today.weekday()
+    monday = today - timedelta(days=weekday)
+    week_dates = {}
+    for i, name in enumerate(
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    ):
+        d = monday + timedelta(days=i)
+        week_dates[name] = d.isoformat()
 
-CURRENT DATE/TIME: {now.strftime('%A, %B %d, %Y %H:%M UTC')}
+    week_ref = ", ".join(f"{name}={date}" for name, date in week_dates.items())
+    yesterday = (today - timedelta(days=1)).isoformat()
+
+    return f"""You parse surveillance search queries into JSON filters.
+
+CURRENT: {now.strftime('%A %Y-%m-%d %H:%M UTC')}
+THIS WEEK: {week_ref}
 
 CAMERAS:
 {cameras_text}
 
-OBJECT CLASSES (use exactly): person, car, truck, bus, bicycle, motorcycle, animal
-EVENT TYPES (use exactly): entered_scene, exited_scene, loitering, stopped
-COLORS (use exactly): black, white, red, blue, green, yellow, silver, orange, brown
+ZONE MATCHING RULE: If the user mentions a zone name (e.g. "office"), find the camera that has that zone. Zone names are the PRIMARY key — ignore location descriptions when a zone name matches.
 
-TIME CONVENTIONS:
-- "morning" = 06:00-12:00
-- "afternoon" = 12:00-17:00
-- "evening" = 17:00-22:00
-- "night" = 22:00-06:00
-- "yesterday" = the day before today
-- "Monday" = most recent Monday (past, not future)
+CLASSES: person, car, truck, bus, bicycle, motorcycle, animal
+EVENTS: entered_scene, exited_scene, loitering, stopped
+COLORS: black, white, red, blue, green, yellow, silver, orange, brown
 
-RULES:
-1. Map location mentions to the correct camera using descriptions and zone names.
-2. Convert relative dates to ISO datetimes based on the current date/time.
-3. Only set fields you are confident about. Leave others as empty strings.
-4. Respond with ONLY a JSON object. No markdown, no backticks, no other text.
+DATETIME FORMAT: Always use full ISO 8601 with timezone. Example: "2026-04-14T06:00:00+00:00"
+Never return partial times like "16:30" or dates like "Monday".
 
-JSON FORMAT:
-{{"camera_id":"","object_class":"","event_type":"","start":"","end":"","zone_name":"","color":"","state":"","explanation":"one sentence describing what you understood"}}"""
+TIME RANGES: morning=06:00-12:00, afternoon=12:00-17:00, evening=17:00-22:00, night=22:00-06:00
+
+Return ONLY a JSON object. No other text.
+
+EXAMPLES:
+
+Query: "person in the office friday afternoon"
+{{"camera_id":"cam-2","object_class":"person","event_type":"","start":"{week_dates['Friday']}T12:00:00+00:00","end":"{week_dates['Friday']}T17:00:00+00:00","zone_name":"office","color":"","explanation":"Person in office zone (cam-2) on Friday afternoon"}}
+
+Query: "cars yesterday evening"
+{{"camera_id":"","object_class":"car","event_type":"","start":"{yesterday}T17:00:00+00:00","end":"{yesterday}T22:00:00+00:00","zone_name":"","color":"","explanation":"Cars detected yesterday evening across all cameras"}}
+
+Query: "red car in parking lot"
+{{"camera_id":"","object_class":"car","event_type":"","start":"","end":"","zone_name":"","color":"red","explanation":"Red car detected anywhere (no time filter)"}}
+
+Now parse this query:"""
+
+
+def _validate_datetime(value: str) -> str | None:
+    """Return a valid ISO datetime string or None if it can't be parsed as one."""
+    if not value or len(value) < 10:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.isoformat()
+    except (ValueError, TypeError):
+        return None
 
 
 async def _call_ollama(system_prompt: str, user_query: str) -> str:
@@ -212,9 +240,13 @@ async def nlp_search(
     if parsed.get("event_type") and parsed["event_type"] in valid_events:
         filters["event_type"] = parsed["event_type"]
     if parsed.get("start"):
-        filters["start"] = parsed["start"]
+        validated = _validate_datetime(parsed["start"])
+        if validated:
+            filters["start"] = validated
     if parsed.get("end"):
-        filters["end"] = parsed["end"]
+        validated = _validate_datetime(parsed["end"])
+        if validated:
+            filters["end"] = validated
     if parsed.get("color") and parsed["color"] in valid_colors:
         filters["color"] = parsed["color"]
     if parsed.get("state"):
