@@ -18,8 +18,12 @@ services:
       KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-0:9092,EXTERNAL://localhost:19092"
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
       ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_HEAP_OPTS: "-Xmx384m -Xms256m"
     volumes:
       - kafka_0_data:/bitnami/kafka
+    mem_limit: 640m
+    memswap_limit: 640m
+    cpus: 0.6
     healthcheck:
       test:
         - CMD-SHELL
@@ -48,8 +52,12 @@ services:
       KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-1:9092,EXTERNAL://localhost:19093"
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
       ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_HEAP_OPTS: "-Xmx384m -Xms256m"
     volumes:
       - kafka_1_data:/bitnami/kafka
+    mem_limit: 640m
+    memswap_limit: 640m
+    cpus: 0.6
     healthcheck:
       test:
         - CMD-SHELL
@@ -78,8 +86,12 @@ services:
       KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-2:9092,EXTERNAL://localhost:19094"
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
       ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_HEAP_OPTS: "-Xmx384m -Xms256m"
     volumes:
       - kafka_2_data:/bitnami/kafka
+    mem_limit: 640m
+    memswap_limit: 640m
+    cpus: 0.6
     healthcheck:
       test:
         - CMD-SHELL
@@ -105,6 +117,9 @@ services:
       KAFKA_CLUSTERS_0_NAME: "local"
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka-0:9092,kafka-1:9092,kafka-2:9092"
       DYNAMIC_CONFIG_ENABLED: "true"
+    mem_limit: 160m
+    memswap_limit: 160m
+    cpus: 0.1
     healthcheck:
       test:
         - CMD-SHELL
@@ -128,6 +143,9 @@ services:
       - "8222:8222"
     volumes:
       - nats_data:/data
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpus: 0.2
     healthcheck:
       test:
         - CMD-SHELL
@@ -149,6 +167,9 @@ services:
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
       - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    mem_limit: 1280m
+    memswap_limit: 1280m
+    cpus: 1.5
     healthcheck:
       test:
         - CMD-SHELL
@@ -175,6 +196,9 @@ services:
       MINIO_PROMETHEUS_AUTH_TYPE: public
     volumes:
       - minio_data:/data
+    mem_limit: 320m
+    memswap_limit: 320m
+    cpus: 0.3
     healthcheck:
       test:
         - CMD-SHELL
@@ -212,6 +236,9 @@ services:
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minioadmin}"
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minioadmin123}"
+    mem_limit: 32m
+    memswap_limit: 32m
+    cpus: 0.1
     healthcheck:
       test:
         - CMD-SHELL
@@ -232,6 +259,9 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpus: 0.2
     healthcheck:
       test:
         - CMD
@@ -255,6 +285,9 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
+    mem_limit: 320m
+    memswap_limit: 320m
+    cpus: 0.2
     healthcheck:
       test:
         - CMD-SHELL
@@ -283,6 +316,9 @@ services:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    mem_limit: 160m
+    memswap_limit: 160m
+    cpus: 0.2
     healthcheck:
       test:
         - CMD-SHELL
@@ -299,7 +335,9 @@ services:
       - ollama_data:/root/.ollama
     environment:
       OLLAMA_KEEP_ALIVE: "5m"
-    mem_limit: 6g
+    mem_limit: 2048m
+    memswap_limit: 2048m
+    cpus: 2.5
     restart: unless-stopped
     healthcheck:
       test:
@@ -329,6 +367,9 @@ services:
           OLLAMA_HOST=http://ollama:11434 ollama pull gemma2:2b;
         fi;
         echo "Model ready.";
+    mem_limit: 64m
+    memswap_limit: 64m
+    cpus: 0.1
     restart: "no"
 
   go2rtc:
@@ -341,7 +382,9 @@ services:
       - ./dev/go2rtc.yaml:/config/go2rtc.yaml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    mem_limit: 256m
+    mem_limit: 160m
+    memswap_limit: 160m
+    cpus: 0.4
     restart: unless-stopped
     healthcheck:
       test:
@@ -380,6 +423,9 @@ services:
           --backend-store-uri postgresql://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@timescaledb:5432/mlflow \
           --artifacts-destination s3://debug-traces/mlflow \
           --serve-artifacts
+    mem_limit: 192m
+    memswap_limit: 192m
+    cpus: 0.2
     healthcheck:
       test:
         - CMD-SHELL
@@ -409,7 +455,9 @@ services:
       - ./dev/edge-agent.yaml:/app/config.yaml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    mem_limit: 512m
+    mem_limit: 192m
+    memswap_limit: 192m
+    cpus: 0.3
     restart: unless-stopped
     healthcheck:
       test:
@@ -437,7 +485,9 @@ services:
       BRIDGE_LOG_LEVEL: INFO
     volumes:
       - ./dev/ingress-bridge.yaml:/app/config.yaml:ro
-    mem_limit: 512m
+    mem_limit: 192m
+    memswap_limit: 192m
+    cpus: 0.3
     restart: unless-stopped
     healthcheck:
       test:
@@ -473,7 +523,9 @@ services:
       DECODE_METRICS_PORT: "9090"
       DECODE_HEALTH_PORT: "8081"
       DECODE_LOG_LEVEL: INFO
-    mem_limit: 512m
+    mem_limit: 320m
+    memswap_limit: 320m
+    cpus: 1.2
     restart: unless-stopped
     healthcheck:
       test:
@@ -524,7 +576,9 @@ services:
       INFERENCE_HEALTH_PORT: "9091"
       INFERENCE_DB_URL: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
       INFERENCE_LOG_LEVEL: INFO
-    mem_limit: 1g
+    mem_limit: 1280m
+    memswap_limit: 1280m
+    cpus: 2.5
     restart: unless-stopped
     healthcheck:
       test:
@@ -557,7 +611,9 @@ services:
       ATTR_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
       ATTR_HEALTH_PORT: "8081"
       ATTR_LOG_LEVEL: INFO
-    mem_limit: 512m
+    mem_limit: 192m
+    memswap_limit: 192m
+    cpus: 0.4
     restart: unless-stopped
     healthcheck:
       test:
@@ -588,7 +644,9 @@ services:
       EVENT_EVENT_COOLDOWN_S: "10"
       EVENT_HEALTH_PORT: "8081"
       EVENT_LOG_LEVEL: INFO
-    mem_limit: 512m
+    mem_limit: 192m
+    memswap_limit: 192m
+    cpus: 0.3
     restart: unless-stopped
     healthcheck:
       test:
@@ -630,7 +688,9 @@ services:
       CLIP_BUFFER_SEGMENT_S: "30"
       CLIP_BUFFER_MAX_SEGMENTS: "20"
       CLIP_BUFFER_TARGET_BITRATE: "2000k"
-    mem_limit: 1024m
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 0.8
     restart: unless-stopped
     healthcheck:
       test:
@@ -666,7 +726,9 @@ services:
       MTMC_SITE_ID: "00000000-0000-0000-0000-000000000001"
       MTMC_HEALTH_PORT: "8081"
       MTMC_LOG_LEVEL: INFO
-    mem_limit: 1024m
+    mem_limit: 384m
+    memswap_limit: 384m
+    cpus: 0.4
     restart: unless-stopped
     healthcheck:
       test:
@@ -697,7 +759,9 @@ services:
       BULK_DATABASE__DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
       BULK_METRICS_PORT: "9091"
       BULK_LOG_LEVEL: INFO
-    mem_limit: 512m
+    mem_limit: 192m
+    memswap_limit: 192m
+    cpus: 0.3
     restart: unless-stopped
     healthcheck:
       test:
@@ -740,7 +804,9 @@ services:
       # commands sent over the socket still execute. Container runs as root
       # (image default), so no group_add gymnastics needed.
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    mem_limit: 512m
+    mem_limit: 320m
+    memswap_limit: 320m
+    cpus: 0.4
     restart: unless-stopped
     healthcheck:
       test:
@@ -764,7 +830,9 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: "http://query-api:8000"
       API_URL: "http://query-api:8000"
-    mem_limit: 256m
+    mem_limit: 160m
+    memswap_limit: 160m
+    cpus: 0.2
     restart: unless-stopped
     healthcheck:
       test:

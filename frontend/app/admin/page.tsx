@@ -15,6 +15,7 @@ import {
   Archive,
   Server,
   HeartPulse,
+  MemoryStick,
   Users,
   ShieldCheck,
   BarChart3,
@@ -80,8 +81,9 @@ const ADMIN_GROUPS: AdminGroup[] = [
     Icon: Server,
     accent: "amber",
     pages: [
-      { href: "/admin/services", name: "Services", desc: "Monitor and restart Docker containers", Icon: Server },
-      { href: "/admin/health",   name: "Health",   desc: "Embedded Grafana monitoring panels", Icon: HeartPulse },
+      { href: "/admin/services",  name: "Services",  desc: "Monitor and restart Docker containers", Icon: Server },
+      { href: "/admin/resources", name: "Resources", desc: "Memory and CPU limits per service", Icon: MemoryStick },
+      { href: "/admin/health",    name: "Health",    desc: "Embedded Grafana monitoring panels", Icon: HeartPulse },
     ],
   },
   {
