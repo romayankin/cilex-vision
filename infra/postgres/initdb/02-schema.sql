@@ -229,3 +229,37 @@ CREATE INDEX IF NOT EXISTS idx_access_log_path    ON access_log (path, created_a
 INSERT INTO sites (site_id, name, timezone)
 VALUES ('00000000-0000-0000-0000-000000000001', 'Default Site', 'UTC')
 ON CONFLICT (site_id) DO NOTHING;
+
+-- ===================================================================
+-- Feature toggles (admin-controlled service enable/disable state)
+-- ===================================================================
+
+CREATE TABLE IF NOT EXISTS service_toggles (
+    service_name  TEXT PRIMARY KEY,
+    enabled       BOOLEAN NOT NULL DEFAULT true,
+    description   TEXT,
+    impact        TEXT,
+    ram_savings_mb INTEGER,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_by    TEXT
+);
+
+INSERT INTO service_toggles (service_name, enabled, description, impact, ram_savings_mb)
+VALUES
+    ('ollama', true,
+     'Gemma 2B LLM for natural language search',
+     'Disables AI search on /search page. Filters still work manually.',
+     3072),
+    ('mtmc-service', true,
+     'Multi-Target Multi-Camera Re-ID (cross-camera journeys)',
+     'Disables /journey page cross-camera tracking. Per-camera tracking still works.',
+     400),
+    ('clip-service', true,
+     'Event clip extraction (±5s around motion events)',
+     'CRITICAL: Motion events still fire but no MP4 clips are generated. Existing clips remain accessible.',
+     512),
+    ('attribute-service', true,
+     'Color and attribute extraction (e.g. "red car")',
+     'Disables color filter on search. Events still detected.',
+     192)
+ON CONFLICT (service_name) DO NOTHING;

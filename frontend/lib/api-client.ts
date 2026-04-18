@@ -374,3 +374,40 @@ export async function createSite(body: CreateSiteRequest): Promise<SiteResponse>
 export async function updateSite(siteId: string, body: UpdateSiteRequest): Promise<SiteResponse> {
   return apiMutate<SiteResponse>(`/sites/${siteId}`, "PUT", body);
 }
+
+// ---------------------------------------------------------------------------
+// Service toggles (admin-controlled enable/disable of optional services)
+// ---------------------------------------------------------------------------
+
+export interface ServiceToggle {
+  service_name: string;
+  enabled: boolean;
+  description: string | null;
+  impact: string | null;
+  ram_savings_mb: number | null;
+  container_status: string | null;
+  updated_at: string | null;
+}
+
+export async function getToggles(): Promise<{ toggles: ServiceToggle[] }> {
+  const res = await fetch("/api/admin/toggles", { credentials: "include" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function setToggle(
+  serviceName: string,
+  enabled: boolean,
+): Promise<ServiceToggle> {
+  const res = await fetch(`/api/admin/toggles/${serviceName}`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}

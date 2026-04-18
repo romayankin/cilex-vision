@@ -48,6 +48,7 @@ from routers import (
     similarity,
     storage,
     streams,
+    toggles as toggles_router,
     topology,
     tracks,
     zones,
@@ -196,6 +197,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(services_router.router)
     app.include_router(nlp_search.router)
     app.include_router(resources_router.router)
+    app.include_router(toggles_router.router)
 
     # Prometheus metrics
     metrics_app = make_asgi_app()

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Power } from "lucide-react";
+import { getToggles, setToggle, type ServiceToggle } from "@/lib/api-client";
 
 const POLL_INTERVAL_MS = 15_000;
 const ALERT_INTERVAL_MS = 15_000;
@@ -280,6 +282,11 @@ export default function ServicesPage() {
     return sessionStorage.getItem(ALERT_MUTE_STORAGE_KEY) === "true";
   });
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [toggles, setToggles] = useState<ServiceToggle[]>([]);
+  const [togglesLoading, setTogglesLoading] = useState(true);
+  const [togglesError, setTogglesError] = useState<string | null>(null);
+  const [confirmToggle, setConfirmToggle] = useState<ServiceToggle | null>(null);
+  const [togglePending, setTogglePending] = useState(false);
 
   // Pause auto-refresh while a logs/diagnostics panel is open so we don't
   // interrupt scroll position.
@@ -309,6 +316,44 @@ export default function ServicesPage() {
     }, POLL_INTERVAL_MS);
     return () => window.clearInterval(id);
   }, [fetchServices]);
+
+  const loadToggles = useCallback(async () => {
+    try {
+      const { toggles } = await getToggles();
+      setToggles(toggles);
+      setTogglesError(null);
+    } catch (err) {
+      setTogglesError(err instanceof Error ? err.message : "Load failed");
+    } finally {
+      setTogglesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadToggles();
+    const id = window.setInterval(loadToggles, 10_000);
+    return () => window.clearInterval(id);
+  }, [loadToggles]);
+
+  const applyToggle = useCallback(
+    async (t: ServiceToggle) => {
+      setTogglePending(true);
+      try {
+        await setToggle(t.service_name, !t.enabled);
+        await loadToggles();
+        await fetchServices();
+      } catch (err) {
+        setToast({
+          kind: "err",
+          msg: `Toggle ${t.service_name}: ${err instanceof Error ? err.message : "failed"}`,
+        });
+      } finally {
+        setTogglePending(false);
+        setConfirmToggle(null);
+      }
+    },
+    [loadToggles, fetchServices],
+  );
 
   // Tick once per second so countdowns update.
   useEffect(() => {
@@ -496,6 +541,89 @@ export default function ServicesPage() {
 
   return (
     <div className="space-y-4">
+      <section className="bg-white border border-gray-200 rounded-lg p-4">
+        <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+          <Power className="w-5 h-5 text-amber-600" />
+          Optional Services
+        </h2>
+        <p className="text-xs text-gray-500 mb-4">
+          Turn off services you don&apos;t currently need to free up RAM. Core
+          services (Kafka, Postgres, etc.) cannot be disabled.
+        </p>
+
+        {togglesLoading && toggles.length === 0 && (
+          <div className="text-sm text-gray-400">Loading…</div>
+        )}
+        {togglesError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded p-2 text-sm mb-2">
+            {togglesError}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {toggles.map((t) => {
+            const isRunning = t.container_status === "running";
+            const mismatch = (t.enabled && !isRunning) || (!t.enabled && isRunning);
+            return (
+              <div
+                key={t.service_name}
+                className={`flex items-start gap-3 border rounded-lg p-3 ${
+                  mismatch ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-white"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setConfirmToggle(t)}
+                  disabled={togglePending}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                    t.enabled ? "bg-green-500" : "bg-gray-300"
+                  }`}
+                  aria-label={t.enabled ? "Disable" : "Enable"}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${
+                      t.enabled ? "translate-x-5" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-sm font-medium">{t.service_name}</span>
+                    <span
+                      className={`text-xs px-1.5 py-0.5 rounded ${
+                        isRunning
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {t.container_status || "unknown"}
+                    </span>
+                    {t.ram_savings_mb ? (
+                      <span className="text-xs text-gray-500">
+                        saves ~{(t.ram_savings_mb / 1024).toFixed(1)} GB
+                      </span>
+                    ) : null}
+                    {mismatch && (
+                      <span className="text-xs text-amber-700 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> state sync in progress
+                      </span>
+                    )}
+                  </div>
+                  {t.description && (
+                    <p className="text-xs text-gray-600 mt-1">{t.description}</p>
+                  )}
+                  {t.impact && (
+                    <p className="text-xs text-gray-500 mt-1 italic">
+                      Impact: {t.impact}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Services</h1>
@@ -641,6 +769,53 @@ export default function ServicesPage() {
           </tbody>
         </table>
       </div>
+
+      {confirmToggle && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="font-semibold text-lg mb-2">
+              {confirmToggle.enabled ? "Disable" : "Enable"} {confirmToggle.service_name}?
+            </h3>
+            {confirmToggle.enabled && confirmToggle.impact && (
+              <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800 mb-4">
+                <strong>Impact:</strong> {confirmToggle.impact}
+              </div>
+            )}
+            {!confirmToggle.enabled && (
+              <p className="text-sm text-gray-600 mb-4">
+                This will start the <code>{confirmToggle.service_name}</code>{" "}
+                container. It may take up to 30 seconds to become healthy.
+              </p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmToggle(null)}
+                disabled={togglePending}
+                className="px-4 py-2 border border-gray-300 rounded text-sm disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => applyToggle(confirmToggle)}
+                disabled={togglePending}
+                className={`px-4 py-2 rounded text-sm text-white disabled:opacity-50 ${
+                  confirmToggle.enabled
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-green-600 hover:bg-green-700"
+                }`}
+              >
+                {togglePending
+                  ? "Working…"
+                  : confirmToggle.enabled
+                  ? "Disable"
+                  : "Enable"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
