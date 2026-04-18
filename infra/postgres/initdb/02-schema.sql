@@ -328,3 +328,50 @@ ALTER TABLE cameras ADD COLUMN IF NOT EXISTS profile_id UUID REFERENCES camera_p
 UPDATE cameras
 SET profile_id = (SELECT profile_id FROM camera_profiles WHERE is_default = true LIMIT 1)
 WHERE profile_id IS NULL;
+
+-- ===================================================================
+-- Storage tier configuration (hot/warm/cold video storage)
+-- ===================================================================
+
+CREATE TABLE IF NOT EXISTS storage_tier_config (
+    site_id              UUID PRIMARY KEY REFERENCES sites(site_id),
+
+    total_budget_gb      DOUBLE PRECISION NOT NULL DEFAULT 100,
+
+    hot_fraction         DOUBLE PRECISION NOT NULL DEFAULT 0.20,
+    warm_fraction        DOUBLE PRECISION NOT NULL DEFAULT 0.30,
+    cold_fraction        DOUBLE PRECISION NOT NULL DEFAULT 0.50,
+
+    hot_width            INTEGER NOT NULL DEFAULT 1920,
+    hot_height           INTEGER NOT NULL DEFAULT 1080,
+    hot_fps              INTEGER NOT NULL DEFAULT 25,
+    hot_bitrate_kbps     INTEGER NOT NULL DEFAULT 4000,
+
+    warm_width           INTEGER NOT NULL DEFAULT 1280,
+    warm_height          INTEGER NOT NULL DEFAULT 720,
+    warm_fps             INTEGER NOT NULL DEFAULT 15,
+    warm_bitrate_kbps    INTEGER NOT NULL DEFAULT 2000,
+
+    cold_width           INTEGER NOT NULL DEFAULT 640,
+    cold_height          INTEGER NOT NULL DEFAULT 360,
+    cold_fps             INTEGER NOT NULL DEFAULT 5,
+    cold_bitrate_kbps    INTEGER NOT NULL DEFAULT 500,
+
+    storage_backend      VARCHAR(10) NOT NULL DEFAULT 'volume',
+    bind_mount_path      TEXT,
+
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_by           TEXT,
+
+    CONSTRAINT ck_tier_fractions CHECK (
+        hot_fraction + warm_fraction + cold_fraction BETWEEN 0.99 AND 1.01
+        AND hot_fraction >= 0.05
+        AND warm_fraction >= 0.05
+        AND cold_fraction >= 0.05
+    ),
+    CONSTRAINT ck_storage_backend CHECK (storage_backend IN ('volume','bind'))
+);
+
+INSERT INTO storage_tier_config (site_id)
+SELECT site_id FROM sites WHERE site_id = '00000000-0000-0000-0000-000000000001'
+ON CONFLICT (site_id) DO NOTHING;

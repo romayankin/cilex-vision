@@ -72,8 +72,9 @@ const ADMIN_GROUPS: AdminGroup[] = [
     Icon: Database,
     accent: "emerald",
     pages: [
-      { href: "/admin/storage",   name: "Storage",   desc: "MinIO bucket sizes, purge old data, storage configuration", Icon: Database },
-      { href: "/admin/retention", name: "Retention", desc: "Data retention policies by class", Icon: Archive },
+      { href: "/admin/storage",        name: "Storage",        desc: "MinIO bucket sizes, purge old data, storage configuration", Icon: Database },
+      { href: "/admin/retention",      name: "Retention",      desc: "Data retention policies by class", Icon: Archive },
+      { href: "/admin/storage-tiers",  name: "Storage Tiers",  desc: "Hot/warm/cold video retention policy", Icon: Archive },
     ],
   },
   {

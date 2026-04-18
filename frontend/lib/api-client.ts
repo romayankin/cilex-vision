@@ -508,3 +508,81 @@ export async function assignCameraProfile(
     body: JSON.stringify({ profile_id: profileId }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Storage tiers (hot/warm/cold video storage)
+// ---------------------------------------------------------------------------
+
+export interface TierQuality {
+  width: number;
+  height: number;
+  fps: number;
+  bitrate_kbps: number;
+}
+
+export interface StorageTierConfig {
+  total_budget_gb: number;
+  hot_fraction: number;
+  warm_fraction: number;
+  cold_fraction: number;
+  hot: TierQuality;
+  warm: TierQuality;
+  cold: TierQuality;
+  storage_backend: "volume" | "bind";
+  bind_mount_path: string | null;
+}
+
+export interface ComputedRetention {
+  tier: "hot" | "warm" | "cold";
+  gb: number;
+  hours: number;
+  pretty_duration: string;
+}
+
+export interface StorageTierConfigResponse {
+  config: StorageTierConfig;
+  computed: ComputedRetention[];
+  disk_available_gb: number;
+  disk_total_gb: number;
+  num_cameras: number;
+}
+
+export interface TierUsageEntry {
+  bytes: number;
+  segments: number;
+  oldest: string | null;
+  newest: string | null;
+}
+
+export type TierUsageResponse = Record<"hot" | "warm" | "cold", TierUsageEntry>;
+
+async function tiersFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`/api/admin/storage-tiers${path}`, {
+    credentials: "include",
+    ...init,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `HTTP ${res.status}`);
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export async function getStorageTierConfig(): Promise<StorageTierConfigResponse> {
+  return tiersFetch<StorageTierConfigResponse>("");
+}
+
+export async function updateStorageTierConfig(
+  body: StorageTierConfig,
+): Promise<{ status: string }> {
+  return tiersFetch<{ status: string }>("", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getStorageTierUsage(): Promise<TierUsageResponse> {
+  return tiersFetch<TierUsageResponse>("/usage");
+}
