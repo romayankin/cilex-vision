@@ -42,6 +42,7 @@ from routers import (
     nlp_search,
     pipeline,
     pipeline_metrics,
+    recording as recording_router,
     resources as resources_router,
     services as services_router,
     settings as settings_router,
@@ -196,6 +197,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(zones.router)
     app.include_router(services_router.router)
     app.include_router(nlp_search.router)
+    app.include_router(recording_router.router)
     app.include_router(resources_router.router)
     app.include_router(toggles_router.router)
 

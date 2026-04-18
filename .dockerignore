@@ -1,0 +1,10 @@
+infra/pilot-data
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+.git
+.venv
+node_modules
+frontend/.next
+frontend/node_modules

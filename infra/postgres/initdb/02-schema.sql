@@ -263,3 +263,36 @@ VALUES
      'Disables color filter on search. Events still detected.',
      192)
 ON CONFLICT (service_name) DO NOTHING;
+
+-- ===================================================================
+-- Continuous video segments (raw recordings split into 30s chunks)
+-- ===================================================================
+
+CREATE TABLE IF NOT EXISTS video_segments (
+    segment_id     UUID DEFAULT gen_random_uuid(),
+    camera_id      TEXT NOT NULL REFERENCES cameras(camera_id),
+    start_time     TIMESTAMPTZ NOT NULL,
+    end_time       TIMESTAMPTZ NOT NULL,
+    duration_s     DOUBLE PRECISION NOT NULL,
+    tier           VARCHAR(10) NOT NULL DEFAULT 'hot',
+    storage_uri    TEXT NOT NULL,
+    bytes          BIGINT NOT NULL,
+    width          INTEGER,
+    height         INTEGER,
+    fps            DOUBLE PRECISION,
+    bitrate_kbps   INTEGER,
+    codec          VARCHAR(20),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_video_segments_tier CHECK (tier IN ('hot','warm','cold')),
+    PRIMARY KEY (start_time, camera_id, segment_id)
+);
+
+SELECT create_hypertable('video_segments', 'start_time',
+       chunk_time_interval => INTERVAL '1 day',
+       if_not_exists => TRUE);
+
+CREATE INDEX IF NOT EXISTS idx_video_segments_camera_time
+    ON video_segments (camera_id, start_time DESC);
+
+CREATE INDEX IF NOT EXISTS idx_video_segments_tier
+    ON video_segments (tier, start_time);
