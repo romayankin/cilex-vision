@@ -21,8 +21,8 @@ services:
       KAFKA_HEAP_OPTS: "-Xmx384m -Xms256m"
     volumes:
       - kafka_0_data:/bitnami/kafka
-    mem_limit: 640m
-    memswap_limit: 640m
+    mem_limit: 960m
+    memswap_limit: 960m
     cpus: 0.6
     healthcheck:
       test:
@@ -55,8 +55,8 @@ services:
       KAFKA_HEAP_OPTS: "-Xmx384m -Xms256m"
     volumes:
       - kafka_1_data:/bitnami/kafka
-    mem_limit: 640m
-    memswap_limit: 640m
+    mem_limit: 960m
+    memswap_limit: 960m
     cpus: 0.6
     healthcheck:
       test:
@@ -89,8 +89,8 @@ services:
       KAFKA_HEAP_OPTS: "-Xmx384m -Xms256m"
     volumes:
       - kafka_2_data:/bitnami/kafka
-    mem_limit: 640m
-    memswap_limit: 640m
+    mem_limit: 960m
+    memswap_limit: 960m
     cpus: 0.6
     healthcheck:
       test:
@@ -117,8 +117,8 @@ services:
       KAFKA_CLUSTERS_0_NAME: "local"
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka-0:9092,kafka-1:9092,kafka-2:9092"
       DYNAMIC_CONFIG_ENABLED: "true"
-    mem_limit: 160m
-    memswap_limit: 160m
+    mem_limit: 256m
+    memswap_limit: 256m
     cpus: 0.1
     healthcheck:
       test:
@@ -167,8 +167,8 @@ services:
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
       - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
-    mem_limit: 1280m
-    memswap_limit: 1280m
+    mem_limit: 768m
+    memswap_limit: 768m
     cpus: 1.5
     healthcheck:
       test:
@@ -259,8 +259,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    mem_limit: 128m
-    memswap_limit: 128m
+    mem_limit: 96m
+    memswap_limit: 96m
     cpus: 0.2
     healthcheck:
       test:
@@ -285,8 +285,8 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
-    mem_limit: 320m
-    memswap_limit: 320m
+    mem_limit: 192m
+    memswap_limit: 192m
     cpus: 0.2
     healthcheck:
       test:
@@ -335,8 +335,9 @@ services:
       - ollama_data:/root/.ollama
     environment:
       OLLAMA_KEEP_ALIVE: "5m"
-    mem_limit: 2048m
-    memswap_limit: 2048m
+    mem_limit: 3g
+    mem_reservation: 2g
+    memswap_limit: 3g
     cpus: 2.5
     restart: unless-stopped
     healthcheck:
