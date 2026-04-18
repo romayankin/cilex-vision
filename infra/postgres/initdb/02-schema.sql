@@ -375,3 +375,35 @@ CREATE TABLE IF NOT EXISTS storage_tier_config (
 INSERT INTO storage_tier_config (site_id)
 SELECT site_id FROM sites WHERE site_id = '00000000-0000-0000-0000-000000000001'
 ON CONFLICT (site_id) DO NOTHING;
+
+-- ===================================================================
+-- Tier rebalance daemon — job history + per-day processed marker
+-- ===================================================================
+
+CREATE TABLE IF NOT EXISTS rebalance_jobs (
+    job_id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    site_id             UUID NOT NULL REFERENCES sites(site_id),
+    started_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at         TIMESTAMPTZ,
+    status              VARCHAR(20) NOT NULL DEFAULT 'running',
+    total_segments      INTEGER,
+    processed_segments  INTEGER NOT NULL DEFAULT 0,
+    bytes_processed     BIGINT NOT NULL DEFAULT 0,
+    last_error          TEXT,
+    CONSTRAINT ck_rebalance_status CHECK (status IN ('running','paused','completed','failed'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_rebalance_active
+    ON rebalance_jobs (status) WHERE status = 'running';
+
+CREATE INDEX IF NOT EXISTS idx_rebalance_started
+    ON rebalance_jobs (started_at DESC);
+
+CREATE TABLE IF NOT EXISTS tier_processed_marker (
+    site_id         UUID NOT NULL REFERENCES sites(site_id),
+    processed_date  DATE NOT NULL,
+    tier            VARCHAR(10) NOT NULL,
+    processed_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (site_id, processed_date, tier),
+    CONSTRAINT ck_tier_marker_tier CHECK (tier IN ('hot','warm','cold'))
+);

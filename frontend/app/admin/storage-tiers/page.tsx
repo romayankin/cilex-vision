@@ -9,14 +9,21 @@ import {
   ChevronDown,
   ChevronRight,
   HardDrive,
+  Activity,
+  CheckCircle2,
+  AlertCircle,
+  Pause,
 } from "lucide-react";
 import {
   getStorageTierConfig,
   updateStorageTierConfig,
   getStorageTierUsage,
+  getRebalanceStatus,
   type StorageTierConfig,
   type TierQuality,
   type TierUsageResponse,
+  type RebalanceStatusResponse,
+  type RebalanceJob,
 } from "@/lib/api-client";
 import { getUserRole, isAdmin } from "@/lib/auth";
 
@@ -112,6 +119,41 @@ function prettyHours(hours: number): string {
 
 function bytesToGb(b: number): number {
   return b / 1024 ** 3;
+}
+
+function bytesToMb(b: number): number {
+  return b / 1024 ** 2;
+}
+
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h ago`;
+}
+
+function formatElapsed(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
+function estimateEtaSeconds(job: RebalanceJob): number | null {
+  if (!job.total_segments || job.total_segments <= 0) return null;
+  if (job.processed_segments <= 0) return null;
+  const rate = job.processed_segments / Math.max(job.elapsed_s, 1);
+  if (rate <= 0) return null;
+  const remaining = job.total_segments - job.processed_segments;
+  if (remaining <= 0) return 0;
+  return remaining / rate;
 }
 
 interface PillarProps {
@@ -261,6 +303,145 @@ function QualityEditor({ tier, value, onChange }: QualityEditorProps) {
   );
 }
 
+function RebalanceStatusPanel({ status }: { status: RebalanceStatusResponse | null }) {
+  if (!status) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h2 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
+          <Activity className="w-4 h-4" /> Rebalance
+        </h2>
+        <p className="text-xs text-gray-500">Loading…</p>
+      </div>
+    );
+  }
+
+  const { current, history } = status;
+  const latestFailure = history.find((j) => j.status === "failed");
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
+        <Activity className="w-4 h-4" /> Rebalance
+      </h2>
+
+      {current ? (
+        <CurrentJobRow job={current} />
+      ) : history.length > 0 ? (
+        <LastJobRow job={history[0]} />
+      ) : (
+        <p className="text-xs text-gray-500">
+          No rebalance has run yet. The daemon will start during the next idle window
+          (CPU &lt; 30% and no motion events for 5 minutes).
+        </p>
+      )}
+
+      {latestFailure && current?.status !== "failed" && (
+        <div className="mt-3 text-xs bg-red-50 border border-red-200 text-red-700 rounded px-3 py-2 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-medium">Last run failed {timeAgo(latestFailure.started_at)}</div>
+            {latestFailure.last_error && (
+              <div className="font-mono text-[10px] mt-0.5 break-all">{latestFailure.last_error}</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {history.length > 1 && (
+        <details className="mt-3 text-xs">
+          <summary className="cursor-pointer text-gray-600 hover:text-gray-900">
+            History ({history.length})
+          </summary>
+          <div className="mt-2 space-y-1">
+            {history.map((h) => (
+              <div key={h.job_id} className="flex items-center justify-between text-gray-600 font-mono text-[11px]">
+                <span>{new Date(h.started_at).toLocaleString()}</span>
+                <span className="flex items-center gap-2">
+                  <span>{h.processed_segments} segs</span>
+                  <span>{bytesToMb(h.bytes_processed).toFixed(0)} MB</span>
+                  <StatusBadge status={h.status} />
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function CurrentJobRow({ job }: { job: RebalanceJob }) {
+  const pct =
+    job.total_segments && job.total_segments > 0
+      ? Math.min(100, (job.processed_segments / job.total_segments) * 100)
+      : null;
+  const etaS = estimateEtaSeconds(job);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-sm">
+        <StatusBadge status={job.status} />
+        <span className="text-gray-700">
+          {job.processed_segments}
+          {job.total_segments ? ` / ${job.total_segments}` : ""} segments
+        </span>
+        {pct !== null && (
+          <span className="text-gray-500">({pct.toFixed(1)}%)</span>
+        )}
+        <span className="text-gray-500">· {bytesToMb(job.bytes_processed).toFixed(0)} MB processed</span>
+      </div>
+      {pct !== null && (
+        <div className="h-2 bg-gray-100 rounded overflow-hidden">
+          <div
+            className={`h-full ${job.status === "paused" ? "bg-gray-400" : "bg-blue-500"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+      <div className="text-xs text-gray-500 flex gap-3 flex-wrap">
+        <span>Started {timeAgo(job.started_at)}</span>
+        <span>Elapsed {formatElapsed(job.elapsed_s)}</span>
+        {job.status === "running" && etaS !== null && (
+          <span>ETA {formatElapsed(etaS)}</span>
+        )}
+        {job.status === "paused" && (
+          <span className="text-amber-700">Waiting for next idle window…</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LastJobRow({ job }: { job: RebalanceJob }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <StatusBadge status={job.status} />
+      <span className="text-gray-700">
+        Last rebalance {job.finished_at ? timeAgo(job.finished_at) : timeAgo(job.started_at)}
+      </span>
+      <span className="text-gray-500">
+        · {job.processed_segments} segments, {bytesToMb(job.bytes_processed).toFixed(0)} MB
+      </span>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: RebalanceJob["status"] }) {
+  const map: Record<RebalanceJob["status"], { label: string; cls: string; Icon: typeof Activity }> = {
+    running: { label: "Running", cls: "bg-blue-50 text-blue-700 border-blue-200", Icon: Activity },
+    paused: { label: "Paused", cls: "bg-amber-50 text-amber-700 border-amber-200", Icon: Pause },
+    completed: { label: "Completed", cls: "bg-green-50 text-green-700 border-green-200", Icon: CheckCircle2 },
+    failed: { label: "Failed", cls: "bg-red-50 text-red-700 border-red-200", Icon: AlertCircle },
+  };
+  const m = map[status];
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium uppercase tracking-wide ${m.cls}`}>
+      <m.Icon className="w-3 h-3" />
+      {m.label}
+    </span>
+  );
+}
+
 export default function StorageTiersPage() {
   const role = getUserRole();
   const [config, setConfig] = useState<StorageTierConfig | null>(null);
@@ -269,6 +450,7 @@ export default function StorageTiersPage() {
   const [diskTotal, setDiskTotal] = useState<number>(0);
   const [diskAvail, setDiskAvail] = useState<number>(0);
   const [usage, setUsage] = useState<TierUsageResponse | null>(null);
+  const [rebalance, setRebalance] = useState<RebalanceStatusResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -309,6 +491,22 @@ export default function StorageTiersPage() {
     };
     load();
     const id = setInterval(load, 30_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [role]);
+
+  useEffect(() => {
+    if (!isAdmin(role)) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const r = await getRebalanceStatus();
+        if (!cancelled) setRebalance(r);
+      } catch {
+        // non-fatal
+      }
+    };
+    load();
+    const id = setInterval(load, 10_000);
     return () => { cancelled = true; clearInterval(id); };
   }, [role]);
 
@@ -505,6 +703,9 @@ export default function StorageTiersPage() {
           {saving ? "Saving…" : "Apply"}
         </button>
       </div>
+
+      {/* Rebalance status */}
+      <RebalanceStatusPanel status={rebalance} />
 
       {/* Current usage */}
       <div className="bg-white border border-gray-200 rounded-lg p-4">

@@ -23,6 +23,7 @@ from aiohttp import web
 from minio import Minio
 
 from config import RecorderSettings
+from rebalancer import TierRebalancer
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,8 @@ class RecorderService:
         self._minio: Minio | None = None
         self._recorders: dict[str, CameraRecorder] = {}
         self._tasks: list[asyncio.Task] = []
+        self._rebalancer: TierRebalancer | None = None
+        self._rebalancer_task: asyncio.Task | None = None
         self._shutdown = asyncio.Event()
 
     async def start(self) -> None:
@@ -249,6 +252,9 @@ class RecorderService:
                 cam_id, recorder.recording_mode, recorder.tz_name,
             )
 
+        self._rebalancer = TierRebalancer(self._pool, self._minio)
+        self._rebalancer_task = asyncio.create_task(self._rebalancer.run())
+
         await self._start_health_server()
 
         await self._shutdown.wait()
@@ -276,6 +282,12 @@ class RecorderService:
 
     async def shutdown(self) -> None:
         logger.info("Shutting down %d recorders", len(self._recorders))
+        if self._rebalancer_task:
+            self._rebalancer_task.cancel()
+            try:
+                await self._rebalancer_task
+            except (asyncio.CancelledError, Exception):
+                pass
         for r in self._recorders.values():
             r.stop()
         await asyncio.gather(*self._tasks, return_exceptions=True)

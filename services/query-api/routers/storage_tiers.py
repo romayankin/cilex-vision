@@ -234,6 +234,51 @@ async def update_config(
     return {"status": "ok"}
 
 
+@router.get("/rebalance/status")
+async def rebalance_status(
+    request: Request,
+    user: UserClaims = Depends(get_current_user),
+):
+    """Current rebalance job (if any) + last 5 jobs as history."""
+    _require_admin(user)
+    pool = request.app.state.db_pool
+
+    rows = await fetch_rows(
+        pool,
+        """
+        SELECT job_id, started_at, finished_at, status,
+               total_segments, processed_segments, bytes_processed, last_error,
+               EXTRACT(EPOCH FROM (COALESCE(finished_at, NOW()) - started_at)) AS elapsed_s
+        FROM rebalance_jobs
+        ORDER BY started_at DESC
+        LIMIT 5
+        """,
+        [],
+        query_type="rebalance_status",
+    )
+
+    current = None
+    history: list[dict] = []
+    for r in rows:
+        item = {
+            "job_id": str(r["job_id"]),
+            "started_at": r["started_at"].isoformat(),
+            "finished_at": r["finished_at"].isoformat() if r["finished_at"] else None,
+            "status": r["status"],
+            "total_segments": int(r["total_segments"]) if r["total_segments"] is not None else None,
+            "processed_segments": int(r["processed_segments"]),
+            "bytes_processed": int(r["bytes_processed"]),
+            "elapsed_s": float(r["elapsed_s"]) if r["elapsed_s"] is not None else 0.0,
+            "last_error": r["last_error"],
+        }
+        if r["status"] in ("running", "paused") and current is None:
+            current = item
+        else:
+            history.append(item)
+
+    return {"current": current, "history": history}
+
+
 @router.get("/usage")
 async def get_usage(
     request: Request,

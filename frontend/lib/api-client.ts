@@ -586,3 +586,24 @@ export async function updateStorageTierConfig(
 export async function getStorageTierUsage(): Promise<TierUsageResponse> {
   return tiersFetch<TierUsageResponse>("/usage");
 }
+
+export interface RebalanceJob {
+  job_id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: "running" | "paused" | "completed" | "failed";
+  total_segments: number | null;
+  processed_segments: number;
+  bytes_processed: number;
+  elapsed_s: number;
+  last_error: string | null;
+}
+
+export interface RebalanceStatusResponse {
+  current: RebalanceJob | null;
+  history: RebalanceJob[];
+}
+
+export async function getRebalanceStatus(): Promise<RebalanceStatusResponse> {
+  return tiersFetch<RebalanceStatusResponse>("/rebalance/status");
+}
