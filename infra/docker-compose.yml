@@ -399,6 +399,7 @@ services:
   mlflow:
     image: python:3.11-slim
     container_name: mlflow
+    profiles: ["training"]
     depends_on:
       timescaledb:
         condition: service_healthy
