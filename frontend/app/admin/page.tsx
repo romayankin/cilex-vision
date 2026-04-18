@@ -47,10 +47,11 @@ const ADMIN_GROUPS: AdminGroup[] = [
     Icon: Video,
     accent: "blue",
     pages: [
-      { href: "/admin/cameras",     name: "Cameras",     desc: "Add, edit, and manage camera feeds", Icon: Video },
-      { href: "/admin/zones",       name: "Zones",       desc: "Draw detection and loitering zones on camera snapshots", Icon: Map },
-      { href: "/admin/topology",    name: "Topology",    desc: "Edit camera graph, edges, and transit times", Icon: Compass },
-      { href: "/admin/calibration", name: "Calibration", desc: "Edge filter calibration status", Icon: Ruler },
+      { href: "/admin/cameras",     name: "Cameras",            desc: "Add, edit, and manage camera feeds", Icon: Video },
+      { href: "/admin/recording",   name: "Recording Profiles", desc: "Configure recording modes and schedules", Icon: Video },
+      { href: "/admin/zones",       name: "Zones",              desc: "Draw detection and loitering zones on camera snapshots", Icon: Map },
+      { href: "/admin/topology",    name: "Topology",           desc: "Edit camera graph, edges, and transit times", Icon: Compass },
+      { href: "/admin/calibration", name: "Calibration",        desc: "Edge filter calibration status", Icon: Ruler },
     ],
   },
   {

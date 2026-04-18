@@ -411,3 +411,100 @@ export async function setToggle(
   }
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Camera recording profiles
+// ---------------------------------------------------------------------------
+
+export interface CameraProfile {
+  profile_id: string;
+  name: string;
+  description: string | null;
+  recording_mode: "continuous" | "motion" | "hybrid";
+  business_hours_start: string | null;
+  business_hours_end: string | null;
+  business_days: number[];
+  motion_sensitivity: number;
+  pre_roll_s: number;
+  post_roll_s: number;
+  timezone: string;
+  is_default: boolean;
+  cameras_assigned: number;
+}
+
+export interface CameraProfileCreate {
+  name: string;
+  description?: string | null;
+  recording_mode: "continuous" | "motion" | "hybrid";
+  business_hours_start?: string | null;
+  business_hours_end?: string | null;
+  business_days: number[];
+  motion_sensitivity: number;
+  pre_roll_s: number;
+  post_roll_s: number;
+  timezone: string;
+}
+
+export interface ProfileAssignment {
+  camera_id: string;
+  profile_id: string | null;
+  profile_name: string | null;
+  recording_mode: string | null;
+}
+
+async function profilesFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`/api/admin/camera-profiles${path}`, {
+    credentials: "include",
+    ...init,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `HTTP ${res.status}`);
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export async function getCameraProfiles(): Promise<{ profiles: CameraProfile[] }> {
+  return profilesFetch<{ profiles: CameraProfile[] }>("");
+}
+
+export async function getProfileAssignments(): Promise<{ assignments: ProfileAssignment[] }> {
+  return profilesFetch<{ assignments: ProfileAssignment[] }>("/assignments");
+}
+
+export async function createCameraProfile(
+  body: CameraProfileCreate,
+): Promise<{ profile_id: string }> {
+  return profilesFetch<{ profile_id: string }>("", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateCameraProfile(
+  profileId: string,
+  body: CameraProfileCreate,
+): Promise<void> {
+  await profilesFetch<{ status: string }>(`/${profileId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteCameraProfile(profileId: string): Promise<void> {
+  await profilesFetch<{ status: string }>(`/${profileId}`, { method: "DELETE" });
+}
+
+export async function assignCameraProfile(
+  cameraId: string,
+  profileId: string,
+): Promise<void> {
+  await profilesFetch<{ status: string }>(`/assign/${cameraId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ profile_id: profileId }),
+  });
+}

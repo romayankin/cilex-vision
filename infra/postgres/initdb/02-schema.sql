@@ -296,3 +296,35 @@ CREATE INDEX IF NOT EXISTS idx_video_segments_camera_time
 
 CREATE INDEX IF NOT EXISTS idx_video_segments_tier
     ON video_segments (tier, start_time);
+
+-- ===================================================================
+-- Camera recording profiles
+-- ===================================================================
+
+CREATE TABLE IF NOT EXISTS camera_profiles (
+    profile_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name                  VARCHAR(100) NOT NULL UNIQUE,
+    description           TEXT,
+    recording_mode        VARCHAR(20) NOT NULL DEFAULT 'continuous',
+    business_hours_start  TIME,
+    business_hours_end    TIME,
+    business_days         JSONB DEFAULT '[1,2,3,4,5]'::jsonb,
+    motion_sensitivity    DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+    pre_roll_s            INTEGER NOT NULL DEFAULT 5,
+    post_roll_s           INTEGER NOT NULL DEFAULT 5,
+    timezone              VARCHAR(50) NOT NULL DEFAULT 'UTC',
+    is_default            BOOLEAN NOT NULL DEFAULT false,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at            TIMESTAMPTZ,
+    CONSTRAINT ck_camera_profiles_mode CHECK (recording_mode IN ('continuous','motion','hybrid'))
+);
+
+INSERT INTO camera_profiles (name, description, recording_mode, is_default, motion_sensitivity)
+VALUES ('Default (24/7)', 'Records continuously, standard motion sensitivity', 'continuous', true, 0.5)
+ON CONFLICT (name) DO NOTHING;
+
+ALTER TABLE cameras ADD COLUMN IF NOT EXISTS profile_id UUID REFERENCES camera_profiles(profile_id);
+
+UPDATE cameras
+SET profile_id = (SELECT profile_id FROM camera_profiles WHERE is_default = true LIMIT 1)
+WHERE profile_id IS NULL;

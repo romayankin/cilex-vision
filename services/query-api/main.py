@@ -33,6 +33,7 @@ from storage_watchdog import StorageWatchdog
 from routers import (
     audit as audit_router,
     auth,
+    camera_profiles as camera_profiles_router,
     debug,
     detections,
     discovery,
@@ -198,6 +199,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(services_router.router)
     app.include_router(nlp_search.router)
     app.include_router(recording_router.router)
+    app.include_router(camera_profiles_router.router)
     app.include_router(resources_router.router)
     app.include_router(toggles_router.router)
 

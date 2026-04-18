@@ -5,6 +5,11 @@ import {
   getTopologyGraph,
   addCamera,
   removeCamera,
+  getCameraProfiles,
+  getProfileAssignments,
+  assignCameraProfile,
+  type CameraProfile,
+  type ProfileAssignment,
 } from "@/lib/api-client";
 import type { CameraNode, CameraCreateRequest, TopologyGraph } from "@/lib/api-client";
 import { getUserRole, isAdmin } from "@/lib/auth";
@@ -20,12 +25,23 @@ export default function CamerasPage() {
   const [showForm, setShowForm] = useState(false);
   const [editCamera, setEditCamera] = useState<CameraNode | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<CameraProfile[]>([]);
+  const [assignments, setAssignments] = useState<Record<string, ProfileAssignment>>({});
+  const [pendingAssign, setPendingAssign] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getTopologyGraph(DEFAULT_SITE);
-      setTopology(data);
+      const [topo, profs, asgn] = await Promise.all([
+        getTopologyGraph(DEFAULT_SITE),
+        getCameraProfiles().catch(() => ({ profiles: [] as CameraProfile[] })),
+        getProfileAssignments().catch(() => ({ assignments: [] as ProfileAssignment[] })),
+      ]);
+      setTopology(topo);
+      setProfiles(profs.profiles);
+      const map: Record<string, ProfileAssignment> = {};
+      for (const a of asgn.assignments) map[a.camera_id] = a;
+      setAssignments(map);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load cameras");
@@ -60,6 +76,18 @@ export default function CamerasPage() {
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete camera");
+    }
+  }
+
+  async function handleProfileChange(cameraId: string, profileId: string) {
+    try {
+      setPendingAssign(cameraId);
+      await assignCameraProfile(cameraId, profileId);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to assign profile");
+    } finally {
+      setPendingAssign(null);
     }
   }
 
@@ -101,6 +129,7 @@ export default function CamerasPage() {
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Zone</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Status</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">Location</th>
+                <th className="text-left px-4 py-2 font-medium text-gray-600">Recording Profile</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600">Actions</th>
               </tr>
             </thead>
@@ -123,6 +152,28 @@ export default function CamerasPage() {
                   </td>
                   <td className="px-4 py-2 text-gray-500 text-xs">
                     {cam.location_description ?? "-"}
+                  </td>
+                  <td className="px-4 py-2 text-xs">
+                    <select
+                      value={assignments[cam.camera_id]?.profile_id ?? ""}
+                      onChange={(e) =>
+                        handleProfileChange(cam.camera_id, e.target.value)
+                      }
+                      disabled={
+                        profiles.length === 0 || pendingAssign === cam.camera_id
+                      }
+                      className="border border-gray-300 rounded px-1.5 py-0.5 text-xs bg-white disabled:bg-gray-50"
+                    >
+                      {!assignments[cam.camera_id]?.profile_id && (
+                        <option value="">— none —</option>
+                      )}
+                      {profiles.map((p) => (
+                        <option key={p.profile_id} value={p.profile_id}>
+                          {p.name}
+                          {p.is_default ? " (default)" : ""}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-4 py-2 text-right space-x-2">
                     <button
@@ -160,7 +211,7 @@ export default function CamerasPage() {
               ))}
               {topology.cameras.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
+                  <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
                     No cameras configured. Click &ldquo;Add Camera&rdquo; to get started.
                   </td>
                 </tr>

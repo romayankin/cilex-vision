@@ -36,15 +36,32 @@ class CameraRecorder:
         camera_id: str,
         pool: asyncpg.Pool,
         minio: Minio,
+        recording_mode: str = "continuous",
+        business_hours_start=None,
+        business_hours_end=None,
+        business_days: list[int] | None = None,
+        timezone: str = "UTC",
     ):
         self.settings = settings
         self.camera_id = camera_id
         self.pool = pool
         self.minio = minio
+        self.recording_mode = recording_mode or "continuous"
+        self.business_hours_start = business_hours_start
+        self.business_hours_end = business_hours_end
+        self.business_days = business_days or [1, 2, 3, 4, 5]
+        self.tz_name = timezone or "UTC"
         self.proc: subprocess.Popen | None = None
         self._shutdown = False
         self._cam_dir = Path(settings.work_dir) / camera_id
         self._cam_dir.mkdir(parents=True, exist_ok=True)
+
+        if self.recording_mode != "continuous":
+            logger.warning(
+                "Camera %s profile requests '%s' mode — not yet implemented, "
+                "falling back to continuous 24/7 recording",
+                self.camera_id, self.recording_mode,
+            )
 
     def _start_ffmpeg(self) -> subprocess.Popen:
         rtsp_url = f"{self.settings.go2rtc_base}/{self.camera_id}"
@@ -191,15 +208,46 @@ class RecorderService:
 
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT camera_id FROM cameras WHERE status != 'disabled'"
+                """
+                SELECT c.camera_id,
+                       COALESCE(p.recording_mode, 'continuous') AS recording_mode,
+                       p.business_hours_start, p.business_hours_end,
+                       p.business_days, COALESCE(p.timezone, 'UTC') AS timezone
+                FROM cameras c
+                LEFT JOIN camera_profiles p ON p.profile_id = c.profile_id
+                WHERE c.status != 'disabled'
+                """
             )
-        camera_ids = [r["camera_id"] for r in rows]
-        logger.info("Found %d cameras: %s", len(camera_ids), camera_ids)
+        logger.info("Found %d cameras", len(rows))
 
-        for cam_id in camera_ids:
-            recorder = CameraRecorder(self.settings, cam_id, self._pool, self._minio)
+        for r in rows:
+            cam_id = r["camera_id"]
+            business_days_raw = r["business_days"]
+            if isinstance(business_days_raw, str):
+                try:
+                    import json as _json
+                    business_days = _json.loads(business_days_raw)
+                except Exception:
+                    business_days = [1, 2, 3, 4, 5]
+            elif isinstance(business_days_raw, list):
+                business_days = business_days_raw
+            else:
+                business_days = [1, 2, 3, 4, 5]
+
+            recorder = CameraRecorder(
+                self.settings, cam_id, self._pool, self._minio,
+                recording_mode=r["recording_mode"],
+                business_hours_start=r["business_hours_start"],
+                business_hours_end=r["business_hours_end"],
+                business_days=business_days,
+                timezone=r["timezone"],
+            )
             self._recorders[cam_id] = recorder
             self._tasks.append(asyncio.create_task(recorder.run()))
+            logger.info(
+                "Registered recorder for %s (mode=%s tz=%s)",
+                cam_id, recorder.recording_mode, recorder.tz_name,
+            )
 
         await self._start_health_server()
 
