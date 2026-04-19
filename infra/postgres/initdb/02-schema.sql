@@ -158,18 +158,43 @@ CREATE TABLE IF NOT EXISTS events (
     clip_uri         TEXT,
     state            VARCHAR(20) NOT NULL,
     metadata_jsonb   JSONB,
+    clip_source_type VARCHAR(20) DEFAULT 'standalone',
     source_capture_ts TIMESTAMPTZ,
     edge_receive_ts  TIMESTAMPTZ,
     core_ingest_ts   TIMESTAMPTZ,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ,
     CONSTRAINT ck_events_type CHECK (
-        event_type IN ('entered_scene','exited_scene','stopped','loitering','motion_started','motion_ended')
+        event_type IN ('motion','entered_scene','exited_scene','stopped','loitering','motion_started','motion_ended')
     ),
     CONSTRAINT ck_events_state CHECK (
         state IN ('new','active','stopped','exited','closed')
+    ),
+    CONSTRAINT ck_events_clip_source CHECK (
+        clip_source_type IS NULL OR clip_source_type IN ('standalone','segment_range')
     )
 );
+
+-- ===================================================================
+-- Fast search over metadata_jsonb
+-- ===================================================================
+
+-- GIN index for containment queries like: metadata_jsonb @> '{"objects": {"person": {}}}'
+CREATE INDEX IF NOT EXISTS idx_events_metadata_gin
+    ON events USING GIN (metadata_jsonb jsonb_path_ops);
+
+-- Expression indexes for common single-field filters
+CREATE INDEX IF NOT EXISTS idx_events_has_person
+    ON events ((metadata_jsonb -> 'objects' ? 'person'))
+    WHERE metadata_jsonb IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_events_has_car
+    ON events ((metadata_jsonb -> 'objects' ? 'car'))
+    WHERE metadata_jsonb IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_events_duration
+    ON events ((metadata_jsonb -> 'motion_interval' ->> 'duration_s'))
+    WHERE metadata_jsonb IS NOT NULL;
 
 -- ===================================================================
 --  Auth
