@@ -77,11 +77,15 @@ class DetectorConfig(BaseModel):
 class DebugConfig(BaseModel):
     sample_rate_pct: float = 2.0
     low_confidence_threshold: float = 0.45
-    enabled: bool = True
+    # Phase 2 refactor: per-frame debug traces (debug-traces bucket) are off
+    # by default. Flip to true per-camera to investigate inference quality.
+    enabled: bool = False
 
 
 class ThumbnailConfig(BaseModel):
-    enabled: bool = True
+    # Phase 2 refactor: per-object thumbnails are redundant — clips are the
+    # durable artifact, metadata encodes content. Off by default.
+    enabled: bool = False
     bucket: str = "thumbnails"
     max_per_track: int = 5
     min_confidence: float = 0.50

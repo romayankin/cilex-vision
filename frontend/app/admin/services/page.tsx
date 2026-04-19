@@ -55,7 +55,7 @@ const SERVICE_CATALOG: Record<string, ServiceMeta> = {
   },
   "inference-worker": {
     description:
-      "Core AI engine. Runs YOLOv8s object detection, ByteTrack tracking, and OSNet Market-1501 Re-ID on every frame. Produces detections, tracks, and embeddings.",
+      "Core AI engine. Runs YOLOv8s object detection, ByteTrack tracking, and OSNet Market-1501 Re-ID on every frame. Produces detections, tracks, and embeddings. (Thumbnail + debug-trace storage deprecated in phase 2.)",
     priority: "P0",
     priorityLabel: "If this stops, AI detection and tracking stops completely",
   },
