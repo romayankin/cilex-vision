@@ -52,6 +52,20 @@ async def list_events(
     has_clip: Optional[bool] = Query(
         None, description="Filter to events with (true) or without (false) clips"
     ),
+    contains_classes: list[str] = Query(
+        default_factory=list,
+        description="metadata_jsonb must contain each of these object classes (AND)",
+    ),
+    colors: list[str] = Query(
+        default_factory=list,
+        description="metadata_jsonb must contain ANY of these colors across upper/lower/colors",
+    ),
+    min_duration_s: Optional[float] = Query(
+        None, description="motion_interval.duration_s >= this value"
+    ),
+    max_duration_s: Optional[float] = Query(
+        None, description="motion_interval.duration_s <= this value"
+    ),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
     user: UserClaims = Depends(get_current_user),
@@ -126,6 +140,47 @@ async def list_events(
         else:
             conditions.append("e.clip_uri IS NULL")
 
+    # Class containment — uses GIN index idx_events_metadata_gin.
+    # Each class becomes its own bound parameter, so values are never
+    # interpolated into the SQL string.
+    for cls in contains_classes:
+        param_idx += 1
+        conditions.append(f"e.metadata_jsonb @> ${param_idx}::jsonb")
+        args.append(json.dumps({"objects": {cls: {}}}))
+
+    # Color filter — match if any object's attributes contain the color in
+    # upper_colors, lower_colors, or colors. Color values are bound parameters
+    # (json.dumps wraps user input in JSON-encoded form), never string-pasted.
+    for color in colors:
+        upper_idx = param_idx + 1
+        lower_idx = param_idx + 2
+        generic_idx = param_idx + 3
+        param_idx += 3
+        conditions.append(
+            f"""EXISTS (
+                SELECT 1 FROM jsonb_each(e.metadata_jsonb -> 'objects') AS o(cls, info)
+                WHERE info -> 'attributes' @> ${upper_idx}::jsonb
+                   OR info -> 'attributes' @> ${lower_idx}::jsonb
+                   OR info -> 'attributes' @> ${generic_idx}::jsonb
+            )"""
+        )
+        args.append(json.dumps({"upper_colors": [color]}))
+        args.append(json.dumps({"lower_colors": [color]}))
+        args.append(json.dumps({"colors": [color]}))
+
+    if min_duration_s is not None:
+        param_idx += 1
+        conditions.append(
+            f"(e.metadata_jsonb -> 'motion_interval' ->> 'duration_s')::numeric >= ${param_idx}"
+        )
+        args.append(min_duration_s)
+    if max_duration_s is not None:
+        param_idx += 1
+        conditions.append(
+            f"(e.metadata_jsonb -> 'motion_interval' ->> 'duration_s')::numeric <= ${param_idx}"
+        )
+        args.append(max_duration_s)
+
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
     # Use join when site_id filter is present
@@ -144,7 +199,8 @@ async def list_events(
 
     data_sql = f"""
         SELECT e.event_id, e.event_type, e.track_id, e.camera_id,
-               e.start_time, e.end_time, e.duration_ms, e.clip_uri,
+               e.start_time, e.end_time, e.duration_ms,
+               e.clip_uri, e.clip_source_type,
                e.state, e.metadata_jsonb,
                e.source_capture_ts, e.edge_receive_ts, e.core_ingest_ts
         FROM events e
@@ -170,8 +226,10 @@ async def list_events(
             end_time=row["end_time"],
             duration_ms=row["duration_ms"],
             clip_url=generate_signed_url(minio_client, row["clip_uri"], expiry_s, request=request)
-            if row["clip_uri"]
+            if row["clip_uri"] and (row["clip_source_type"] or "standalone") == "standalone"
             else None,
+            clip_uri=row["clip_uri"],
+            clip_source_type=row["clip_source_type"],
             state=row["state"],
             metadata=_parse_jsonb(row["metadata_jsonb"]),
             source_capture_ts=row["source_capture_ts"],

@@ -125,7 +125,9 @@ class EventResponse(BaseModel):
     start_time: datetime
     end_time: Optional[datetime] = None
     duration_ms: Optional[int] = None
-    clip_url: Optional[str] = None  # signed MinIO URL
+    clip_url: Optional[str] = None  # signed MinIO URL (kept for back-compat)
+    clip_uri: Optional[str] = None  # raw URI: s3://... or range:cam:start|end
+    clip_source_type: Optional[str] = None  # standalone | segment_range
     state: str
     metadata: Optional[dict] = None
     source_capture_ts: Optional[datetime] = None

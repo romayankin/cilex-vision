@@ -1,502 +1,327 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import FilterSidebar, { FilterState } from "@/components/FilterSidebar";
-import ResultCard from "@/components/ResultCard";
-import {
-  getDetections,
-  getEvents,
-  getTracks,
-  getTrackDetail,
-  type TrackDetailResponse,
-} from "@/lib/api-client";
+import { useEffect, useMemo, useState } from "react";
+import { Camera, Clock, Download, MapPin, Play, Search as SearchIcon } from "lucide-react";
+import ClipPlayer from "@/components/ClipPlayer";
+import type { EventMetadata } from "@/lib/event-metadata";
 
-const PAGE_SIZE = 20;
-const FILTER_DEBOUNCE_MS = 300;
-
-const EXAMPLE_QUERIES = [
-  "person in office friday afternoon",
-  "car yesterday evening",
-  "person entering corridor monday morning",
-  "person loitering in office today",
-  "all activity on cam-2 this morning",
-  "red car",
-];
-
-function isValidDate(s: string | undefined | null): boolean {
-  if (!s || s.length < 10) return false;
-  const d = new Date(s);
-  return !isNaN(d.getTime());
+interface MotionEvent {
+  event_id: string;
+  camera_id: string;
+  start_time: string;
+  end_time: string | null;
+  duration_ms: number | null;
+  clip_uri: string | null;
+  clip_source_type: "standalone" | "segment_range" | null;
+  metadata: EventMetadata | null;
 }
 
-type ResultItem = {
-  kind: "detection" | "event" | "track";
-  id: string;
-  trackId: string | null;
+interface ApiEventResponse {
+  event_id: string;
+  camera_id: string;
+  start_time: string;
+  end_time: string | null;
+  duration_ms: number | null;
+  clip_uri: string | null;
+  clip_source_type: "standalone" | "segment_range" | null;
+  metadata: EventMetadata | null;
+}
+
+interface ApiListResponse {
+  events: ApiEventResponse[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+interface Filters {
   cameraId: string;
-  objectClass: string;
-  timestamp: string;
-  confidence: number;
-  thumbnailUrl?: string | null;
-  clipUrl?: string | null;
-  attributes?: { attribute_type: string; color_value: string; confidence: number }[];
-  metadata?: Record<string, unknown> | null;
-  durationMs?: number | null;
+  timeRange: "1h" | "24h" | "7d" | "30d" | "all";
+  containsPerson: boolean;
+  containsCar: boolean;
+  minDurationS: string;
+  maxDurationS: string;
+}
+
+const DEFAULT_FILTERS: Filters = {
+  cameraId: "",
+  timeRange: "24h",
+  containsPerson: false,
+  containsCar: false,
+  minDurationS: "",
+  maxDurationS: "",
 };
 
-function parseFiltersFromParams(params: URLSearchParams): FilterState {
-  return {
-    camera_id: params.get("camera_id") ?? "",
-    start: params.get("start") ?? "",
-    end: params.get("end") ?? "",
-    object_class: params.get("object_class") ?? "",
-    color: params.get("color") ?? "",
-    event_type: params.get("event_type") ?? "",
-    state: params.get("state") ?? "",
+function computeTimeRange(range: Filters["timeRange"]): { start?: string; end?: string } {
+  if (range === "all") return {};
+  const ms: Record<string, number> = {
+    "1h": 60 * 60 * 1000,
+    "24h": 24 * 60 * 60 * 1000,
+    "7d": 7 * 24 * 60 * 60 * 1000,
+    "30d": 30 * 24 * 60 * 60 * 1000,
   };
+  const now = Date.now();
+  return { start: new Date(now - ms[range]).toISOString(), end: new Date(now).toISOString() };
 }
 
-function filtersEqual(a: FilterState, b: FilterState): boolean {
-  return (
-    a.camera_id === b.camera_id &&
-    a.start === b.start &&
-    a.end === b.end &&
-    a.object_class === b.object_class &&
-    a.color === b.color &&
-    a.event_type === b.event_type &&
-    a.state === b.state
-  );
+function formatDuration(sec: number): string {
+  if (!isFinite(sec) || sec <= 0) return "—";
+  if (sec < 60) return `${Math.round(sec)}s`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec - m * 60);
+  return `${m}m ${s}s`;
+}
+
+function objectIcon(cls: string): string {
+  if (cls === "person") return "👤";
+  if (cls === "car" || cls === "truck" || cls === "bus") return "🚗";
+  if (cls === "animal" || cls === "dog" || cls === "cat") return "🐾";
+  return "🔸";
+}
+
+function summarizeObjects(metadata: EventMetadata | null): string[] {
+  if (!metadata?.objects) return [];
+  return Object.entries(metadata.objects).map(([cls, info]) => {
+    const attrs: string[] = [];
+    if (info.attributes?.upper_colors?.length) {
+      attrs.push(`${info.attributes.upper_colors.join("/")} upper`);
+    }
+    if (info.attributes?.lower_colors?.length) {
+      attrs.push(`${info.attributes.lower_colors.join("/")} lower`);
+    }
+    if (info.attributes?.colors?.length) {
+      attrs.push(info.attributes.colors.join("/"));
+    }
+    const attrsStr = attrs.length ? ` (${attrs.join(", ")})` : "";
+    return `${objectIcon(cls)} ${info.count} ${cls}${info.count !== 1 ? "s" : ""}${attrsStr}`;
+  });
+}
+
+function standaloneDownloadUrl(uri: string): string {
+  const key = uri.replace(/^s3:\/\/event-clips\//, "");
+  const encoded = key.split("/").map(encodeURIComponent).join("/");
+  return `/api/clips/s3/${encoded}`;
 }
 
 export default function SearchPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [filters, setFilters] = useState<FilterState>(() =>
-    parseFiltersFromParams(searchParams),
-  );
-  const [debouncedFilters, setDebouncedFilters] = useState<FilterState>(filters);
-  const [results, setResults] = useState<ResultItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [cameras, setCameras] = useState<string[]>([]);
+  const [results, setResults] = useState<MotionEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [thumbOnly, setThumbOnly] = useState(true);
-  const [clipsOnly, setClipsOnly] = useState(false);
-  const requestIdRef = useRef(0);
-
-  const handleThumbOnlyChange = (v: boolean) => {
-    setThumbOnly(v);
-    if (v) setClipsOnly(false);
-  };
-  const handleClipsOnlyChange = (v: boolean) => {
-    setClipsOnly(v);
-    if (v) setThumbOnly(false);
-  };
-
-  const [nlpQuery, setNlpQuery] = useState("");
-  const [nlpLoading, setNlpLoading] = useState(false);
-  const [nlpExplanation, setNlpExplanation] = useState<string | null>(null);
-  const [nlpError, setNlpError] = useState<string | null>(null);
-  const [nlpAvailable, setNlpAvailable] = useState<boolean | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/search/nlp/status", { credentials: "include" })
+    fetch("/api/streams", { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => setNlpAvailable(d.available === true))
-      .catch(() => setNlpAvailable(false));
+      .then((d: { streams?: { camera_id: string }[] }) => {
+        setCameras((d.streams ?? []).map((c) => c.camera_id));
+      })
+      .catch(() => {});
   }, []);
 
-  async function handleNlpSearch() {
-    if (!nlpQuery.trim() || !nlpAvailable) return;
-    setNlpLoading(true);
-    setNlpError(null);
-    setNlpExplanation(null);
-
-    try {
-      const res = await fetch("/api/search/nlp", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: nlpQuery }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setNlpError(body.detail || `HTTP ${res.status}`);
-        return;
-      }
-
-      const data = await res.json();
-
-      if (data.parse_error) {
-        setNlpError(data.explanation);
-        return;
-      }
-
-      if (data.filters && Object.keys(data.filters).length > 0) {
-        setFilters((prev) => ({
-          ...prev,
-          camera_id: data.filters.camera_id || prev.camera_id,
-          object_class: data.filters.object_class || prev.object_class,
-          event_type: data.filters.event_type || prev.event_type,
-          start: isValidDate(data.filters.start) ? data.filters.start : prev.start,
-          end: isValidDate(data.filters.end) ? data.filters.end : prev.end,
-          color: data.filters.color || prev.color,
-          state: data.filters.state || prev.state,
-        }));
-      }
-
-      if (data.explanation) {
-        setNlpExplanation(data.explanation);
-      }
-    } catch (err) {
-      setNlpError(err instanceof Error ? err.message : "Search failed");
-    } finally {
-      setNlpLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      setDebouncedFilters((prev) => (filtersEqual(prev, filters) ? prev : filters));
-    }, FILTER_DEBOUNCE_MS);
-    return () => window.clearTimeout(id);
+  const query = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("event_type", "motion");
+    if (filters.cameraId) params.set("camera_id", filters.cameraId);
+    const { start, end } = computeTimeRange(filters.timeRange);
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    if (filters.containsPerson) params.append("contains_classes", "person");
+    if (filters.containsCar) params.append("contains_classes", "car");
+    if (filters.minDurationS) params.set("min_duration_s", filters.minDurationS);
+    if (filters.maxDurationS) params.set("max_duration_s", filters.maxDurationS);
+    params.set("limit", "50");
+    return params.toString();
   }, [filters]);
 
-  const doSearch = useCallback(
-    async (
-      currentFilters: FilterState,
-      currentThumbOnly: boolean,
-      currentClipsOnly: boolean,
-      newOffset: number,
-    ) => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
       setLoading(true);
       setError(null);
-
-      const params = new URLSearchParams();
-      for (const [k, v] of Object.entries(currentFilters)) {
-        if (v) params.set(k, v);
-      }
-      if (newOffset > 0) params.set("offset", String(newOffset));
-      router.replace(`/search?${params.toString()}`, { scroll: false });
-
-      const reqId = ++requestIdRef.current;
-
       try {
-        const items: ResultItem[] = [];
-        let fetchedTotal = 0;
-
-        if (currentClipsOnly) {
-          const res = await getEvents({
-            camera_id: currentFilters.camera_id || undefined,
-            start: currentFilters.start || undefined,
-            end: currentFilters.end || undefined,
-            event_type: currentFilters.event_type || undefined,
-            state: currentFilters.state || undefined,
-            has_clip: true,
-            offset: newOffset,
-            limit: PAGE_SIZE,
-          });
-          fetchedTotal = res.total;
-          for (const ev of res.events) {
-            items.push({
-              kind: "event",
-              id: ev.event_id,
-              trackId: ev.track_id,
-              cameraId: ev.camera_id,
-              objectClass: ev.event_type,
-              timestamp: ev.start_time,
-              confidence: 1.0,
-              clipUrl: ev.clip_url,
-              thumbnailUrl: null,
-              metadata: ev.metadata,
-              durationMs: ev.duration_ms,
-            });
-          }
-        } else if (currentFilters.event_type) {
-          const res = await getEvents({
-            camera_id: currentFilters.camera_id || undefined,
-            start: currentFilters.start || undefined,
-            end: currentFilters.end || undefined,
-            event_type: currentFilters.event_type || undefined,
-            state: currentFilters.state || undefined,
-            offset: newOffset,
-            limit: PAGE_SIZE,
-          });
-          fetchedTotal = res.total;
-          for (const ev of res.events) {
-            items.push({
-              kind: "event",
-              id: ev.event_id,
-              trackId: ev.track_id,
-              cameraId: ev.camera_id,
-              objectClass: ev.event_type,
-              timestamp: ev.start_time,
-              confidence: 1.0,
-              clipUrl: ev.clip_url,
-              metadata: ev.metadata,
-              durationMs: ev.duration_ms,
-            });
-          }
-        } else if (currentFilters.state) {
-          const res = await getTracks({
-            camera_id: currentFilters.camera_id || undefined,
-            start: currentFilters.start || undefined,
-            end: currentFilters.end || undefined,
-            object_class: currentFilters.object_class || undefined,
-            state: currentFilters.state || undefined,
-            offset: newOffset,
-            limit: PAGE_SIZE,
-          });
-          fetchedTotal = res.total;
-          for (const tr of res.tracks) {
-            let detail: TrackDetailResponse | null = null;
-            try {
-              detail = await getTrackDetail(tr.local_track_id);
-            } catch {
-              /* optional */
-            }
-            items.push({
-              kind: "track",
-              id: tr.local_track_id,
-              trackId: tr.local_track_id,
-              cameraId: tr.camera_id,
-              objectClass: tr.object_class,
-              timestamp: tr.start_time,
-              confidence: tr.mean_confidence ?? 0,
-              thumbnailUrl: detail?.thumbnail_url,
-              attributes: detail?.attributes,
-            });
-          }
-        } else {
-          const res = await getDetections({
-            camera_id: currentFilters.camera_id || undefined,
-            start: currentFilters.start || undefined,
-            end: currentFilters.end || undefined,
-            object_class: currentFilters.object_class || undefined,
-            has_thumbnail: currentThumbOnly || undefined,
-            offset: newOffset,
-            limit: PAGE_SIZE,
-          });
-          fetchedTotal = res.total;
-          for (const det of res.detections) {
-            items.push({
-              kind: "detection",
-              id: `${det.camera_id}-${det.frame_seq}-${det.time}`,
-              trackId: det.local_track_id,
-              cameraId: det.camera_id,
-              objectClass: det.object_class,
-              timestamp: det.time,
-              confidence: det.confidence,
-              thumbnailUrl: det.thumbnail_url,
-            });
-          }
-        }
-
-        if (reqId !== requestIdRef.current) return;
-
-        setResults(items);
-        setTotal(fetchedTotal);
-        setOffset(newOffset);
+        const res = await fetch(`/api/events?${query}`, { credentials: "include" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data: ApiListResponse = await res.json();
+        if (!cancelled) setResults(data.events);
       } catch (err) {
-        if (reqId !== requestIdRef.current) return;
-        setError(err instanceof Error ? err.message : "Search failed");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Search failed");
       } finally {
-        if (reqId === requestIdRef.current) setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    },
-    [router],
-  );
-
-  useEffect(() => {
-    doSearch(debouncedFilters, thumbOnly, clipsOnly, 0);
-  }, [debouncedFilters, thumbOnly, clipsOnly, doSearch]);
-
-  const clearAll = () =>
-    setFilters({
-      camera_id: "",
-      start: "",
-      end: "",
-      object_class: "",
-      color: "",
-      event_type: "",
-      state: "",
-    });
-
-  const activeCount = Object.values(filters).filter(Boolean).length;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Search</h1>
-        <div className="flex items-center gap-3 text-sm text-gray-500">
-          {loading ? (
-            <span className="text-gray-400">Searching…</span>
-          ) : (
-            <span>
-              {total.toLocaleString()} result{total === 1 ? "" : "s"}
-            </span>
-          )}
-          {activeCount > 0 && (
-            <button
-              type="button"
-              onClick={clearAll}
-              className="text-xs text-gray-500 hover:text-gray-900 border border-gray-200 rounded px-2 py-1"
+    <div className="space-y-4 p-4">
+      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+          <SearchIcon className="w-4 h-4" /> Search filters
+        </h2>
+
+        <div className="flex flex-wrap gap-4 items-center">
+          <label className="text-sm">
+            Camera:
+            <select
+              value={filters.cameraId}
+              onChange={(e) => setFilters({ ...filters, cameraId: e.target.value })}
+              className="ml-1 border border-gray-300 rounded px-2 py-0.5 text-sm"
             >
-              Clear {activeCount} filter{activeCount === 1 ? "" : "s"}
-            </button>
-          )}
+              <option value="">All</option>
+              {cameras.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-sm">
+            Time:
+            <select
+              value={filters.timeRange}
+              onChange={(e) =>
+                setFilters({ ...filters, timeRange: e.target.value as Filters["timeRange"] })
+              }
+              className="ml-1 border border-gray-300 rounded px-2 py-0.5 text-sm"
+            >
+              <option value="1h">Last 1 hour</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="all">All time</option>
+            </select>
+          </label>
+
+          <label className="text-sm flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={filters.containsPerson}
+              onChange={(e) => setFilters({ ...filters, containsPerson: e.target.checked })}
+            />
+            👤 person
+          </label>
+
+          <label className="text-sm flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={filters.containsCar}
+              onChange={(e) => setFilters({ ...filters, containsCar: e.target.checked })}
+            />
+            🚗 car
+          </label>
+
+          <label className="text-sm">
+            Duration:
+            <input
+              type="number"
+              placeholder="min"
+              value={filters.minDurationS}
+              onChange={(e) => setFilters({ ...filters, minDurationS: e.target.value })}
+              className="ml-1 w-16 border border-gray-300 rounded px-1 py-0.5 text-sm"
+            />
+            <span className="text-gray-400 mx-1">–</span>
+            <input
+              type="number"
+              placeholder="max"
+              value={filters.maxDurationS}
+              onChange={(e) => setFilters({ ...filters, maxDurationS: e.target.value })}
+              className="w-16 border border-gray-300 rounded px-1 py-0.5 text-sm"
+            />
+            <span className="text-xs text-gray-500 ml-1">sec</span>
+          </label>
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <div className="flex-1 relative">
-          <input
-            type="text"
-            value={nlpQuery}
-            onChange={(e) => setNlpQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleNlpSearch()}
-            placeholder={
-              nlpAvailable === false
-                ? "AI search unavailable — Ollama not running"
-                : nlpAvailable === null
-                  ? "Checking AI search availability..."
-                  : `Try: "${EXAMPLE_QUERIES[Math.floor(Date.now() / 30000) % EXAMPLE_QUERIES.length]}"`
-            }
-            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:text-gray-500"
-            disabled={nlpLoading || nlpAvailable === false}
-          />
-          {nlpLoading && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="space-y-2">
+        <div className="text-xs text-gray-500">
+          {loading
+            ? "Loading…"
+            : error
+              ? <span className="text-red-600">{error}</span>
+              : `${results.length} results`}
+        </div>
+
+        {results.map((ev) => {
+          const durationS = ev.duration_ms ? ev.duration_ms / 1000 : 0;
+          const objectLines = summarizeObjects(ev.metadata);
+          const isExpanded = expanded === ev.event_id;
+          const zones = ev.metadata?.zones_triggered ?? [];
+
+          return (
+            <div
+              key={ev.event_id}
+              className="border border-gray-200 rounded-lg p-3 bg-white hover:border-blue-300 transition"
+            >
+              <div className="flex items-center gap-3 mb-1 text-xs flex-wrap">
+                <span className="font-mono text-gray-600">
+                  {new Date(ev.start_time).toLocaleString()}
+                </span>
+                <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded flex items-center gap-1">
+                  <Camera className="w-3 h-3" /> {ev.camera_id}
+                </span>
+                <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> {formatDuration(durationS)}
+                </span>
+                {zones.length > 0 && (
+                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> {zones.join(", ")}
+                  </span>
+                )}
+              </div>
+
+              <div className="text-sm text-gray-800 space-y-0.5 mb-2">
+                {objectLines.length === 0 ? (
+                  <div className="text-gray-400 italic">No objects detected</div>
+                ) : (
+                  objectLines.map((line, i) => <div key={i}>{line}</div>)
+                )}
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <button
+                  type="button"
+                  onClick={() => setExpanded(isExpanded ? null : ev.event_id)}
+                  disabled={!ev.clip_uri}
+                  className="flex items-center gap-1 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  <Play className="w-3 h-3" /> {isExpanded ? "Hide" : "Play"}
+                </button>
+                {ev.clip_uri && ev.clip_source_type === "standalone" && (
+                  <a
+                    href={standaloneDownloadUrl(ev.clip_uri)}
+                    download
+                    className="flex items-center gap-1 text-xs border border-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-50"
+                  >
+                    <Download className="w-3 h-3" /> Download
+                  </a>
+                )}
+                {!ev.clip_uri && (
+                  <span className="text-xs text-gray-400 italic">
+                    No clip (recorder was not running)
+                  </span>
+                )}
+              </div>
+
+              {isExpanded && (
+                <div className="mt-3">
+                  <ClipPlayer uri={ev.clip_uri} sourceType={ev.clip_source_type} />
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={handleNlpSearch}
-          disabled={nlpLoading || !nlpQuery.trim() || nlpAvailable !== true}
-          className="px-4 py-2.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-        >
-          {nlpLoading ? "Thinking..." : "AI Search"}
-        </button>
+          );
+        })}
+
+        {!loading && !error && results.length === 0 && (
+          <div className="text-center py-8 text-gray-400 text-sm">
+            No motion events match your filters.
+          </div>
+        )}
       </div>
-
-      {nlpExplanation && (
-        <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-800">
-          <span className="text-blue-500 mt-0.5 flex-shrink-0">✨</span>
-          <div>
-            <span className="font-medium">AI understood:</span> {nlpExplanation}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setNlpExplanation(null);
-              setFilters({
-                camera_id: "",
-                start: "",
-                end: "",
-                object_class: "",
-                color: "",
-                event_type: "",
-                state: "",
-              });
-            }}
-            className="ml-auto text-blue-600 hover:text-blue-800 text-xs font-medium whitespace-nowrap flex-shrink-0"
-          >
-            Clear filters
-          </button>
-        </div>
-      )}
-
-      {nlpError && (
-        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
-          <span className="flex-shrink-0">⚠</span>
-          <div>{nlpError}</div>
-          <button
-            type="button"
-            onClick={() => setNlpError(null)}
-            className="ml-auto text-amber-400 hover:text-amber-600 text-xs flex-shrink-0"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
-          {error}
-        </div>
-      )}
-
-      {!loading && results.length > 0 && (
-        <>
-          <div className="text-xs text-gray-500">
-            Showing {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} of{" "}
-            {total.toLocaleString()} results
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {results.map((r) => (
-              <ResultCard
-                key={r.id}
-                trackId={r.trackId}
-                cameraId={r.cameraId}
-                objectClass={r.objectClass}
-                timestamp={r.timestamp}
-                confidence={r.confidence}
-                thumbnailUrl={r.thumbnailUrl}
-                clipUrl={r.clipUrl}
-                attributes={r.attributes}
-                metadata={r.metadata}
-                durationMs={r.durationMs}
-              />
-            ))}
-          </div>
-
-          <div className="flex items-center justify-center gap-4 pt-4">
-            <button
-              onClick={() =>
-                doSearch(
-                  debouncedFilters,
-                  thumbOnly,
-                  clipsOnly,
-                  Math.max(0, offset - PAGE_SIZE),
-                )
-              }
-              disabled={offset === 0}
-              className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() =>
-                doSearch(debouncedFilters, thumbOnly, clipsOnly, offset + PAGE_SIZE)
-              }
-              disabled={offset + PAGE_SIZE >= total}
-              className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </>
-      )}
-
-      {!loading && results.length === 0 && !error && (
-        <div className="text-center py-12 text-gray-400">
-          No results match the current filters.
-        </div>
-      )}
-
-      <FilterSidebar
-        filters={filters}
-        onChange={setFilters}
-        thumbOnly={thumbOnly}
-        onThumbOnlyChange={handleThumbOnlyChange}
-        clipsOnly={clipsOnly}
-        onClipsOnlyChange={handleClipsOnlyChange}
-      />
     </div>
   );
 }

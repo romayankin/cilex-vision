@@ -34,6 +34,7 @@ from routers import (
     audit as audit_router,
     auth,
     camera_profiles as camera_profiles_router,
+    clips as clips_router,
     debug,
     detections,
     discovery,
@@ -235,6 +236,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(detections.router)
     app.include_router(tracks.router)
     app.include_router(events.router)
+    app.include_router(clips_router.router)
     app.include_router(lpr.router)
     app.include_router(debug.router)
     app.include_router(topology.router)
