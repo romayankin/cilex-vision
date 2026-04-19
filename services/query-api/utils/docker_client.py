@@ -198,6 +198,25 @@ async def restart_container(name: str) -> tuple[bool, str]:
     return await asyncio.to_thread(_restart)
 
 
+async def stop_container(name: str, timeout: int = 10) -> tuple[bool, str]:
+    """Stop a container by name. Returns (success, message)."""
+
+    def _stop() -> tuple[bool, str]:
+        client = get_docker_client()
+        try:
+            container = client.containers.get(name)
+            container.stop(timeout=timeout)
+            return True, f"Container '{name}' stopped"
+        except NotFound:
+            return False, f"Container '{name}' not found"
+        except APIError as e:
+            return False, f"Docker API error: {e}"
+        finally:
+            client.close()
+
+    return await asyncio.to_thread(_stop)
+
+
 async def get_container_logs(name: str, tail: int = 50) -> str:
     """Get recent log lines from a container."""
 

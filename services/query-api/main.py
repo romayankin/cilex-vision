@@ -76,6 +76,53 @@ async def _reset_high_water() -> None:
         CONCURRENT_REQUESTS_HIGH_WATER.set(0)
 
 
+async def _enforce_service_toggles_on_startup(app: FastAPI) -> None:
+    """Reconcile service_toggles.enabled against running container state.
+
+    On cold boot, ``docker compose up -d`` brings up every service regardless
+    of DB state. This stops any container intentionally disabled via the
+    admin UI before the last shutdown. Best-effort: failures are logged but
+    don't block startup. Must run before ServiceWatchdog starts so the
+    watchdog doesn't see "running + not in skip list" mid-reconcile.
+    """
+    try:
+        pool = app.state.db_pool
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT service_name FROM service_toggles WHERE enabled = false"
+            )
+
+        if not rows:
+            logger.info("Service toggle reconciliation: no disabled services")
+            return
+
+        disabled = [r["service_name"] for r in rows]
+        logger.info("Enforcing toggle state for disabled services: %s", disabled)
+
+        from utils.docker_client import list_containers, stop_container
+
+        containers = {c.name: c for c in await list_containers()}
+
+        for svc in disabled:
+            container = containers.get(svc)
+            if container is None:
+                logger.debug("Toggle reconciliation: %s container not found, skipping", svc)
+                continue
+            if container.status != "running":
+                logger.debug(
+                    "Toggle reconciliation: %s already stopped (status=%s)",
+                    svc, container.status,
+                )
+                continue
+
+            logger.info("Toggle reconciliation: stopping %s (was disabled before shutdown)", svc)
+            ok, msg = await stop_container(svc)
+            if not ok:
+                logger.warning("Toggle reconciliation: failed to stop %s: %s", svc, msg)
+    except Exception:
+        logger.exception("Toggle reconciliation failed — continuing startup")
+
+
 def setup_logging(level: str) -> None:
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
@@ -115,6 +162,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.storage_watchdog = watchdog
     await watchdog.start()
+
+    # Reconcile service_toggles against running container state. Must run
+    # before the watchdog so it doesn't see "running + not yet in skip list".
+    await _enforce_service_toggles_on_startup(app)
 
     # Microservice health watchdog (auto-restart with backoff)
     service_watchdog = ServiceWatchdog(db_pool=pool)
