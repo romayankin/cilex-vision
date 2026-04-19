@@ -10,7 +10,6 @@ const NAV_ITEMS = [
   { href: "/live", label: "Live" },
   { href: "/search", label: "Search" },
   { href: "/timeline", label: "Timeline" },
-  { href: "/journey", label: "Journey" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

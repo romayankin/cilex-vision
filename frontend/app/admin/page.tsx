@@ -64,6 +64,7 @@ const ADMIN_GROUPS: AdminGroup[] = [
       { href: "/admin/pipeline",  name: "Pipeline",         desc: "Real-time data flow monitoring", Icon: Activity },
       { href: "/admin/planner",   name: "Use Case Planner", desc: "Select AI models and see which surveillance use cases become feasible", Icon: Target },
       { href: "/admin/settings",  name: "Settings",         desc: "Thumbnail quality, frame rate, detection parameters", Icon: Sliders },
+      { href: "/journey",         name: "Journeys (experimental)", desc: "Cross-camera MTMC journeys — requires mtmc-service enabled", Icon: Compass },
     ],
   },
   {
