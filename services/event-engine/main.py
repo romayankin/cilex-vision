@@ -21,6 +21,7 @@ from typing import Any, cast
 
 import asyncpg
 
+from clip_uri import build_segment_range_uri
 from config import EventEngineSettings
 from event_emitter import EventEmitter
 from metadata_aggregator import MetadataAggregator
@@ -464,6 +465,118 @@ class EventEngineService:
                             "Aggregation failed for motion event %s", event_id,
                         )
 
+                await self._route_clip(
+                    event_id=event_id,
+                    camera_id=camera_id,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+
+    async def _route_clip(
+        self,
+        event_id: str,
+        camera_id: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> None:
+        """Pick clip_uri/clip_source_type based on camera recording mode.
+
+        continuous/hybrid -> range URI resolved at play time by /clips/range.
+        motion            -> synchronous POST to clip-service /extract for
+                             a standalone MP4 covering pre_roll + motion + post_roll.
+        """
+        if self._pool is None:
+            return
+
+        async with self._pool.acquire() as conn:
+            prof = await conn.fetchrow(
+                """
+                SELECT COALESCE(p.recording_mode, 'continuous') AS mode,
+                       COALESCE(p.pre_roll_s, 5) AS pre_roll_s,
+                       COALESCE(p.post_roll_s, 5) AS post_roll_s
+                FROM cameras c
+                LEFT JOIN camera_profiles p ON p.profile_id = c.profile_id
+                WHERE c.camera_id = $1
+                """,
+                camera_id,
+            )
+
+        mode = prof["mode"] if prof else "continuous"
+        clip_uri: str | None = None
+        source_type = "segment_range"
+
+        if mode in ("continuous", "hybrid"):
+            clip_uri = await build_segment_range_uri(
+                self._pool,
+                camera_id=camera_id,
+                start=start_time,
+                end=end_time,
+            )
+            source_type = "segment_range"
+        else:  # motion
+            source_type = "standalone"
+            try:
+                clip_uri = await self._call_clip_service_extract(
+                    event_id=event_id,
+                    camera_id=camera_id,
+                    motion_start=start_time,
+                    motion_end=end_time,
+                    pre_roll_s=float(prof["pre_roll_s"]) if prof else 5.0,
+                    post_roll_s=float(prof["post_roll_s"]) if prof else 5.0,
+                )
+            except Exception:
+                logger.exception(
+                    "Standalone clip extraction failed for event %s; clip_uri stays null",
+                    event_id,
+                )
+                clip_uri = None
+
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE events
+                SET clip_uri = $1, clip_source_type = $2, updated_at = NOW()
+                WHERE event_id = $3::uuid
+                """,
+                clip_uri, source_type, uuid.UUID(event_id),
+            )
+        logger.info(
+            "Clip route for event %s: mode=%s source=%s uri=%s",
+            event_id, mode, source_type, clip_uri,
+        )
+
+    async def _call_clip_service_extract(
+        self,
+        event_id: str,
+        camera_id: str,
+        motion_start: datetime,
+        motion_end: datetime,
+        pre_roll_s: float,
+        post_roll_s: float,
+    ) -> str | None:
+        """POST to clip-service /extract and return its reported clip_uri."""
+        from aiohttp import ClientSession, ClientTimeout  # noqa: PLC0415
+
+        url = f"{self.settings.clip_service_url.rstrip('/')}/extract"
+        payload = {
+            "event_id": event_id,
+            "camera_id": camera_id,
+            "motion_start": motion_start.isoformat(),
+            "motion_end": motion_end.isoformat(),
+            "pre_roll_s": pre_roll_s,
+            "post_roll_s": post_roll_s,
+        }
+        timeout = ClientTimeout(total=self.settings.clip_extract_timeout_s)
+        async with ClientSession(timeout=timeout) as session:
+            async with session.post(url, json=payload) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise RuntimeError(
+                        f"clip-service /extract returned {resp.status}: {text}"
+                    )
+                body = await resp.json()
+        return body.get("clip_uri")
+
     async def _insert_motion_event(
         self,
         camera_id: str,
@@ -480,7 +593,7 @@ class EventEngineService:
                 source_capture_ts, edge_receive_ts, core_ingest_ts
             ) VALUES (
                 $1::uuid, 'motion', $2, $3, 'active',
-                'standalone',
+                'segment_range',
                 $4, $5, $6
             )
         """

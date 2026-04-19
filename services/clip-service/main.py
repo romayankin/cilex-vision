@@ -219,8 +219,52 @@ class ClipService:
             }
             return web.json_response(body, status=200 if healthy else 503)
 
+        async def extract_handler(request: Any) -> Any:
+            try:
+                body = await request.json()
+            except Exception:
+                return web.json_response({"error": "invalid json"}, status=400)
+
+            required = ("event_id", "camera_id", "motion_start", "motion_end")
+            missing = [k for k in required if k not in body]
+            if missing:
+                return web.json_response(
+                    {"error": f"missing fields: {','.join(missing)}"}, status=400,
+                )
+
+            try:
+                motion_start = _parse_iso_utc(body["motion_start"])
+                motion_end = _parse_iso_utc(body["motion_end"])
+            except ValueError as exc:
+                return web.json_response({"error": str(exc)}, status=400)
+
+            pre_roll_s = float(body.get("pre_roll_s", self.settings.pre_roll_s))
+            post_roll_s = float(body.get("post_roll_s", self.settings.post_roll_s))
+
+            try:
+                result = await self.extract_motion_clip(
+                    event_id=str(body["event_id"]),
+                    camera_id=str(body["camera_id"]),
+                    motion_start=motion_start,
+                    motion_end=motion_end,
+                    pre_roll_s=pre_roll_s,
+                    post_roll_s=post_roll_s,
+                    want_thumbnail=False,
+                )
+            except Exception as exc:
+                logger.exception(
+                    "extract_handler failed for event %s", body.get("event_id"),
+                )
+                return web.json_response({"error": str(exc)}, status=500)
+
+            if result is None:
+                return web.json_response({"clip_uri": None}, status=200)
+            clip_uri, _ = result
+            return web.json_response({"clip_uri": clip_uri}, status=200)
+
         app = web.Application()
         app.router.add_get("/health", health_handler)
+        app.router.add_post("/extract", extract_handler)
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, "0.0.0.0", self.settings.health_port)
@@ -309,26 +353,67 @@ class ClipService:
             return
 
         end_time = timestamp_to_datetime(event.end_time) or start_time
-        if end_time < start_time:
-            end_time = start_time
-
-        minimum_duration = timedelta(milliseconds=self.settings.min_clip_duration_ms)
-        if (end_time - start_time) < minimum_duration:
-            end_time = start_time + minimum_duration
-
-        clip_start = start_time - timedelta(seconds=self.settings.pre_roll_s)
-        clip_end = end_time + timedelta(seconds=self.settings.post_roll_s)
-
         camera_id = str(event.camera_id)
+
+        result = await self.extract_motion_clip(
+            event_id=event_id,
+            camera_id=camera_id,
+            motion_start=start_time,
+            motion_end=end_time,
+            pre_roll_s=self.settings.pre_roll_s,
+            post_roll_s=self.settings.post_roll_s,
+            want_thumbnail=True,
+        )
+        if result is None:
+            return
+
+        clip_uri, thumbnail_uri = result
+        await self._db.update_event_assets(
+            event_id=event_id,
+            clip_uri=clip_uri,
+            thumbnail_uri=thumbnail_uri,
+        )
+        await asyncio.to_thread(self._publish_completion, event, clip_uri)
+
+    async def extract_motion_clip(
+        self,
+        *,
+        event_id: str,
+        camera_id: str,
+        motion_start: datetime,
+        motion_end: datetime,
+        pre_roll_s: float,
+        post_roll_s: float,
+        want_thumbnail: bool = False,
+    ) -> tuple[str, str | None] | None:
+        """Extract a standalone MP4 covering pre_roll + motion + post_roll.
+
+        Uploads to the clip bucket and returns `(clip_uri, thumbnail_uri_or_none)`
+        on success. Returns None when there is nothing to extract (no buffer
+        segments and no source JPEGs). Raises nothing — failures are logged
+        and the caller gets None.
+        """
+        if self._db is None or self._minio is None:
+            raise RuntimeError("service not started")
+
+        if motion_end < motion_start:
+            motion_end = motion_start
+        minimum_duration = timedelta(milliseconds=self.settings.min_clip_duration_ms)
+        if (motion_end - motion_start) < minimum_duration:
+            motion_end = motion_start + minimum_duration
+
+        clip_start = motion_start - timedelta(seconds=pre_roll_s)
+        clip_end = motion_end + timedelta(seconds=post_roll_s)
+
         site_id = await self._db.get_camera_site_id(camera_id)
         temp_root = Path(self.settings.temp_dir) / event_id
         frames_dir = temp_root / "frames"
         clip_path = temp_root / f"{event_id}.mp4"
         thumbnail_path = temp_root / f"{event_id}_thumb.jpg"
         started_at = time.perf_counter()
-        clip_size = 0
 
         try:
+            thumbnail_generated = False
             buffer_used = False
             if (
                 self._recording_buffer is not None
@@ -350,12 +435,14 @@ class ClipService:
                             output_path=clip_path,
                             target_bitrate=self.settings.buffer_target_bitrate,
                         )
-                        await generate_thumbnail_from_video(
-                            video_path=clip_path,
-                            output_path=thumbnail_path,
-                            width=self.settings.thumbnail_width,
-                            height=self.settings.thumbnail_height,
-                        )
+                        if want_thumbnail:
+                            await generate_thumbnail_from_video(
+                                video_path=clip_path,
+                                output_path=thumbnail_path,
+                                width=self.settings.thumbnail_width,
+                                height=self.settings.thumbnail_height,
+                            )
+                            thumbnail_generated = True
                         buffer_used = True
                         logger.info(
                             "Clip %s extracted from RTSP buffer (%d segments, full FPS)",
@@ -377,7 +464,7 @@ class ClipService:
                 )
                 if not frames:
                     CLIP_EVENTS_SKIPPED_TOTAL.labels(reason="no_source_frames").inc()
-                    return
+                    return None
                 frame_paths = await self._minio.download_frames(frames, frames_dir)
                 if not frame_paths:
                     logger.warning(
@@ -385,21 +472,23 @@ class ClipService:
                         event_id,
                     )
                     CLIP_EVENTS_SKIPPED_TOTAL.labels(reason="frames_unavailable").inc()
-                    return
+                    return None
                 await extract_clip(
                     frame_paths=frame_paths,
                     output_path=clip_path,
                     target_bitrate=self.settings.target_bitrate,
                     fps=self.settings.target_fps,
                 )
-                await generate_thumbnail(
-                    frame_paths=frame_paths,
-                    output_path=thumbnail_path,
-                    width=self.settings.thumbnail_width,
-                    height=self.settings.thumbnail_height,
-                )
+                if want_thumbnail:
+                    await generate_thumbnail(
+                        frame_paths=frame_paths,
+                        output_path=thumbnail_path,
+                        width=self.settings.thumbnail_width,
+                        height=self.settings.thumbnail_height,
+                    )
+                    thumbnail_generated = True
 
-            asset_date = start_time.date()
+            asset_date = motion_start.date()
             clip_uri = await self._minio.upload_clip(
                 local_path=clip_path,
                 site_id=site_id,
@@ -407,37 +496,36 @@ class ClipService:
                 event_id=event_id,
                 asset_date=asset_date,
             )
-            thumbnail_uri = await self._minio.upload_thumbnail(
-                local_path=thumbnail_path,
-                site_id=site_id,
-                camera_id=camera_id,
-                event_id=event_id,
-                asset_date=asset_date,
-            )
+            thumbnail_uri: str | None = None
+            if thumbnail_generated:
+                thumbnail_uri = await self._minio.upload_thumbnail(
+                    local_path=thumbnail_path,
+                    site_id=site_id,
+                    camera_id=camera_id,
+                    event_id=event_id,
+                    asset_date=asset_date,
+                )
 
-            await self._db.update_event_assets(
-                event_id=event_id,
-                clip_uri=clip_uri,
-                thumbnail_uri=thumbnail_uri,
-            )
-            await asyncio.to_thread(self._publish_completion, event, clip_uri)
             clip_size = clip_path.stat().st_size
+            CLIP_EXTRACTED_TOTAL.inc()
+            if thumbnail_generated:
+                CLIP_THUMBNAILS_GENERATED_TOTAL.inc()
+            CLIP_SIZE_BYTES.observe(clip_size)
+            CLIP_EXTRACTION_LATENCY_MS.observe(
+                (time.perf_counter() - started_at) * 1000.0
+            )
+            self._clips_generated += 1
+            return clip_uri, thumbnail_uri
         except FileNotFoundError:
             CLIP_EXTRACTION_ERRORS_TOTAL.labels(reason="ffmpeg_not_found").inc()
             logger.exception("FFmpeg is not installed or not on PATH")
-            return
+            return None
         except Exception:
             CLIP_EXTRACTION_ERRORS_TOTAL.labels(reason="clip_pipeline_failed").inc()
             logger.exception("Clip extraction failed for event %s", event_id)
-            return
+            return None
         finally:
             await asyncio.to_thread(shutil.rmtree, temp_root, True)
-
-        CLIP_EXTRACTED_TOTAL.inc()
-        CLIP_THUMBNAILS_GENERATED_TOTAL.inc()
-        CLIP_SIZE_BYTES.observe(clip_size)
-        CLIP_EXTRACTION_LATENCY_MS.observe((time.perf_counter() - started_at) * 1000.0)
-        self._clips_generated += 1
 
     def _publish_completion(self, event: Any, clip_uri: str) -> None:
         frame_payload = build_completion_frame_ref(event, clip_uri)
@@ -467,6 +555,19 @@ def build_completion_frame_ref(event: Any, clip_uri: str) -> bytes:
     message.codec = "h264-baseline-mp4"
     _copy_video_timestamps(message.timestamps, event.timestamps)
     return cast(bytes, message.SerializeToString())
+
+
+def _parse_iso_utc(value: Any) -> datetime:
+    """Accept an ISO-8601 string and return a UTC-aware datetime."""
+    if not isinstance(value, str):
+        raise ValueError(f"expected ISO-8601 string, got {type(value).__name__}")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"invalid ISO-8601 timestamp: {value!r}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def timestamp_to_datetime(raw_timestamp: Any) -> datetime | None:

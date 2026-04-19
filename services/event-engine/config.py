@@ -41,6 +41,10 @@ class EventEngineSettings(BaseSettings):
     health_port: int = 8081
     log_level: str = "INFO"
 
+    # Base URL for clip-service's HTTP API (POST /extract).
+    clip_service_url: str = "http://clip-service:8081"
+    clip_extract_timeout_s: float = 120.0
+
     @classmethod
     def from_yaml(cls, path: Path | str) -> EventEngineSettings:
         """Load settings from YAML when the file exists."""

@@ -158,7 +158,7 @@ CREATE TABLE IF NOT EXISTS events (
     clip_uri         TEXT,
     state            VARCHAR(20) NOT NULL,
     metadata_jsonb   JSONB,
-    clip_source_type VARCHAR(20) DEFAULT 'standalone',
+    clip_source_type VARCHAR(20) DEFAULT 'segment_range',
     source_capture_ts TIMESTAMPTZ,
     edge_receive_ts  TIMESTAMPTZ,
     core_ingest_ts   TIMESTAMPTZ,
