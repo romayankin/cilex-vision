@@ -13,7 +13,9 @@ import logging
 import signal
 import sys
 import time
+import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -21,6 +23,7 @@ import asyncpg
 
 from config import EventEngineSettings
 from event_emitter import EventEmitter
+from metadata_aggregator import MetadataAggregator
 from metrics import (
     EVENT_ACTIVE_STATE_MACHINES,
     EVENT_STATE_TRANSITIONS_TOTAL,
@@ -29,12 +32,12 @@ from metrics import (
 )
 from state_machine import (
     CameraZones,
+    EventTimestamps,
     EventTrigger,
     EventType,
     TrackStateMachine,
     extract_event_timestamps,
     extract_tracklet_time,
-    make_point_event,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,11 +95,17 @@ def _load_tracklet_type() -> type[Any]:
 
 @dataclass
 class CameraMotionState:
-    """Best-effort camera activity derived from tracklet flow."""
+    """Best-effort camera activity derived from tracklet flow.
+
+    When motion_active is true, active_event_id points at the open
+    motion duration event row being accumulated for this camera.
+    """
 
     motion_active: bool = False
     last_activity_at: float | None = None
     last_timestamps: Any = None
+    active_event_id: str | None = None
+    motion_started_at: datetime | None = None
 
 
 class CameraConfigStore:
@@ -143,6 +152,7 @@ class EventEngineService:
         self._consumer: Any = None
         self._producer: Any = None
         self._emitter: EventEmitter | None = None
+        self._aggregator: MetadataAggregator | None = None
         self._camera_configs: CameraConfigStore | None = None
         self._state_machines: dict[str, TrackStateMachine] = {}
         self._camera_motion: dict[str, CameraMotionState] = {}
@@ -194,6 +204,7 @@ class EventEngineService:
             producer=self._producer,
             output_topic=self.settings.kafka_output_topic,
         )
+        self._aggregator = MetadataAggregator(pool=self._pool)
 
         start_http_server(self.settings.metrics_port)
         logger.info("Metrics server listening on port %d", self.settings.metrics_port)
@@ -337,9 +348,7 @@ class EventEngineService:
         triggers = machine.update(tracklet)
         self._record_transition(previous_state.value, machine.state.value)
 
-        motion_triggers = self._update_camera_motion(tracklet)
-        if motion_triggers:
-            triggers.extend(motion_triggers)
+        await self._maybe_start_motion(tracklet)
 
         filtered_triggers = [t for t in triggers if not self._should_suppress(t)]
         if filtered_triggers:
@@ -363,77 +372,144 @@ class EventEngineService:
                     triggers.extend(machine_triggers)
                 self._record_transition(previous_state.value, machine.state.value)
 
-            triggers.extend(self._check_camera_motion(now))
+            await self._maybe_end_motion(now)
+
             filtered = [t for t in triggers if not self._should_suppress(t)]
             if filtered and self._emitter is not None:
                 await self._emitter.emit_many(filtered)
 
             self._cleanup_cooldowns(now)
 
-    def _update_camera_motion(self, tracklet: Any) -> list[EventTrigger]:
+    async def _maybe_start_motion(self, tracklet: Any) -> None:
+        """Open a 'motion' duration event row when a new motion burst begins."""
         if not self.settings.motion_events_enabled:
-            return []
+            return
         state = getattr(tracklet, "state", None)
         if state not in {TRACKLET_STATE_NEW, TRACKLET_STATE_ACTIVE}:
-            return []
+            return
 
         camera_id = str(tracklet.camera_id)
         event_time = extract_tracklet_time(tracklet)
         now = event_time.timestamp()
         timestamps = extract_event_timestamps(tracklet)
         motion_state = self._camera_motion.setdefault(camera_id, CameraMotionState())
-        triggers: list[EventTrigger] = []
 
         stillness_s = self.settings.motion_stillness_ms / 1000.0
-        if (
+        is_new_burst = (
             not motion_state.motion_active
             and (
                 motion_state.last_activity_at is None
                 or now - motion_state.last_activity_at >= stillness_s
             )
-        ):
-            triggers.append(
-                make_point_event(
-                    event_type=EventType.MOTION_STARTED,
-                    camera_id=camera_id,
-                    track_id=None,
-                    event_time=event_time,
-                    timestamps=timestamps,
-                )
+        )
+        if is_new_burst:
+            event_id = await self._insert_motion_event(
+                camera_id=camera_id,
+                start_time=event_time,
+                timestamps=timestamps,
             )
             motion_state.motion_active = True
+            motion_state.active_event_id = event_id
+            motion_state.motion_started_at = event_time
+            logger.info(
+                "Motion started on %s — event %s at %s",
+                camera_id, event_id, event_time.isoformat(),
+            )
 
         motion_state.last_activity_at = now
         motion_state.last_timestamps = timestamps
-        return triggers
 
-    def _check_camera_motion(self, now: float) -> list[EventTrigger]:
+    async def _maybe_end_motion(self, now: float) -> None:
+        """Close any motion event whose activity has been quiet long enough."""
         if not self.settings.motion_events_enabled:
-            return []
-        triggers: list[EventTrigger] = []
+            return
         for camera_id, motion_state in self._camera_motion.items():
             if (
                 not motion_state.motion_active
                 or motion_state.last_activity_at is None
-                or motion_state.last_timestamps is None
+                or motion_state.active_event_id is None
+                or motion_state.motion_started_at is None
             ):
                 continue
 
             if now - motion_state.last_activity_at >= self.settings.motion_end_duration_s:
-                event_time = datetime_from_epoch(
+                end_time = datetime_from_epoch(
                     motion_state.last_activity_at + self.settings.motion_end_duration_s
                 )
-                triggers.append(
-                    make_point_event(
-                        event_type=EventType.MOTION_ENDED,
-                        camera_id=camera_id,
-                        track_id=None,
-                        event_time=event_time,
-                        timestamps=motion_state.last_timestamps,
-                    )
+                event_id = motion_state.active_event_id
+                start_time = motion_state.motion_started_at
+                await self._close_motion_event(
+                    event_id=event_id,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+                logger.info(
+                    "Motion ended on %s — event %s (duration %.1fs)",
+                    camera_id, event_id, (end_time - start_time).total_seconds(),
                 )
                 motion_state.motion_active = False
-        return triggers
+                motion_state.active_event_id = None
+                motion_state.motion_started_at = None
+
+                if self._aggregator is not None:
+                    try:
+                        await self._aggregator.aggregate(
+                            event_id=event_id,
+                            camera_id=camera_id,
+                            start_time=start_time,
+                            end_time=end_time,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Aggregation failed for motion event %s", event_id,
+                        )
+
+    async def _insert_motion_event(
+        self,
+        camera_id: str,
+        start_time: datetime,
+        timestamps: EventTimestamps,
+    ) -> str:
+        if self._pool is None:
+            raise RuntimeError("pool not initialised")
+        event_id = str(uuid.uuid4())
+        sql = """
+            INSERT INTO events (
+                event_id, event_type, camera_id, start_time, state,
+                clip_source_type,
+                source_capture_ts, edge_receive_ts, core_ingest_ts
+            ) VALUES (
+                $1::uuid, 'motion', $2, $3, 'active',
+                'standalone',
+                $4, $5, $6
+            )
+        """
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                sql,
+                uuid.UUID(event_id), camera_id, start_time,
+                timestamps.source_capture_ts,
+                timestamps.edge_receive_ts,
+                timestamps.core_ingest_ts,
+            )
+        return event_id
+
+    async def _close_motion_event(
+        self,
+        event_id: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> None:
+        if self._pool is None:
+            raise RuntimeError("pool not initialised")
+        duration_ms = max(0, int((end_time - start_time).total_seconds() * 1000))
+        sql = """
+            UPDATE events
+            SET end_time = $2, duration_ms = $3, state = 'closed', updated_at = NOW()
+            WHERE event_id = $1::uuid
+        """
+        async with self._pool.acquire() as conn:
+            await conn.execute(sql, uuid.UUID(event_id), end_time, duration_ms)
 
     def _record_transition(self, from_state: str, to_state: str) -> None:
         if from_state != to_state:

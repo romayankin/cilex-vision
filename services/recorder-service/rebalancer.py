@@ -113,7 +113,7 @@ class TierRebalancer:
             count = await conn.fetchval(
                 """
                 SELECT COUNT(*) FROM events
-                WHERE event_type IN ('entered_scene','motion_started')
+                WHERE event_type IN ('entered_scene','motion','motion_started')
                   AND start_time > NOW() - ($1 * INTERVAL '1 minute')
                 """,
                 self.no_motion_window_min,
