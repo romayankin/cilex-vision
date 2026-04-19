@@ -10,42 +10,22 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Optional
-
-import asyncpg
 
 logger = logging.getLogger(__name__)
 
 
-async def build_segment_range_uri(
-    pool: asyncpg.Pool,
+def build_segment_range_uri(
     camera_id: str,
     start: datetime,
     end: datetime,
-) -> Optional[str]:
-    """Return a playable `range:` URI when hot segments cover the window.
+) -> str:
+    """Return a `range:` URI for the motion window.
 
-    Returns None when no hot video_segments overlap the window — typically
-    because the recorder was down. Callers should persist None rather than
-    a URI that would 404 at play time.
+    We do NOT verify segment existence at this point — recorder-service
+    writes segments asynchronously in 30s chunks, so a short motion event
+    often closes before its covering segment has been finalized and
+    indexed. The URI is resolved at play time by /clips/range (Phase 9),
+    which is already the authoritative check for segment availability
+    (it also handles hot->warm tier migration).
     """
-    async with pool.acquire() as conn:
-        exists = await conn.fetchval(
-            """
-            SELECT EXISTS (
-                SELECT 1 FROM video_segments
-                WHERE camera_id = $1 AND tier = 'hot'
-                  AND start_time < $3 AND end_time > $2
-            )
-            """,
-            camera_id, start, end,
-        )
-
-    if not exists:
-        logger.warning(
-            "No segments overlap motion window on %s (%s to %s); clip_uri will be null",
-            camera_id, start.isoformat(), end.isoformat(),
-        )
-        return None
-
     return f"range:{camera_id}:{start.isoformat()}|{end.isoformat()}"

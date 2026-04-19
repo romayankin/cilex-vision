@@ -506,8 +506,7 @@ class EventEngineService:
         source_type = "segment_range"
 
         if mode in ("continuous", "hybrid"):
-            clip_uri = await build_segment_range_uri(
-                self._pool,
+            clip_uri = build_segment_range_uri(
                 camera_id=camera_id,
                 start=start_time,
                 end=end_time,
