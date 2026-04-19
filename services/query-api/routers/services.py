@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from auth.audit import _client_hostname, _client_ip, _write_audit_log
 from auth.jwt import get_current_user
 from schemas import UserClaims
+from service_watchdog import ONESHOT_CONTAINERS
 from utils.docker_client import (
     get_container_logs,
     list_containers,
@@ -58,6 +59,7 @@ async def list_services(
             "uptime_seconds": c.uptime_seconds,
             "exit_code": c.exit_code,
             "restart_count": c.restart_count,
+            "is_oneshot": c.name in ONESHOT_CONTAINERS,
         }
         rs = restart_states.get(c.name)
         if rs:

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Power } from "lucide-react";
+import { AlertTriangle, Power, Wrench } from "lucide-react";
 import { getToggles, setToggle, type ServiceToggle } from "@/lib/api-client";
 
 const POLL_INTERVAL_MS = 15_000;
@@ -203,9 +203,8 @@ function metaFor(name: string): ServiceMeta {
 }
 
 // One-shot init containers exit cleanly by design — don't count them as down.
-const ONESHOT_CONTAINERS = new Set(["minio-init", "ollama-init"]);
 function isDown(svc: Service): boolean {
-  if (ONESHOT_CONTAINERS.has(svc.name) && svc.status === "exited" && svc.exit_code === 0) {
+  if (svc.is_oneshot && svc.status === "exited" && svc.exit_code === 0) {
     return false;
   }
   return svc.status !== "running";
@@ -229,6 +228,7 @@ interface Service {
   uptime_seconds: number;
   exit_code: number | null;
   restart_count: number;
+  is_oneshot?: boolean;
   watchdog?: WatchdogState;
 }
 
@@ -361,21 +361,24 @@ export default function ServicesPage() {
     return () => window.clearInterval(id);
   }, []);
 
+  const liveServices = useMemo(() => services.filter((s) => !s.is_oneshot), [services]);
+  const oneshotServices = useMemo(() => services.filter((s) => s.is_oneshot), [services]);
+
   const sorted = useMemo(() => {
-    return [...services].sort((a, b) => {
+    return [...liveServices].sort((a, b) => {
       const pDiff = PRIORITY_ORDER[metaFor(a.name).priority] - PRIORITY_ORDER[metaFor(b.name).priority];
       if (pDiff !== 0) return pDiff;
       return a.name.localeCompare(b.name);
     });
-  }, [services]);
+  }, [liveServices]);
 
   const p0Down = useMemo(() => {
-    return services.filter((s) => metaFor(s.name).priority === "P0" && isDown(s));
-  }, [services]);
+    return liveServices.filter((s) => metaFor(s.name).priority === "P0" && isDown(s));
+  }, [liveServices]);
 
   const otherIssues = useMemo(() => {
-    return services.filter((s) => isDown(s) && metaFor(s.name).priority !== "P0").length;
-  }, [services]);
+    return liveServices.filter((s) => isDown(s) && metaFor(s.name).priority !== "P0").length;
+  }, [liveServices]);
 
   // Persist mute preference for the session.
   useEffect(() => {
@@ -628,7 +631,7 @@ export default function ServicesPage() {
         <div>
           <h1 className="text-xl font-semibold">Services</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            {services.length} container{services.length === 1 ? "" : "s"}
+            {liveServices.length} service{liveServices.length === 1 ? "" : "s"}
             {lastUpdate && ` · updated ${lastUpdate.toLocaleTimeString()}`}
             {pausedRef.current && " · auto-refresh paused"}
           </p>
@@ -703,9 +706,9 @@ export default function ServicesPage() {
       )}
 
       <div className="text-sm text-gray-600">
-        {services.length} service{services.length === 1 ? "" : "s"}:
+        {liveServices.length} service{liveServices.length === 1 ? "" : "s"}:
         <span className="text-green-600 font-medium ml-2">
-          {services.filter((s) => s.status === "running").length} running
+          {liveServices.filter((s) => s.status === "running").length} running
         </span>
         {p0Down.length > 0 && (
           <span className="text-red-600 font-medium ml-2">
@@ -759,7 +762,7 @@ export default function ServicesPage() {
                 />
               );
             })}
-            {services.length === 0 && !error && (
+            {liveServices.length === 0 && !error && (
               <tr>
                 <td colSpan={6} className="text-center text-gray-400 py-8 text-sm">
                   No containers found.
@@ -769,6 +772,78 @@ export default function ServicesPage() {
           </tbody>
         </table>
       </div>
+
+      {oneshotServices.length > 0 && (
+        <details className="mt-6 bg-white border border-gray-200 rounded-lg p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <Wrench className="w-4 h-4" />
+            Setup Logs
+            <span className="text-xs text-gray-400 font-normal">
+              ({oneshotServices.length} one-shot container{oneshotServices.length === 1 ? "" : "s"})
+            </span>
+          </summary>
+          <p className="text-xs text-gray-500 mt-2 mb-3">
+            These containers run once on first startup (e.g., model download, bucket creation)
+            and then exit. They&apos;re listed here for diagnostic purposes. An &quot;exited&quot;
+            status with code 0 is normal and expected.
+          </p>
+          <div className="space-y-2">
+            {oneshotServices.map((svc) => {
+              const meta = metaFor(svc.name);
+              const cleanExit = svc.status === "exited" && svc.exit_code === 0;
+              return (
+                <div
+                  key={svc.name}
+                  className="border border-gray-200 rounded p-2 text-xs flex items-center gap-3 flex-wrap"
+                >
+                  <span className="font-mono font-medium">{svc.name}</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded ${
+                      cleanExit
+                        ? "bg-gray-100 text-gray-600"
+                        : svc.status === "running"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {svc.status}
+                    {svc.exit_code !== null && svc.status === "exited" && ` (exit ${svc.exit_code})`}
+                  </span>
+                  <span className="text-gray-500 min-w-0 flex-1">{meta.description}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleLogs(svc.name)}
+                    className="ml-auto text-blue-600 hover:underline"
+                  >
+                    {expandedLogs === svc.name ? "Hide logs" : "View logs"}
+                  </button>
+                </div>
+              );
+            })}
+            {oneshotServices.map((svc) =>
+              expandedLogs === svc.name ? (
+                <div key={`${svc.name}-logs`} className="bg-gray-50 rounded p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-gray-600">
+                      {svc.name} — logs (last 50 lines)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => refreshLogs(svc.name)}
+                      className="text-[10px] text-gray-500 hover:text-gray-900"
+                    >
+                      ↻ refresh
+                    </button>
+                  </div>
+                  <pre className="bg-gray-900 text-gray-100 text-[11px] font-mono p-3 rounded max-h-80 overflow-auto whitespace-pre-wrap">
+                    {logs[svc.name] || "Loading…"}
+                  </pre>
+                </div>
+              ) : null,
+            )}
+          </div>
+        </details>
+      )}
 
       {confirmToggle && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
