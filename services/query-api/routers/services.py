@@ -84,6 +84,18 @@ async def manual_restart(
     if watchdog:
         watchdog.clear_restart_state(name)
 
+    if success:
+        try:
+            async with request.app.state.db_pool.acquire() as conn:
+                await conn.execute(
+                    "UPDATE service_toggles "
+                    "SET enabled = true, updated_at = NOW(), updated_by = $1 "
+                    "WHERE service_name = $2 AND enabled = false",
+                    user.username, name,
+                )
+        except Exception:
+            logger.warning("Failed to clear disabled toggle for %s", name, exc_info=True)
+
     try:
         await _write_audit_log(
             pool=request.app.state.db_pool,

@@ -159,6 +159,20 @@ class ServiceWatchdog:
                 )
                 continue
 
+            # Skip if the admin intentionally disabled this service via toggle.
+            async with self._pool.acquire() as conn:
+                toggle_row = await conn.fetchrow(
+                    "SELECT enabled FROM service_toggles WHERE service_name = $1",
+                    c.name,
+                )
+            if toggle_row is not None and toggle_row["enabled"] is False:
+                logger.debug(
+                    "Skipping restart of '%s' — intentionally disabled via toggle",
+                    c.name,
+                )
+                self._restart_states.pop(c.name, None)
+                continue
+
             # Skip if a hard dependency is down — restarting now would just fail.
             deps = DEPENDENCY_MAP.get(c.name, [])
             deps_down = [
