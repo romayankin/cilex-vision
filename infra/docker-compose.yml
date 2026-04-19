@@ -645,7 +645,7 @@ services:
       EVENT_KAFKA_INPUT_TOPIC: tracklets.local
       EVENT_KAFKA_OUTPUT_TOPIC: events.raw
       EVENT_DB_DSN: "postgresql://cilex:cilex_dev_password@timescaledb:5432/vidanalytics"
-      EVENT_MOTION_EVENTS_ENABLED: "false"
+      EVENT_MOTION_EVENTS_ENABLED: "true"
       EVENT_EVENT_COOLDOWN_S: "10"
       EVENT_HEALTH_PORT: "8081"
       EVENT_LOG_LEVEL: INFO
