@@ -111,6 +111,13 @@ export default function SearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  const [nlpQuery, setNlpQuery] = useState("");
+  const [nlpLoading, setNlpLoading] = useState(false);
+  const [nlpExplanation, setNlpExplanation] = useState<string | null>(null);
+  const [nlpError, setNlpError] = useState<string | null>(null);
+  const [nlpAvailable, setNlpAvailable] = useState<boolean | null>(null);
+  const [nlpResults, setNlpResults] = useState<MotionEvent[] | null>(null);
+
   useEffect(() => {
     fetch("/api/streams", { credentials: "include" })
       .then((r) => r.json())
@@ -119,6 +126,54 @@ export default function SearchPage() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    fetch("/api/search/nlp/status", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setNlpAvailable(d.available === true))
+      .catch(() => setNlpAvailable(false));
+  }, []);
+
+  async function handleNlpSearch() {
+    if (!nlpQuery.trim() || !nlpAvailable) return;
+    setNlpLoading(true);
+    setNlpError(null);
+    setNlpExplanation(null);
+    try {
+      const res = await fetch("/api/search/nlp", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: nlpQuery }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setNlpError(body.detail || `HTTP ${res.status}`);
+        setNlpResults(null);
+        return;
+      }
+      const data = await res.json();
+      if (data.parse_error) {
+        setNlpError(data.explanation);
+        setNlpResults([]);
+        return;
+      }
+      setNlpExplanation(data.explanation);
+      setNlpResults(data.events);
+    } catch (err) {
+      setNlpError(err instanceof Error ? err.message : "Search failed");
+      setNlpResults(null);
+    } finally {
+      setNlpLoading(false);
+    }
+  }
+
+  function clearNlp() {
+    setNlpQuery("");
+    setNlpResults(null);
+    setNlpExplanation(null);
+    setNlpError(null);
+  }
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -156,8 +211,64 @@ export default function SearchPage() {
     };
   }, [query]);
 
+  const displayResults = nlpResults ?? results;
+
   return (
     <div className="space-y-4 p-4">
+      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-2">
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={nlpQuery}
+              onChange={(e) => setNlpQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleNlpSearch()}
+              placeholder={
+                nlpAvailable === false
+                  ? "AI search unavailable — enable ollama in /admin/services"
+                  : nlpAvailable === null
+                    ? "Checking AI availability…"
+                    : "Try: 'red car on cam-1 this morning' or 'motion longer than 2 minutes'"
+              }
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+              disabled={nlpLoading || nlpAvailable === false}
+            />
+            {nlpLoading && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleNlpSearch}
+            disabled={nlpLoading || !nlpQuery.trim() || nlpAvailable !== true}
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {nlpLoading ? "Thinking…" : "AI Search"}
+          </button>
+          {nlpResults !== null && (
+            <button
+              type="button"
+              onClick={clearNlp}
+              className="px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        {nlpExplanation && (
+          <div className="text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded px-2 py-1">
+            ✨ <span className="font-medium">AI understood:</span> {nlpExplanation}
+          </div>
+        )}
+        {nlpError && (
+          <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded px-2 py-1">
+            ⚠ {nlpError}
+          </div>
+        )}
+      </div>
+
       <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
         <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
           <SearchIcon className="w-4 h-4" /> Search filters
@@ -243,10 +354,12 @@ export default function SearchPage() {
             ? "Loading…"
             : error
               ? <span className="text-red-600">{error}</span>
-              : `${results.length} results`}
+              : nlpResults !== null
+                ? `${nlpResults.length} AI-filtered results`
+                : `${results.length} results`}
         </div>
 
-        {results.map((ev) => {
+        {displayResults.map((ev) => {
           const durationS = ev.duration_ms ? ev.duration_ms / 1000 : 0;
           const objectLines = summarizeObjects(ev.metadata);
           const isExpanded = expanded === ev.event_id;
@@ -316,9 +429,11 @@ export default function SearchPage() {
           );
         })}
 
-        {!loading && !error && results.length === 0 && (
+        {!loading && !error && displayResults.length === 0 && (
           <div className="text-center py-8 text-gray-400 text-sm">
-            No motion events match your filters.
+            {nlpResults !== null
+              ? "No motion events match your AI search."
+              : "No motion events match your filters."}
           </div>
         )}
       </div>

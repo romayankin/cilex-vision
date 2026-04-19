@@ -37,6 +37,103 @@ def _parse_jsonb(value: Any) -> dict | None:
     return None
 
 
+def build_metadata_filter_sql(
+    camera_id: str | None = None,
+    camera_ids: list[str] | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    contains_classes: list[str] | None = None,
+    colors: list[str] | None = None,
+    min_duration_s: float | None = None,
+    max_duration_s: float | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[str, list]:
+    """Build a parameterized SQL query against events + metadata_jsonb.
+
+    Shared by /search/nlp and other callers that need motion-event
+    metadata filtering. All user-provided values are bound as
+    parameters, never interpolated into the SQL string — see Phase 5
+    for the injection test. `limit`/`offset` ARE interpolated but are
+    cast to int() first so non-numeric values raise before SQL.
+
+    GET /events has its own expanded filter logic (site_id join,
+    event_type, state, has_clip, RBAC scope) and does NOT use this
+    helper — keep its behavior identical.
+    """
+    conditions = ["event_type = 'motion'", "metadata_jsonb IS NOT NULL"]
+    args: list = []
+    idx = 0
+
+    if camera_id:
+        idx += 1
+        conditions.append(f"camera_id = ${idx}")
+        args.append(camera_id)
+
+    if camera_ids:
+        idx += 1
+        conditions.append(f"camera_id = ANY(${idx}::text[])")
+        args.append(camera_ids)
+
+    if start is not None:
+        idx += 1
+        conditions.append(f"start_time >= ${idx}")
+        args.append(start)
+
+    if end is not None:
+        idx += 1
+        conditions.append(f"start_time <= ${idx}")
+        args.append(end)
+
+    if contains_classes:
+        for cls in contains_classes:
+            idx += 1
+            conditions.append(f"metadata_jsonb @> ${idx}::jsonb")
+            args.append(json.dumps({"objects": {cls: {}}}))
+
+    if colors:
+        for color in colors:
+            upper_idx = idx + 1
+            lower_idx = idx + 2
+            generic_idx = idx + 3
+            idx += 3
+            conditions.append(
+                f"""EXISTS (
+                    SELECT 1 FROM jsonb_each(metadata_jsonb -> 'objects') AS o(cls, info)
+                    WHERE info -> 'attributes' @> ${upper_idx}::jsonb
+                       OR info -> 'attributes' @> ${lower_idx}::jsonb
+                       OR info -> 'attributes' @> ${generic_idx}::jsonb
+                )"""
+            )
+            args.append(json.dumps({"upper_colors": [color]}))
+            args.append(json.dumps({"lower_colors": [color]}))
+            args.append(json.dumps({"colors": [color]}))
+
+    if min_duration_s is not None:
+        idx += 1
+        conditions.append(
+            f"(metadata_jsonb -> 'motion_interval' ->> 'duration_s')::numeric >= ${idx}"
+        )
+        args.append(min_duration_s)
+
+    if max_duration_s is not None:
+        idx += 1
+        conditions.append(
+            f"(metadata_jsonb -> 'motion_interval' ->> 'duration_s')::numeric <= ${idx}"
+        )
+        args.append(max_duration_s)
+
+    sql = f"""
+        SELECT event_id, camera_id, start_time, end_time, duration_ms, state,
+               clip_uri, clip_source_type, metadata_jsonb
+        FROM events
+        WHERE {' AND '.join(conditions)}
+        ORDER BY start_time DESC
+        LIMIT {int(limit)} OFFSET {int(offset)}
+    """
+    return sql, args
+
+
 @router.get(
     "",
     response_model=EventListResponse,
