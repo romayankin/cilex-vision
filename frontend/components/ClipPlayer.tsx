@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 interface ClipPlayerProps {
   uri: string | null;
@@ -34,10 +34,7 @@ function resolveUri(uri: string | null, sourceType: ClipPlayerProps["sourceType"
       `/api/clips/range?camera_id=${encodeURIComponent(cameraId)}` +
       `&start=${encodeURIComponent(start)}` +
       `&end=${encodeURIComponent(end)}`;
-    return {
-      url: rangeEndpoint,
-      unavailableReason: "Range playback ships in Phase 9 — endpoint not deployed yet",
-    };
+    return { url: rangeEndpoint, unavailableReason: null };
   }
 
   return { url: null, unavailableReason: `Unknown source type: ${sourceType ?? "null"}` };
@@ -45,7 +42,7 @@ function resolveUri(uri: string | null, sourceType: ClipPlayerProps["sourceType"
 
 export default function ClipPlayer({ uri, sourceType, className }: ClipPlayerProps) {
   const resolved = useMemo(() => resolveUri(uri, sourceType), [uri, sourceType]);
-  const showPhase9Notice = sourceType === "segment_range";
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   if (!resolved.url) {
     return (
@@ -59,12 +56,25 @@ export default function ClipPlayer({ uri, sourceType, className }: ClipPlayerPro
 
   return (
     <div className={className}>
-      {showPhase9Notice && (
-        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-1">
-          Range playback endpoint ships in Phase 9. If this fails to load, that is expected.
+      <video
+        src={resolved.url}
+        controls
+        autoPlay={false}
+        onError={(e) => {
+          const videoEl = e.currentTarget;
+          setLoadError(
+            videoEl.error?.code === 4
+              ? "Clip format not supported or corrupted"
+              : "Failed to load clip",
+          );
+        }}
+        className="w-full rounded"
+      />
+      {loadError && (
+        <div className="mt-1 text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">
+          {loadError}
         </div>
       )}
-      <video src={resolved.url} controls autoPlay={false} className="w-full rounded" />
     </div>
   );
 }
